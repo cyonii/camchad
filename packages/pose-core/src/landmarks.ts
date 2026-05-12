@@ -1,0 +1,103 @@
+export type LandmarkName =
+  | 'nose'
+  | 'left_eye_inner'
+  | 'left_eye'
+  | 'left_eye_outer'
+  | 'right_eye_inner'
+  | 'right_eye'
+  | 'right_eye_outer'
+  | 'left_ear'
+  | 'right_ear'
+  | 'mouth_left'
+  | 'mouth_right'
+  | 'left_shoulder'
+  | 'right_shoulder'
+  | 'left_elbow'
+  | 'right_elbow'
+  | 'left_wrist'
+  | 'right_wrist'
+  | 'left_pinky'
+  | 'right_pinky'
+  | 'left_index'
+  | 'right_index'
+  | 'left_thumb'
+  | 'right_thumb'
+  | 'left_hip'
+  | 'right_hip'
+  | 'left_knee'
+  | 'right_knee'
+  | 'left_ankle'
+  | 'right_ankle'
+  | 'left_heel'
+  | 'right_heel'
+  | 'left_foot_index'
+  | 'right_foot_index';
+
+export interface PoseLandmark {
+  readonly name: LandmarkName;
+  readonly x: number;
+  readonly y: number;
+  readonly z?: number;
+  readonly visibility?: number;
+  readonly presence?: number;
+}
+
+export type PoseLandmarkMap = ReadonlyMap<LandmarkName, PoseLandmark>;
+
+export interface PoseFrame {
+  readonly timestampMs: number;
+  readonly landmarks: PoseLandmarkMap;
+  readonly worldLandmarks?: PoseLandmarkMap;
+  readonly confidence: number;
+}
+
+export const mediapipeLandmarkNames: readonly LandmarkName[] = [
+  'nose',
+  'left_eye_inner',
+  'left_eye',
+  'left_eye_outer',
+  'right_eye_inner',
+  'right_eye',
+  'right_eye_outer',
+  'left_ear',
+  'right_ear',
+  'mouth_left',
+  'mouth_right',
+  'left_shoulder',
+  'right_shoulder',
+  'left_elbow',
+  'right_elbow',
+  'left_wrist',
+  'right_wrist',
+  'left_pinky',
+  'right_pinky',
+  'left_index',
+  'right_index',
+  'left_thumb',
+  'right_thumb',
+  'left_hip',
+  'right_hip',
+  'left_knee',
+  'right_knee',
+  'left_ankle',
+  'right_ankle',
+  'left_heel',
+  'right_heel',
+  'left_foot_index',
+  'right_foot_index',
+];
+
+export function toLandmarkMap(landmarks: readonly PoseLandmark[]): PoseLandmarkMap {
+  return new Map(landmarks.map((landmark) => [landmark.name, landmark]));
+}
+
+export function requiredLandmarksVisible(
+  frame: PoseFrame,
+  names: readonly LandmarkName[],
+  minVisibility: number,
+): boolean {
+  return names.every((name) => {
+    const landmark = frame.landmarks.get(name);
+    return Boolean(landmark && (landmark.visibility ?? frame.confidence) >= minVisibility);
+  });
+}
