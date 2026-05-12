@@ -301,7 +301,7 @@ function WorkoutView({
 
       stopCamera(videoRef.current);
       setIsPreviewActive(false);
-      const message = error instanceof Error ? error.message : 'Unable to start camera tracking.';
+      const message = describeCameraStartupError(error);
       setCameraError(message);
       setStatus('Setup needed');
     } finally {
@@ -712,6 +712,24 @@ function SettingsView({
       </div>
     </section>
   );
+}
+
+function describeCameraStartupError(error: unknown): string {
+  if (error instanceof DOMException) {
+    if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
+      return 'Camera access was blocked by the operating system. If Home Workout Tracker is not listed in macOS Camera settings, quit the app, reopen it from /Applications, and press Start again to trigger the system prompt.';
+    }
+
+    if (error.name === 'NotFoundError') {
+      return 'No camera was found. Connect a camera and try again.';
+    }
+
+    if (error.name === 'NotReadableError') {
+      return 'The camera is already in use by another app. Close the other app and try again.';
+    }
+  }
+
+  return error instanceof Error ? error.message : 'Unable to start camera tracking.';
 }
 
 function NavButton({

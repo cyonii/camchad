@@ -17,6 +17,8 @@ npmRebuild: false
 mac:
   category: public.app-category.healthcare-fitness
   icon: build/icon.icns
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
   target:
     - dir
   extendInfo:

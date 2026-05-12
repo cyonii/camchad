@@ -150,16 +150,17 @@ async function ensureCameraPermission(): Promise<CameraPermissionResult> {
     return {
       granted: false,
       reason:
-        'Camera permission is blocked for this app. Enable it in macOS System Settings, then restart the app.',
+        'Camera access is blocked for Home Workout Tracker. Enable it in macOS System Settings > Privacy & Security > Camera, then restart the app.',
     };
   }
 
   const granted = await systemPreferences.askForMediaAccess('camera');
+
   return {
     granted,
     reason: granted
       ? undefined
-      : 'Camera permission was not granted. Enable it in macOS System Settings, then restart the app.',
+      : 'Camera access was not granted. Reopen Home Workout Tracker from /Applications and press Start to request access again.',
   };
 }
 
