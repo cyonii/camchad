@@ -10,10 +10,10 @@
     "target": "ES2022",
     "baseUrl": ".",
     "paths": {
-      "@home-workout/pose-core": ["packages/pose-core/src/index.ts"],
-      "@home-workout/movement-core": ["packages/movement-core/src/index.ts"],
-      "@home-workout/workout-history": ["packages/workout-history/src/index.ts"],
-      "@home-workout/ui": ["packages/ui/src/index.ts"]
+      "@home-activity/pose-core": ["packages/pose-core/src/index.ts"],
+      "@home-activity/movement-core": ["packages/movement-core/src/index.ts"],
+      "@home-activity/activity-history": ["packages/activity-history/src/index.ts"],
+      "@home-activity/ui": ["packages/ui/src/index.ts"]
     },
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true

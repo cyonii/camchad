@@ -1,5 +1,5 @@
 {
-  "name": "@home-workout/movement-core",
+  "name": "@home-activity/movement-core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,6 +17,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@home-workout/pose-core": "0.1.0"
+    "@home-activity/pose-core": "0.1.0"
   }
 }

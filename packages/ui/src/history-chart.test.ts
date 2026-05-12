@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { WorkoutSession } from '@home-workout/workout-history';
+import type { ActivitySession } from '@home-activity/activity-history';
 
 import { buildHistoryChartModel } from './history-chart.js';
 
@@ -11,12 +11,12 @@ describe('buildHistoryChartModel', () => {
     expect(model).toEqual({
       points: expect.arrayContaining([
         expect.objectContaining({
-          hasWorkout: false,
+          hasActivity: false,
           totalReps: 0,
         }),
       ]),
       maxReps: 10,
-      hasWorkouts: false,
+      hasActivities: false,
       totalValidReps: 0,
       totalPartialReps: 0,
     });
@@ -33,21 +33,21 @@ describe('buildHistoryChartModel', () => {
       new Date('2026-05-12T08:00:00.000Z'),
     );
 
-    const workoutPoint = model.points.find((point) => point.hasWorkout);
+    const activityPoint = model.points.find((point) => point.hasActivity);
 
-    expect(workoutPoint).toMatchObject({
+    expect(activityPoint).toMatchObject({
       validReps: 8,
       partialReps: 3,
       totalReps: 11,
     });
-    expect(model.points.some((point) => !point.hasWorkout)).toBe(true);
+    expect(model.points.some((point) => !point.hasActivity)).toBe(true);
     expect(model.maxReps).toBe(20);
-    expect(model.hasWorkouts).toBe(true);
+    expect(model.hasActivities).toBe(true);
     expect(model.totalValidReps).toBe(8);
     expect(model.totalPartialReps).toBe(3);
   });
 
-  it('uses a minimum visual scale so tiny workouts do not fill the graph', () => {
+  it('uses a minimum visual scale so tiny activities do not fill the graph', () => {
     const model = buildHistoryChartModel(
       [session('tiny', '2026-05-12T08:00:00.000Z', 1, 0)],
       12,
@@ -55,7 +55,7 @@ describe('buildHistoryChartModel', () => {
     );
 
     expect(model.maxReps).toBe(10);
-    expect(model.points.find((point) => point.hasWorkout)?.totalReps).toBe(1);
+    expect(model.points.find((point) => point.hasActivity)?.totalReps).toBe(1);
   });
 });
 
@@ -64,12 +64,12 @@ function session(
   startedAt: string,
   validReps: number,
   partialReps: number,
-): WorkoutSession {
+): ActivitySession {
   return {
     id,
     startedAt,
     durationSeconds: 60,
-    exercises: [
+    movements: [
       {
         id: `set-${id}`,
         movementType: 'push_up',

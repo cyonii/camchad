@@ -5,13 +5,13 @@ import {
   browserAppLifecycleClient,
   browserCameraPermissionClient,
   localBrowserHistoryClient,
-  WorkoutApp,
-} from '@home-workout/ui';
-import '@home-workout/ui/styles.css';
+  ActivityApp,
+} from '@home-activity/ui';
+import '@home-activity/ui/styles.css';
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <WorkoutApp
+    <ActivityApp
       assets={{
         logoAssetPath: '/logo.png',
         modelAssetPath: '/vendor/mediapipe/models/pose_landmarker_lite.task',

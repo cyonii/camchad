@@ -174,7 +174,7 @@ button:disabled {
 button,
 .metric,
 .telemetry-panel,
-.workout-stage-panel,
+.activity-stage-panel,
 .chart-panel,
 .settings-list,
 .history-list {
@@ -374,7 +374,7 @@ button,
   background: linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 22%);
 }
 
-.workout-layout {
+.activity-layout {
   display: grid;
   height: calc(100vh - 60px);
   min-height: 0;
@@ -383,21 +383,21 @@ button,
   overflow: hidden;
 }
 
-.workout-command-grid {
+.activity-command-grid {
   display: grid;
   min-height: 0;
   gap: 14px;
 }
 
-.telemetry-fixed .workout-command-grid {
+.telemetry-fixed .activity-command-grid {
   grid-template-columns: minmax(0, 1fr) 382px;
 }
 
-.telemetry-engraved .workout-command-grid {
+.telemetry-engraved .activity-command-grid {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.workout-stage-panel {
+.activity-stage-panel {
   position: relative;
   min-height: 0;
   overflow: hidden;
@@ -412,15 +412,15 @@ button,
     inset 0 0 0 1px rgb(255 255 255 / 3%);
 }
 
-.workout-stage-panel::before,
-.workout-stage-panel::after {
+.activity-stage-panel::before,
+.activity-stage-panel::after {
   position: absolute;
   z-index: 2;
   pointer-events: none;
   content: '';
 }
 
-.workout-stage-panel::before {
+.activity-stage-panel::before {
   inset: 0;
   background:
     linear-gradient(90deg, rgb(255 255 255 / 8%) 1px, transparent 1px),
@@ -429,7 +429,7 @@ button,
   opacity: 0.1;
 }
 
-.workout-stage-panel::after {
+.activity-stage-panel::after {
   inset: auto 0 0;
   height: 28%;
   background: linear-gradient(180deg, transparent, rgb(0 0 0 / 34%));
@@ -1324,7 +1324,7 @@ button,
     grid-template-columns: 220px minmax(0, 1fr);
   }
 
-  .telemetry-fixed .workout-command-grid {
+  .telemetry-fixed .activity-command-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 

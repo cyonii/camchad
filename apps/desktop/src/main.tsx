@@ -1,23 +1,23 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 
-import type { CameraPermissionResult, WorkoutPlatform } from '@home-workout/ui';
-import { WorkoutApp } from '@home-workout/ui';
-import '@home-workout/ui/styles.css';
-import type { WorkoutSession, WorkoutSummary } from '@home-workout/workout-history';
+import type { CameraPermissionResult, ActivityPlatform } from '@home-activity/ui';
+import { ActivityApp } from '@home-activity/ui';
+import '@home-activity/ui/styles.css';
+import type { ActivitySession, ActivitySummary } from '@home-activity/activity-history';
 
-const desktopApi = window.homeWorkout;
+const desktopApi = window.homeActivity;
 
-const platform: WorkoutPlatform = {
+const platform: ActivityPlatform = {
   history: {
-    async list(): Promise<readonly WorkoutSession[]> {
-      return (await desktopApi.history.list()) as readonly WorkoutSession[];
+    async list(): Promise<readonly ActivitySession[]> {
+      return (await desktopApi.history.list()) as readonly ActivitySession[];
     },
-    async save(session: WorkoutSession): Promise<void> {
+    async save(session: ActivitySession): Promise<void> {
       await desktopApi.history.save(session);
     },
-    async summary(): Promise<WorkoutSummary> {
-      return (await desktopApi.history.summary()) as WorkoutSummary;
+    async summary(): Promise<ActivitySummary> {
+      return (await desktopApi.history.summary()) as ActivitySummary;
     },
   },
   cameraPermission: {
@@ -30,7 +30,7 @@ const platform: WorkoutPlatform = {
     setStartupEnabled: (enabled) => desktopApi.settings.setStartupEnabled(enabled),
   },
   notifications: {
-    workoutReminder: (body) => desktopApi.notifications.workoutReminder(body),
+    activityReminder: (body) => desktopApi.notifications.activityReminder(body),
   },
   appLifecycle: {
     exit: () => desktopApi.app.exit(),
@@ -39,7 +39,7 @@ const platform: WorkoutPlatform = {
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <WorkoutApp
+    <ActivityApp
       assets={{
         logoAssetPath: './logo.png',
         modelAssetPath: './vendor/mediapipe/models/pose_landmarker_lite.task',

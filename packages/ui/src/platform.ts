@@ -1,4 +1,4 @@
-import type { WorkoutSession, WorkoutSummary } from '@home-workout/workout-history';
+import type { ActivitySession, ActivitySummary } from '@home-activity/activity-history';
 
 export interface CameraPermissionResult {
   readonly granted: boolean;
@@ -6,9 +6,9 @@ export interface CameraPermissionResult {
 }
 
 export interface HistoryClient {
-  list(): Promise<readonly WorkoutSession[]>;
-  save(session: WorkoutSession): Promise<void>;
-  summary(): Promise<WorkoutSummary>;
+  list(): Promise<readonly ActivitySession[]>;
+  save(session: ActivitySession): Promise<void>;
+  summary(): Promise<ActivitySummary>;
 }
 
 export interface SettingsClient {
@@ -17,7 +17,7 @@ export interface SettingsClient {
 }
 
 export interface NotificationClient {
-  workoutReminder(body: string): Promise<void>;
+  activityReminder(body: string): Promise<void>;
 }
 
 export interface CameraPermissionClient {
@@ -28,7 +28,7 @@ export interface AppLifecycleClient {
   exit(): Promise<void>;
 }
 
-export interface WorkoutPlatform {
+export interface ActivityPlatform {
   readonly history: HistoryClient;
   readonly settings?: SettingsClient;
   readonly notifications?: NotificationClient;
@@ -37,26 +37,26 @@ export interface WorkoutPlatform {
 }
 
 export const localBrowserHistoryClient: HistoryClient = {
-  async list(): Promise<readonly WorkoutSession[]> {
+  async list(): Promise<readonly ActivitySession[]> {
     return readLocalSessions();
   },
 
-  async save(session: WorkoutSession): Promise<void> {
+  async save(session: ActivitySession): Promise<void> {
     const sessions = readLocalSessions();
     const nextSessions = [session, ...sessions.filter((existing) => existing.id !== session.id)];
-    localStorage.setItem('home-workout:sessions', JSON.stringify(nextSessions));
+    localStorage.setItem('home-activity:sessions', JSON.stringify(nextSessions));
   },
 
-  async summary(): Promise<WorkoutSummary> {
+  async summary(): Promise<ActivitySummary> {
     const sessions = readLocalSessions();
-    const exercises = sessions.flatMap((session) => session.exercises);
+    const movements = sessions.flatMap((session) => session.movements);
 
     return {
       totalSessions: sessions.length,
-      totalReps: exercises.reduce((sum, exercise) => sum + exercise.reps, 0),
-      validReps: exercises.reduce((sum, exercise) => sum + exercise.validReps, 0),
-      partialReps: exercises.reduce((sum, exercise) => sum + exercise.partialReps, 0),
-      lastWorkoutAt: sessions[0]?.startedAt,
+      totalReps: movements.reduce((sum, movement) => sum + movement.reps, 0),
+      validReps: movements.reduce((sum, movement) => sum + movement.validReps, 0),
+      partialReps: movements.reduce((sum, movement) => sum + movement.partialReps, 0),
+      lastActivityAt: sessions[0]?.startedAt,
     };
   },
 };
@@ -77,6 +77,19 @@ export const browserAppLifecycleClient: AppLifecycleClient = {
   },
 };
 
-function readLocalSessions(): readonly WorkoutSession[] {
-  return JSON.parse(localStorage.getItem('home-workout:sessions') ?? '[]') as WorkoutSession[];
+function readLocalSessions(): readonly ActivitySession[] {
+  const raw =
+    localStorage.getItem('home-activity:sessions') ??
+    localStorage.getItem('home-workout:sessions') ??
+    '[]';
+  const sessions = JSON.parse(raw) as readonly LegacyActivitySession[];
+
+  return sessions.map((session) => ({
+    ...session,
+    movements: session.movements ?? session.exercises ?? [],
+  }));
 }
+
+type LegacyActivitySession = ActivitySession & {
+  readonly exercises?: ActivitySession['movements'];
+};

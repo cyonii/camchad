@@ -2,7 +2,7 @@
 
 declare global {
   interface Window {
-    homeWorkout: {
+    homeActivity: {
       history: {
         list(): Promise<unknown>;
         save(session: unknown): Promise<void>;
@@ -16,7 +16,7 @@ declare global {
         setStartupEnabled(enabled: boolean): Promise<void>;
       };
       notifications: {
-        workoutReminder(body: string): Promise<void>;
+        activityReminder(body: string): Promise<void>;
       };
       app: {
         exit(): Promise<void>;

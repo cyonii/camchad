@@ -3,7 +3,7 @@ import {
   type LandmarkName,
   type PoseFrame,
   type PoseLandmark,
-} from '@home-workout/pose-core';
+} from '@home-activity/pose-core';
 
 interface PushUpFrameOptions {
   readonly timestampMs: number;

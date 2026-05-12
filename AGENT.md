@@ -7,9 +7,9 @@ Treat this repository as production-grade software. Optimise for correctness, re
 - Build in small, reviewable commits with meaningful messages.
 - Before committing follow-up work, decide whether the request extends or corrects a recent commit. If it does, amend or autosquash into that commit instead of creating a separate history entry.
 - Validate formatting, linting, type checking, and tests before every commit once tooling exists.
-- Keep architecture explicit: desktop shell, web shell, pose estimation, exercise detection, session history, and storage must remain separately understandable.
-- Do not couple exercise detectors to a specific pose model. Pose engines are adapters; detectors consume normalized pose frames.
-- Treat camera access, local video, and workout history as private user data.
+- Keep architecture explicit: desktop shell, web shell, pose estimation, movement detection, session history, and storage must remain separately understandable.
+- Do not couple movement detectors to a specific pose model. Pose engines are adapters; detectors consume normalized pose frames.
+- Treat camera access, local video, and activity history as private user data.
 - Avoid telemetry, cloud upload, backend services, or external inference unless the product direction explicitly changes.
 - Prefer deterministic state machines over threshold snippets hidden in UI code.
 - When behavior depends on thresholds, name them, configure them, and test representative edge cases.
@@ -18,9 +18,9 @@ Treat this repository as production-grade software. Optimise for correctness, re
 
 - Start desktop-first with Electron, React, and TypeScript.
 - Include a web renderer path because camera behavior is easier to test in browsers and the user wants eventual web/mobile reach.
-- First exercise is push-ups only. Keep detector registration extensible for squats and other indoor exercises.
+- First movement is push-ups only. Keep detector registration extensible for squats and other indoor movements.
 - Support side-view push-up tracking as the reliable default, with diagonal/front modes treated as less reliable until validated.
-- Save a neat local exercise log with sessions, sets, rep events, and form warnings.
+- Save a neat local movement log with sessions, sets, rep events, and form warnings.
 - Local video recording is a later opt-in feature, not a default.
 
 ## Lessons Already Learned

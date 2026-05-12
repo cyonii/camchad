@@ -1,6 +1,6 @@
-# Home Workout Tracker
+# Home Activity Tracker
 
-Local-first camera-based home workout tracker. The desktop app is the first-class target, with shared packages designed for web and future mobile reuse.
+Local-first camera-based home activity tracker. The desktop app is the first-class target, with shared packages designed for web and future mobile reuse.
 
 ## Initial Scope
 
@@ -8,7 +8,7 @@ Local-first camera-based home workout tracker. The desktop app is the first-clas
 - React and TypeScript UI.
 - Push-up tracking first.
 - Local-only pose inference.
-- Local workout history.
+- Local activity history.
 - Camera-angle options with side view as the recommended default.
 - Repository hygiene from the start: formatting, linting, type checking, tests, pre-commit validation, and CI.
 
@@ -18,7 +18,7 @@ Local-first camera-based home workout tracker. The desktop app is the first-clas
 - No cloud upload.
 - No telemetry.
 - Camera frames stay local.
-- Workout history is stored locally.
+- Activity history is stored locally.
 
 ## Architecture Target
 
@@ -30,7 +30,7 @@ apps/
 packages/
   pose-core/
   movement-core/
-  workout-history/
+  activity-history/
   ui/
 ```
 
@@ -74,14 +74,14 @@ npm run package:desktop
 The package command runs the full production build first, then creates an unpacked macOS app bundle under:
 
 ```text
-release/desktop/mac-*/Home Workout Tracker.app
+release/desktop/mac-*/Home Activity Tracker.app
 ```
 
 Install it into the normal macOS Applications folder:
 
 ```bash
-rm -rf "/Applications/Home Workout Tracker.app"
-ditto "release/desktop/mac-arm64/Home Workout Tracker.app" "/Applications/Home Workout Tracker.app"
+rm -rf "/Applications/Home Activity Tracker.app"
+ditto "release/desktop/mac-arm64/Home Activity Tracker.app" "/Applications/Home Activity Tracker.app"
 ```
 
 If your output directory differs, replace `mac-arm64` with the directory that exists under `release/desktop`.
@@ -91,8 +91,8 @@ This local package is ad-hoc signed for development. For a distributable release
 After rebuilding, reinstall the app bundle if you want the copy in `/Applications` to reflect the latest local build:
 
 ```bash
-rm -rf "/Applications/Home Workout Tracker.app"
-ditto "release/desktop/mac-arm64/Home Workout Tracker.app" "/Applications/Home Workout Tracker.app"
+rm -rf "/Applications/Home Activity Tracker.app"
+ditto "release/desktop/mac-arm64/Home Activity Tracker.app" "/Applications/Home Activity Tracker.app"
 ```
 
 ## Camera Notes
@@ -106,7 +106,7 @@ During local development, macOS can still attribute camera access to the launche
 If the packaged app still does not appear under System Settings > Privacy & Security > Camera after pressing Start, reset only this app's camera privacy entry and open it again from `/Applications`:
 
 ```bash
-tccutil reset Camera app.homeworkout.tracker
+tccutil reset Camera app.homeactivity.tracker
 ```
 
 A distributable macOS build should add camera usage metadata, signing, and notarization before it is treated as production-ready.

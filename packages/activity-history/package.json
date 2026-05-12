@@ -1,5 +1,5 @@
 {
-  "name": "@home-workout/workout-history",
+  "name": "@home-activity/activity-history",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,6 +17,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@home-workout/movement-core": "0.1.0"
+    "@home-activity/movement-core": "0.1.0"
   }
 }

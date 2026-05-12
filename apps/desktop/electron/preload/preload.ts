@@ -15,12 +15,12 @@ const api = {
       ipcRenderer.invoke('settings:set-startup-enabled', enabled),
   },
   notifications: {
-    workoutReminder: (body: string): Promise<void> =>
-      ipcRenderer.invoke('notify:workout-reminder', body),
+    activityReminder: (body: string): Promise<void> =>
+      ipcRenderer.invoke('notify:activity-reminder', body),
   },
   app: {
     exit: (): Promise<void> => ipcRenderer.invoke('app:exit'),
   },
 };
 
-contextBridge.exposeInMainWorld('homeWorkout', api);
+contextBridge.exposeInMainWorld('homeActivity', api);

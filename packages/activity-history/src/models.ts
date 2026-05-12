@@ -1,15 +1,20 @@
-import type { CameraAngle, MovementType, FormWarning, RepEvent } from '@home-workout/movement-core';
+import type {
+  CameraAngle,
+  MovementType,
+  FormWarning,
+  RepEvent,
+} from '@home-activity/movement-core';
 
-export interface WorkoutSession {
+export interface ActivitySession {
   readonly id: string;
   readonly startedAt: string;
   readonly endedAt?: string;
   readonly durationSeconds?: number;
-  readonly exercises: readonly ExerciseSet[];
+  readonly movements: readonly MovementSegment[];
   readonly notes?: string;
 }
 
-export interface ExerciseSet {
+export interface MovementSegment {
   readonly id: string;
   readonly movementType: MovementType;
   readonly cameraAngle: CameraAngle;
@@ -29,10 +34,10 @@ export interface VideoRecording {
   readonly sizeBytes: number;
 }
 
-export interface WorkoutSummary {
+export interface ActivitySummary {
   readonly totalSessions: number;
   readonly totalReps: number;
   readonly validReps: number;
   readonly partialReps: number;
-  readonly lastWorkoutAt?: string;
+  readonly lastActivityAt?: string;
 }

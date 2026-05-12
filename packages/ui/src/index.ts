@@ -1,2 +1,2 @@
 export * from './platform.js';
-export * from './WorkoutApp.js';
+export * from './ActivityApp.js';

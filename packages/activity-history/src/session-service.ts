@@ -3,10 +3,10 @@ import type {
   MovementInterpreterState,
   MovementType,
   RepEvent,
-} from '@home-workout/movement-core';
+} from '@home-activity/movement-core';
 
-import type { ExerciseSet, WorkoutSession } from './models.js';
-import type { WorkoutRepository } from './workout-repository.js';
+import type { MovementSegment, ActivitySession } from './models.js';
+import type { ActivityRepository } from './activity-repository.js';
 
 export interface Clock {
   now(): Date;
@@ -28,42 +28,42 @@ export class CryptoIdGenerator implements IdGenerator {
   }
 }
 
-export class WorkoutSessionService {
-  private activeSession?: WorkoutSession;
-  private activeSet?: ExerciseSet;
+export class ActivitySessionService {
+  private activeSession?: ActivitySession;
+  private activeSegment?: MovementSegment;
   private recordedRepNumbers = new Set<number>();
 
   public constructor(
-    private readonly repository: WorkoutRepository,
+    private readonly repository: ActivityRepository,
     private readonly clock: Clock = new SystemClock(),
     private readonly ids: IdGenerator = new CryptoIdGenerator(),
   ) {}
 
-  public startSession(): WorkoutSession {
+  public startSession(): ActivitySession {
     if (this.activeSession) {
-      throw new Error('A workout session is already active.');
+      throw new Error('An activity session is already active.');
     }
 
     this.activeSession = {
       id: this.ids.createId('session'),
       startedAt: this.clock.now().toISOString(),
-      exercises: [],
+      movements: [],
     };
 
     return this.activeSession;
   }
 
-  public startExercise(movementType: MovementType, cameraAngle: CameraAngle): ExerciseSet {
+  public startMovement(movementType: MovementType, cameraAngle: CameraAngle): MovementSegment {
     if (!this.activeSession) {
-      throw new Error('Cannot start an exercise without an active workout session.');
+      throw new Error('Cannot start a movement without an active activity session.');
     }
 
-    if (this.activeSet) {
-      throw new Error('An exercise set is already active.');
+    if (this.activeSegment) {
+      throw new Error('A movement segment is already active.');
     }
 
     this.recordedRepNumbers = new Set();
-    this.activeSet = {
+    this.activeSegment = {
       id: this.ids.createId('set'),
       movementType,
       cameraAngle,
@@ -75,64 +75,64 @@ export class WorkoutSessionService {
       repEvents: [],
     };
 
-    return this.activeSet;
+    return this.activeSegment;
   }
 
-  public updateExercise(state: MovementInterpreterState): ExerciseSet {
-    if (!this.activeSet) {
-      throw new Error('Cannot update exercise because no exercise set is active.');
+  public updateMovement(state: MovementInterpreterState): MovementSegment {
+    if (!this.activeSegment) {
+      throw new Error('Cannot update movement because no movement segment is active.');
     }
 
-    const repEvents = [...this.activeSet.repEvents];
+    const repEvents = [...this.activeSegment.repEvents];
 
     if (state.lastRep && !this.recordedRepNumbers.has(state.lastRep.repNumber)) {
       repEvents.push(state.lastRep);
       this.recordedRepNumbers.add(state.lastRep.repNumber);
     }
 
-    this.activeSet = {
-      ...this.activeSet,
+    this.activeSegment = {
+      ...this.activeSegment,
       reps: state.reps,
       validReps: state.validReps,
       partialReps: state.partialReps,
-      formWarnings: mergeWarnings(this.activeSet.formWarnings, state.warnings),
+      formWarnings: mergeWarnings(this.activeSegment.formWarnings, state.warnings),
       repEvents,
     };
 
-    return this.activeSet;
+    return this.activeSegment;
   }
 
-  public endExercise(): ExerciseSet {
-    if (!this.activeSession || !this.activeSet) {
-      throw new Error('Cannot end exercise because no exercise set is active.');
+  public endMovement(): MovementSegment {
+    if (!this.activeSession || !this.activeSegment) {
+      throw new Error('Cannot end movement because no movement segment is active.');
     }
 
-    const completedSet: ExerciseSet = {
-      ...this.activeSet,
+    const completedSet: MovementSegment = {
+      ...this.activeSegment,
       endedAt: this.clock.now().toISOString(),
     };
 
     this.activeSession = {
       ...this.activeSession,
-      exercises: [...this.activeSession.exercises, completedSet],
+      movements: [...this.activeSession.movements, completedSet],
     };
-    this.activeSet = undefined;
+    this.activeSegment = undefined;
 
     return completedSet;
   }
 
-  public async endSession(notes?: string): Promise<WorkoutSession> {
+  public async endSession(notes?: string): Promise<ActivitySession> {
     if (!this.activeSession) {
-      throw new Error('Cannot end workout because no session is active.');
+      throw new Error('Cannot end activity because no session is active.');
     }
 
-    if (this.activeSet) {
-      this.endExercise();
+    if (this.activeSegment) {
+      this.endMovement();
     }
 
     const endedAt = this.clock.now();
     const startedAt = new Date(this.activeSession.startedAt);
-    const completedSession: WorkoutSession = {
+    const completedSession: ActivitySession = {
       ...this.activeSession,
       endedAt: endedAt.toISOString(),
       durationSeconds: Math.max(0, Math.round((endedAt.getTime() - startedAt.getTime()) / 1000)),
@@ -145,15 +145,15 @@ export class WorkoutSessionService {
     return completedSession;
   }
 
-  public getActiveSession(): WorkoutSession | undefined {
+  public getActiveSession(): ActivitySession | undefined {
     return this.activeSession;
   }
 }
 
 function mergeWarnings(
-  existing: readonly ExerciseSet['formWarnings'][number][],
-  incoming: readonly ExerciseSet['formWarnings'][number][],
-): readonly ExerciseSet['formWarnings'][number][] {
+  existing: readonly MovementSegment['formWarnings'][number][],
+  incoming: readonly MovementSegment['formWarnings'][number][],
+): readonly MovementSegment['formWarnings'][number][] {
   const byCode = new Map(existing.map((warning) => [warning.code, warning]));
 
   for (const warning of incoming) {

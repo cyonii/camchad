@@ -1,10 +1,10 @@
-import type { WorkoutSession } from '@home-workout/workout-history';
+import type { ActivitySession } from '@home-activity/activity-history';
 
 export interface HistoryChartPoint {
   readonly sessionId: string;
   readonly label: string;
   readonly startedAt: string;
-  readonly hasWorkout: boolean;
+  readonly hasActivity: boolean;
   readonly validReps: number;
   readonly partialReps: number;
   readonly totalReps: number;
@@ -14,17 +14,17 @@ export interface HistoryChartPoint {
 export interface HistoryChartModel {
   readonly points: readonly HistoryChartPoint[];
   readonly maxReps: number;
-  readonly hasWorkouts: boolean;
+  readonly hasActivities: boolean;
   readonly totalValidReps: number;
   readonly totalPartialReps: number;
 }
 
 export function buildHistoryChartModel(
-  sessions: readonly WorkoutSession[],
+  sessions: readonly ActivitySession[],
   maxPoints = 12,
   referenceDate = new Date(),
 ): HistoryChartModel {
-  const sessionsByDay = new Map<string, readonly WorkoutSession[]>();
+  const sessionsByDay = new Map<string, readonly ActivitySession[]>();
 
   for (const session of sessions) {
     const key = dayKey(new Date(session.startedAt));
@@ -40,15 +40,15 @@ export function buildHistoryChartModel(
     date.setDate(firstDay.getDate() + index);
     const key = dayKey(date);
     const daySessions = sessionsByDay.get(key) ?? [];
-    const exercises = daySessions.flatMap((session) => session.exercises);
-    const validReps = exercises.reduce((sum, exercise) => sum + exercise.validReps, 0);
-    const partialReps = exercises.reduce((sum, exercise) => sum + exercise.partialReps, 0);
+    const movements = daySessions.flatMap((session) => session.movements);
+    const validReps = movements.reduce((sum, movement) => sum + movement.validReps, 0);
+    const partialReps = movements.reduce((sum, movement) => sum + movement.partialReps, 0);
 
     return {
       sessionId: `day-${key}`,
       label: compactDate(date.toISOString()),
       startedAt: date.toISOString(),
-      hasWorkout: daySessions.length > 0,
+      hasActivity: daySessions.length > 0,
       validReps,
       partialReps,
       totalReps: validReps + partialReps,
@@ -64,7 +64,7 @@ export function buildHistoryChartModel(
   return {
     points,
     maxReps: niceRepCeiling(Math.max(10, maxObservedReps)),
-    hasWorkouts: points.some((point) => point.hasWorkout),
+    hasActivities: points.some((point) => point.hasActivity),
     totalValidReps: points.reduce((sum, point) => sum + point.validReps, 0),
     totalPartialReps: points.reduce((sum, point) => sum + point.partialReps, 0),
   };

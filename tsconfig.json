@@ -8,7 +8,7 @@
       "path": "./packages/movement-core"
     },
     {
-      "path": "./packages/workout-history"
+      "path": "./packages/activity-history"
     },
     {
       "path": "./packages/ui"

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type { MovementInterpreterState } from '@home-workout/movement-core';
+import type { MovementInterpreterState } from '@home-activity/movement-core';
 
 import type { Clock, IdGenerator } from './session-service.js';
-import { repEvent, WorkoutSessionService } from './session-service.js';
-import { InMemoryWorkoutRepository } from './workout-repository.js';
+import { repEvent, ActivitySessionService } from './session-service.js';
+import { InMemoryActivityRepository } from './activity-repository.js';
 
 class FixedClock implements Clock {
   private index = 0;
@@ -27,10 +27,10 @@ class SequentialIds implements IdGenerator {
   }
 }
 
-describe('WorkoutSessionService', () => {
-  it('records a completed workout session with one exercise set', async () => {
-    const repository = new InMemoryWorkoutRepository();
-    const service = new WorkoutSessionService(
+describe('ActivitySessionService', () => {
+  it('records a completed activity session with one movement segment', async () => {
+    const repository = new InMemoryActivityRepository();
+    const service = new ActivitySessionService(
       repository,
       new FixedClock([
         new Date('2026-05-12T07:00:00.000Z'),
@@ -42,8 +42,8 @@ describe('WorkoutSessionService', () => {
     );
 
     service.startSession();
-    service.startExercise('push_up', 'side');
-    service.updateExercise(
+    service.startMovement('push_up', 'side');
+    service.updateMovement(
       movementState({
         movementType: 'push_up',
         phase: 'top',
@@ -55,33 +55,33 @@ describe('WorkoutSessionService', () => {
         metrics: {},
       }),
     );
-    service.endExercise();
+    service.endMovement();
     const session = await service.endSession('Felt steady.');
 
     expect(session.id).toBe('session_1');
     expect(session.durationSeconds).toBe(125);
-    expect(session.exercises).toHaveLength(1);
-    expect(session.exercises[0]?.repEvents).toHaveLength(1);
+    expect(session.movements).toHaveLength(1);
+    expect(session.movements[0]?.repEvents).toHaveLength(1);
     expect(await repository.summary()).toEqual({
       totalSessions: 1,
       totalReps: 1,
       validReps: 1,
       partialReps: 0,
-      lastWorkoutAt: '2026-05-12T07:00:00.000Z',
+      lastActivityAt: '2026-05-12T07:00:00.000Z',
     });
   });
 
   it('does not duplicate repeated lastRep updates from detector state', () => {
-    const service = new WorkoutSessionService(
-      new InMemoryWorkoutRepository(),
+    const service = new ActivitySessionService(
+      new InMemoryActivityRepository(),
       new FixedClock([new Date('2026-05-12T07:00:00.000Z')]),
       new SequentialIds(),
     );
     const firstRep = repEvent(1);
 
     service.startSession();
-    service.startExercise('push_up', 'side');
-    service.updateExercise(
+    service.startMovement('push_up', 'side');
+    service.updateMovement(
       movementState({
         movementType: 'push_up',
         phase: 'top',
@@ -93,7 +93,7 @@ describe('WorkoutSessionService', () => {
         metrics: {},
       }),
     );
-    const set = service.updateExercise(
+    const set = service.updateMovement(
       movementState({
         movementType: 'push_up',
         phase: 'top',

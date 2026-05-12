@@ -1,9 +1,9 @@
 {
-  "name": "@home-workout/desktop",
+  "name": "@home-activity/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Local-first camera-based home workout tracker desktop app.",
-  "author": "Home Workout Tracker",
+  "description": "Local-first camera-based home activity tracker desktop app.",
+  "author": "Home Activity Tracker",
   "type": "module",
   "main": "dist-electron/main/main.js",
   "scripts": {
@@ -14,7 +14,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@home-workout/ui": "0.1.0",
+    "@home-activity/ui": "0.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

@@ -1,4 +1,4 @@
-import type { PoseFrame } from '@home-workout/pose-core';
+import type { PoseFrame } from '@home-activity/pose-core';
 
 export type MovementType = 'push_up';
 

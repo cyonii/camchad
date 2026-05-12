@@ -19,33 +19,37 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
 
-import type { CameraAngle, MovementInterpreterState, RepEvent } from '@home-workout/movement-core';
-import { defaultPushUpConfig, PushUpMovementInterpreter } from '@home-workout/movement-core';
+import type { CameraAngle, MovementInterpreterState, RepEvent } from '@home-activity/movement-core';
+import { defaultPushUpConfig, PushUpMovementInterpreter } from '@home-activity/movement-core';
 import {
   ExponentialPoseSmoother,
   MediaPipePoseEstimator,
   type LandmarkName,
   type PoseEstimator,
   type PoseFrame,
-} from '@home-workout/pose-core';
-import type { ExerciseSet, WorkoutSession, WorkoutSummary } from '@home-workout/workout-history';
+} from '@home-activity/pose-core';
+import type {
+  MovementSegment,
+  ActivitySession,
+  ActivitySummary,
+} from '@home-activity/activity-history';
 
-import type { WorkoutPlatform } from './platform.js';
+import type { ActivityPlatform } from './platform.js';
 import { buildHistoryChartModel, type HistoryChartModel } from './history-chart.js';
 
-type View = 'workout' | 'history' | 'settings';
+type View = 'activity' | 'history' | 'settings';
 type ThemePreference = 'system' | 'light' | 'dark';
 type TelemetryMode = 'fixed' | 'engraved';
 
-export interface WorkoutAssets {
+export interface ActivityAssets {
   readonly logoAssetPath?: string;
   readonly modelAssetPath: string;
   readonly wasmAssetPath: string;
 }
 
-export interface WorkoutAppProps {
-  readonly assets: WorkoutAssets;
-  readonly platform: WorkoutPlatform;
+export interface ActivityAppProps {
+  readonly assets: ActivityAssets;
+  readonly platform: ActivityPlatform;
 }
 
 const initialDetectorState: MovementInterpreterState = {
@@ -63,14 +67,14 @@ const initialDetectorState: MovementInterpreterState = {
   metrics: {},
 };
 
-const themePreferenceStorageKey = 'home-workout:theme-preference';
-const telemetryModeStorageKey = 'home-workout:telemetry-mode';
+const themePreferenceStorageKey = 'home-activity:theme-preference';
+const telemetryModeStorageKey = 'home-activity:telemetry-mode';
 const poseInferenceIntervalMs = 80;
 
-export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement {
-  const [view, setView] = useState<View>('workout');
-  const [sessions, setSessions] = useState<readonly WorkoutSession[]>([]);
-  const [summary, setSummary] = useState<WorkoutSummary>({
+export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElement {
+  const [view, setView] = useState<View>('activity');
+  const [sessions, setSessions] = useState<readonly ActivitySession[]>([]);
+  const [summary, setSummary] = useState<ActivitySummary>({
     totalSessions: 0,
     totalReps: 0,
     validReps: 0,
@@ -101,7 +105,7 @@ export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement 
   }, [themePreference]);
 
   const saveSession = useCallback(
-    async (session: WorkoutSession) => {
+    async (session: ActivitySession) => {
       await platform.history.save(session);
       await loadHistory();
     },
@@ -120,7 +124,7 @@ export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement 
             <img className="brand-logo" src={assets.logoAssetPath ?? '/logo.png'} alt="" />
           </div>
           <div>
-            <strong>Home Workout</strong>
+            <strong>Home Activity</strong>
             <span>Local tracker</span>
           </div>
         </div>
@@ -128,10 +132,10 @@ export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement 
         <nav className="nav-list" aria-label="Primary">
           <NavButton
             icon={<Activity size={18} />}
-            active={view === 'workout'}
-            onClick={() => setView('workout')}
+            active={view === 'activity'}
+            onClick={() => setView('activity')}
           >
-            Workout
+            Activity
           </NavButton>
           <NavButton
             icon={<History size={18} />}
@@ -167,8 +171,8 @@ export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement 
       </aside>
 
       <main className="main-content">
-        {view === 'workout' ? (
-          <WorkoutView assets={assets} platform={platform} onSessionSaved={saveSession} />
+        {view === 'activity' ? (
+          <ActivityView assets={assets} platform={platform} onSessionSaved={saveSession} />
         ) : null}
         {view === 'history' ? <HistoryView sessions={sessions} summary={summary} /> : null}
         {view === 'settings' ? (
@@ -185,14 +189,14 @@ export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement 
   );
 }
 
-function WorkoutView({
+function ActivityView({
   assets,
   platform,
   onSessionSaved,
 }: {
-  readonly assets: WorkoutAssets;
-  readonly platform: WorkoutPlatform;
-  readonly onSessionSaved: (session: WorkoutSession) => Promise<void>;
+  readonly assets: ActivityAssets;
+  readonly platform: ActivityPlatform;
+  readonly onSessionSaved: (session: ActivitySession) => Promise<void>;
 }): ReactElement {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -200,7 +204,7 @@ function WorkoutView({
   const smootherRef = useRef(new ExponentialPoseSmoother());
   const detectorRef = useRef(new PushUpMovementInterpreter());
   const animationFrameRef = useRef<number | undefined>(undefined);
-  const sessionRef = useRef<WorkoutSession | undefined>(undefined);
+  const sessionRef = useRef<ActivitySession | undefined>(undefined);
   const repEventsRef = useRef<RepEvent[]>([]);
   const seenRepNumbersRef = useRef(new Set<number>());
   const startTokenRef = useRef(0);
@@ -264,7 +268,7 @@ function WorkoutView({
     animationFrameRef.current = requestAnimationFrame(processFrame);
   }, []);
 
-  const startWorkout = useCallback(async () => {
+  const startActivity = useCallback(async () => {
     if (startInFlightRef.current || isTracking) {
       return;
     }
@@ -374,7 +378,7 @@ function WorkoutView({
     processFrame,
   ]);
 
-  const stopWorkout = useCallback(async () => {
+  const stopActivity = useCallback(async () => {
     startTokenRef.current += 1;
     startInFlightRef.current = false;
     setIsStarting(false);
@@ -400,21 +404,21 @@ function WorkoutView({
         0,
         Math.round((endedAt.getTime() - new Date(activeSession.startedAt).getTime()) / 1000),
       );
-      const exerciseSet = createExerciseSet(
+      const movementSet = createMovementSegment(
         activeSession.startedAt,
         endedAt.toISOString(),
         cameraAngle,
         detectorStateRef.current,
         [...repEventsRef.current],
       );
-      const completedSession: WorkoutSession = {
+      const completedSession: ActivitySession = {
         ...activeSession,
         endedAt: endedAt.toISOString(),
         durationSeconds,
-        exercises: [exerciseSet],
+        movements: [movementSet],
       };
 
-      if (exerciseSet.reps > 0 || durationSeconds > 3) {
+      if (movementSet.reps > 0 || durationSeconds > 3) {
         await onSessionSaved(completedSession);
       }
     }
@@ -426,9 +430,9 @@ function WorkoutView({
   }, [cameraAngle, onSessionSaved]);
 
   return (
-    <section className={`workout-layout telemetry-${telemetryMode}`}>
-      <div className="workout-command-grid">
-        <div className="workout-stage-panel">
+    <section className={`activity-layout telemetry-${telemetryMode}`}>
+      <div className="activity-command-grid">
+        <div className="activity-stage-panel">
           <div className="video-stage">
             <video ref={videoRef} muted playsInline autoPlay />
             <canvas ref={canvasRef} />
@@ -495,7 +499,7 @@ function WorkoutView({
           <span>Session</span>
           <div className="control-row">
             {!isTracking && !isStarting ? (
-              <button className="primary-action" type="button" onClick={() => void startWorkout()}>
+              <button className="primary-action" type="button" onClick={() => void startActivity()}>
                 <Play size={18} aria-hidden="true" />
                 Start
               </button>
@@ -505,7 +509,7 @@ function WorkoutView({
                   <Pause size={18} aria-hidden="true" />
                   {isStarting ? 'Starting' : 'Pause'}
                 </button>
-                <button className="danger-action" type="button" onClick={() => void stopWorkout()}>
+                <button className="danger-action" type="button" onClick={() => void stopActivity()}>
                   <Square size={18} aria-hidden="true" />
                   Stop
                 </button>
@@ -735,8 +739,8 @@ function HistoryView({
   sessions,
   summary,
 }: {
-  readonly sessions: readonly WorkoutSession[];
-  readonly summary: WorkoutSummary;
+  readonly sessions: readonly ActivitySession[];
+  readonly summary: ActivitySummary;
 }): ReactElement {
   const chartModel = buildHistoryChartModel(sessions);
 
@@ -744,8 +748,8 @@ function HistoryView({
     <section className="stack">
       <div className="page-heading">
         <div>
-          <span>Exercise log</span>
-          <h1>Workout history</h1>
+          <span>Movement log</span>
+          <h1>Activity history</h1>
         </div>
         <div className="summary-strip">
           <Metric label="Sessions" value={String(summary.totalSessions)} />
@@ -754,24 +758,24 @@ function HistoryView({
         </div>
       </div>
 
-      <WorkoutLogChart model={chartModel} />
+      <ActivityLogChart model={chartModel} />
 
       <div className="history-list">
         {sessions.length === 0 ? (
-          <div className="empty-state">No saved workouts yet.</div>
+          <div className="empty-state">No saved activities yet.</div>
         ) : (
           sessions.map((session) => {
-            const exercise = session.exercises[0];
+            const movement = session.movements[0];
 
             return (
               <article className="history-item" key={session.id}>
                 <div>
                   <strong>{formatDate(session.startedAt)}</strong>
-                  <span>{exercise ? `${exercise.validReps} push-ups` : 'No exercise set'}</span>
+                  <span>{movement ? `${movement.validReps} push-ups` : 'No movement segment'}</span>
                 </div>
                 <div>
                   <span>{session.durationSeconds ?? 0}s</span>
-                  <small>{exercise?.formWarnings.length ?? 0} warnings</small>
+                  <small>{movement?.formWarnings.length ?? 0} warnings</small>
                 </div>
               </article>
             );
@@ -782,7 +786,7 @@ function HistoryView({
   );
 }
 
-function WorkoutLogChart({ model }: { readonly model: HistoryChartModel }): ReactElement {
+function ActivityLogChart({ model }: { readonly model: HistoryChartModel }): ReactElement {
   const chartWidth = 720;
   const chartHeight = 240;
   const padding = { top: 24, right: 28, bottom: 44, left: 44 };
@@ -798,11 +802,11 @@ function WorkoutLogChart({ model }: { readonly model: HistoryChartModel }): Reac
         );
 
   return (
-    <section className="chart-panel" aria-labelledby="workout-chart-title">
+    <section className="chart-panel" aria-labelledby="activity-chart-title">
       <div className="chart-heading">
         <div>
           <span>Progress</span>
-          <h2 id="workout-chart-title">Reps by workout</h2>
+          <h2 id="activity-chart-title">Reps by activity</h2>
         </div>
         <div className="chart-legend" aria-label="Chart legend">
           <span>
@@ -816,11 +820,11 @@ function WorkoutLogChart({ model }: { readonly model: HistoryChartModel }): Reac
         </div>
       </div>
 
-      {!model.hasWorkouts ? (
-        <div className="chart-empty">Complete a workout to see rep trends.</div>
+      {!model.hasActivities ? (
+        <div className="chart-empty">Complete an activity to see rep trends.</div>
       ) : (
         <svg className="rep-chart" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img">
-          <title>Valid and partial push-up reps by workout</title>
+          <title>Valid and partial push-up reps by activity</title>
           <line
             className="chart-axis"
             x1={padding.left}
@@ -857,9 +861,9 @@ function WorkoutLogChart({ model }: { readonly model: HistoryChartModel }): Reac
             return (
               <g key={point.sessionId}>
                 <title>
-                  {point.hasWorkout
+                  {point.hasActivity
                     ? `${point.label}: ${point.validReps} valid, ${point.partialReps} partial reps`
-                    : `${point.label}: no workout`}
+                    : `${point.label}: no activity`}
                 </title>
                 {point.totalReps > 0 ? (
                   <rect
@@ -924,7 +928,7 @@ function SettingsView({
   themePreference,
   onThemePreferenceChange,
 }: {
-  readonly platform: WorkoutPlatform;
+  readonly platform: ActivityPlatform;
   readonly startupEnabled: boolean;
   readonly onStartupEnabledChange: (enabled: boolean) => void;
   readonly themePreference: ThemePreference;
@@ -980,7 +984,7 @@ function SettingsView({
             type="button"
             disabled={!canUseNotifications}
             onClick={() => {
-              void platform.notifications?.workoutReminder('Time for a short push-up session.');
+              void platform.notifications?.activityReminder('Time for a short push-up session.');
               setReminderStatus('Reminder sent.');
             }}
             aria-label="Send reminder"
@@ -1118,14 +1122,14 @@ function writeTelemetryMode(mode: TelemetryMode): void {
   try {
     localStorage.setItem(telemetryModeStorageKey, mode);
   } catch {
-    // A blocked storage write should not prevent live workout tracking.
+    // A blocked storage write should not prevent live activity tracking.
   }
 }
 
 function describeCameraStartupError(error: unknown): string {
   if (error instanceof DOMException) {
     if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
-      return 'Camera access was blocked by the operating system. If Home Workout Tracker is not listed in macOS Camera settings, quit the app, reopen it from /Applications, and press Start again to trigger the system prompt.';
+      return 'Camera access was blocked by the operating system. If Home Activity Tracker is not listed in macOS Camera settings, quit the app, reopen it from /Applications, and press Start again to trigger the system prompt.';
     }
 
     if (error.name === 'NotFoundError') {
@@ -1174,22 +1178,22 @@ function Metric({
   );
 }
 
-function createSession(): WorkoutSession {
+function createSession(): ActivitySession {
   return {
     id: `session_${crypto.randomUUID()}`,
     startedAt: new Date().toISOString(),
-    exercises: [],
+    movements: [],
     notes: undefined,
   };
 }
 
-function createExerciseSet(
+function createMovementSegment(
   startedAt: string,
   endedAt: string,
   cameraAngle: CameraAngle,
   state: MovementInterpreterState,
   repEvents: readonly RepEvent[],
-): ExerciseSet {
+): MovementSegment {
   return {
     id: `set_${crypto.randomUUID()}`,
     movementType: 'push_up',
