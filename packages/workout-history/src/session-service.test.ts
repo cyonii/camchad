@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { MovementInterpreterState } from '@home-workout/movement-core';
+
 import type { Clock, IdGenerator } from './session-service.js';
 import { repEvent, WorkoutSessionService } from './session-service.js';
 import { InMemoryWorkoutRepository } from './workout-repository.js';
@@ -41,16 +43,18 @@ describe('WorkoutSessionService', () => {
 
     service.startSession();
     service.startExercise('push_up', 'side');
-    service.updateExercise({
-      exerciseType: 'push_up',
-      phase: 'top',
-      reps: 1,
-      validReps: 1,
-      partialReps: 0,
-      lastRep: repEvent(1),
-      warnings: [],
-      metrics: {},
-    });
+    service.updateExercise(
+      movementState({
+        movementType: 'push_up',
+        phase: 'top',
+        reps: 1,
+        validReps: 1,
+        partialReps: 0,
+        lastRep: repEvent(1),
+        warnings: [],
+        metrics: {},
+      }),
+    );
     service.endExercise();
     const session = await service.endSession('Felt steady.');
 
@@ -77,27 +81,50 @@ describe('WorkoutSessionService', () => {
 
     service.startSession();
     service.startExercise('push_up', 'side');
-    service.updateExercise({
-      exerciseType: 'push_up',
-      phase: 'top',
-      reps: 1,
-      validReps: 1,
-      partialReps: 0,
-      lastRep: firstRep,
-      warnings: [],
-      metrics: {},
-    });
-    const set = service.updateExercise({
-      exerciseType: 'push_up',
-      phase: 'top',
-      reps: 1,
-      validReps: 1,
-      partialReps: 0,
-      lastRep: firstRep,
-      warnings: [],
-      metrics: {},
-    });
+    service.updateExercise(
+      movementState({
+        movementType: 'push_up',
+        phase: 'top',
+        reps: 1,
+        validReps: 1,
+        partialReps: 0,
+        lastRep: firstRep,
+        warnings: [],
+        metrics: {},
+      }),
+    );
+    const set = service.updateExercise(
+      movementState({
+        movementType: 'push_up',
+        phase: 'top',
+        reps: 1,
+        validReps: 1,
+        partialReps: 0,
+        lastRep: firstRep,
+        warnings: [],
+        metrics: {},
+      }),
+    );
 
     expect(set.repEvents).toHaveLength(1);
   });
 });
+
+function movementState(overrides: Partial<MovementInterpreterState>): MovementInterpreterState {
+  return {
+    movementType: 'push_up',
+    recognition: {
+      movementType: 'push_up',
+      confidence: 0.95,
+      status: 'active',
+      evidence: ['test'],
+    },
+    phase: 'setup_needed',
+    reps: 0,
+    validReps: 0,
+    partialReps: 0,
+    warnings: [],
+    metrics: {},
+    ...overrides,
+  };
+}

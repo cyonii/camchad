@@ -1,4 +1,4 @@
-import type { CameraAngle, ExerciseType, FormWarning, RepEvent } from '@home-workout/movement-core';
+import type { CameraAngle, MovementType, FormWarning, RepEvent } from '@home-workout/movement-core';
 
 export interface WorkoutSession {
   readonly id: string;
@@ -11,7 +11,7 @@ export interface WorkoutSession {
 
 export interface ExerciseSet {
   readonly id: string;
-  readonly exerciseType: ExerciseType;
+  readonly movementType: MovementType;
   readonly cameraAngle: CameraAngle;
   readonly startedAt: string;
   readonly endedAt?: string;

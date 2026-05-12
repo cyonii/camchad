@@ -1,10 +1,10 @@
 import type { PoseFrame } from '@home-workout/pose-core';
 
-export type ExerciseType = 'push_up';
+export type MovementType = 'push_up';
 
 export type CameraAngle = 'side' | 'front_diagonal';
 
-export type ExerciseDetectorPhase =
+export type MovementPhase =
   | 'tracking_lost'
   | 'setup_needed'
   | 'top'
@@ -32,9 +32,19 @@ export interface RepEvent {
   readonly warnings: readonly FormWarning[];
 }
 
-export interface ExerciseDetectorState {
-  readonly exerciseType: ExerciseType;
-  readonly phase: ExerciseDetectorPhase;
+export type MovementRecognitionStatus = 'tracking_lost' | 'candidate' | 'active';
+
+export interface MovementRecognition {
+  readonly movementType?: MovementType;
+  readonly confidence: number;
+  readonly status: MovementRecognitionStatus;
+  readonly evidence: readonly string[];
+}
+
+export interface MovementInterpreterState {
+  readonly movementType: MovementType;
+  readonly recognition: MovementRecognition;
+  readonly phase: MovementPhase;
   readonly reps: number;
   readonly validReps: number;
   readonly partialReps: number;
@@ -43,9 +53,9 @@ export interface ExerciseDetectorState {
   readonly metrics: Readonly<Record<string, number>>;
 }
 
-export interface ExerciseDetector {
-  readonly exerciseType: ExerciseType;
-  processPose(frame: PoseFrame | undefined): ExerciseDetectorState;
+export interface MovementInterpreter {
+  readonly movementType: MovementType;
+  processPose(frame: PoseFrame | undefined): MovementInterpreterState;
   reset(): void;
-  getState(): ExerciseDetectorState;
+  getState(): MovementInterpreterState;
 }

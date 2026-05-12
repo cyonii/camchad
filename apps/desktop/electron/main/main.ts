@@ -31,7 +31,7 @@ interface FormWarning {
 
 interface ExerciseSet {
   readonly id: string;
-  readonly exerciseType: string;
+  readonly movementType: string;
   readonly cameraAngle: string;
   readonly startedAt: string;
   readonly endedAt?: string;

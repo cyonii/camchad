@@ -8,14 +8,15 @@ import {
 
 import type {
   CameraAngle,
-  ExerciseDetector,
-  ExerciseDetectorPhase,
-  ExerciseDetectorState,
+  MovementInterpreter,
+  MovementPhase,
+  MovementInterpreterState,
+  MovementRecognition,
   FormWarning,
   RepEvent,
-} from './exercise-detector.js';
+} from './movement-interpreter.js';
 
-export interface PushUpDetectorConfig {
+export interface PushUpMovementInterpreterConfig {
   readonly cameraAngle: CameraAngle;
   readonly minVisibility: number;
   readonly topElbowAngle: number;
@@ -25,7 +26,7 @@ export interface PushUpDetectorConfig {
   readonly minBottomHoldMs: number;
 }
 
-export const defaultPushUpConfig: PushUpDetectorConfig = {
+export const defaultPushUpConfig: PushUpMovementInterpreterConfig = {
   cameraAngle: 'side',
   minVisibility: 0.45,
   topElbowAngle: 148,
@@ -35,10 +36,10 @@ export const defaultPushUpConfig: PushUpDetectorConfig = {
   minBottomHoldMs: 80,
 };
 
-export class PushUpDetector implements ExerciseDetector {
-  public readonly exerciseType = 'push_up';
+export class PushUpMovementInterpreter implements MovementInterpreter {
+  public readonly movementType = 'push_up';
 
-  private phase: ExerciseDetectorPhase = 'setup_needed';
+  private phase: MovementPhase = 'setup_needed';
   private reps = 0;
   private validReps = 0;
   private partialReps = 0;
@@ -47,13 +48,17 @@ export class PushUpDetector implements ExerciseDetector {
   private lowestElbowAngle = 180;
   private warnings: FormWarning[] = [];
   private metrics: Record<string, number> = {};
+  private recognition: MovementRecognition = trackingLostRecognition;
 
-  public constructor(private readonly config: PushUpDetectorConfig = defaultPushUpConfig) {}
+  public constructor(
+    private readonly config: PushUpMovementInterpreterConfig = defaultPushUpConfig,
+  ) {}
 
-  public processPose(frame: PoseFrame | undefined): ExerciseDetectorState {
+  public processPose(frame: PoseFrame | undefined): MovementInterpreterState {
     if (!frame) {
       this.phase = 'tracking_lost';
       this.warnings = [trackingLostWarning];
+      this.recognition = trackingLostRecognition;
       return this.getState();
     }
 
@@ -62,10 +67,11 @@ export class PushUpDetector implements ExerciseDetector {
     if (!trackingSide) {
       this.phase = 'tracking_lost';
       this.warnings = [lowConfidenceWarning];
+      this.recognition = trackingLostRecognition;
       return this.getState();
     }
 
-    const sample = readPushUpSample(frame, trackingSide);
+    const sample = readPushUpSample(frame, trackingSide.side);
     const elbowAngle = sample.elbowAngle;
     const bodyLineDeviation = sample.bodyLineDeviation;
     const alignmentScore = clamp01(1 - bodyLineDeviation / this.config.maxBodyLineDeviation);
@@ -80,7 +86,8 @@ export class PushUpDetector implements ExerciseDetector {
       bodyLineDeviation,
       alignmentScore,
       poseConfidence: frame.confidence,
-      trackingSide: trackingSide === 'left' ? 0 : 1,
+      movementConfidence: movementConfidence(frame.confidence, trackingSide.visibilityScore),
+      trackingSide: trackingSide.side === 'left' ? 0 : 1,
       shoulderY: sample.shoulder.y,
       hipY: sample.hip.y,
     };
@@ -88,6 +95,7 @@ export class PushUpDetector implements ExerciseDetector {
 
     if (hasInvalidAlignment) {
       this.phase = 'invalid_form';
+      this.recognition = this.buildRecognition('active');
       return this.getState();
     }
 
@@ -138,6 +146,10 @@ export class PushUpDetector implements ExerciseDetector {
         break;
     }
 
+    this.recognition = this.buildRecognition(
+      this.phase === 'setup_needed' ? 'candidate' : 'active',
+    );
+
     return this.getState();
   }
 
@@ -151,11 +163,13 @@ export class PushUpDetector implements ExerciseDetector {
     this.lowestElbowAngle = 180;
     this.warnings = [];
     this.metrics = {};
+    this.recognition = trackingLostRecognition;
   }
 
-  public getState(): ExerciseDetectorState {
+  public getState(): MovementInterpreterState {
     return {
-      exerciseType: this.exerciseType,
+      movementType: this.movementType,
+      recognition: this.recognition,
       phase: this.phase,
       reps: this.reps,
       validReps: this.validReps,
@@ -184,6 +198,15 @@ export class PushUpDetector implements ExerciseDetector {
     }
 
     return warnings;
+  }
+
+  private buildRecognition(status: MovementRecognition['status']): MovementRecognition {
+    return {
+      movementType: this.movementType,
+      confidence: this.metrics.movementConfidence ?? 0,
+      status,
+      evidence: ['side_landmark_visibility', 'elbow_flexion_signal', 'body_line_signal'],
+    };
   }
 
   private recordValidRep(timestampMs: number, alignmentScore: number): void {
@@ -242,6 +265,11 @@ interface PushUpSample {
 
 type TrackingSide = 'left' | 'right';
 
+interface TrackingSideSelection {
+  readonly side: TrackingSide;
+  readonly visibilityScore: number;
+}
+
 function readPushUpSample(frame: PoseFrame, side: TrackingSide): PushUpSample {
   const shoulder = mustGet(frame, `${side}_shoulder` as LandmarkName);
   const elbow = mustGet(frame, `${side}_elbow` as LandmarkName);
@@ -257,7 +285,10 @@ function readPushUpSample(frame: PoseFrame, side: TrackingSide): PushUpSample {
   };
 }
 
-function selectTrackingSide(frame: PoseFrame, minVisibility: number): TrackingSide | undefined {
+function selectTrackingSide(
+  frame: PoseFrame,
+  minVisibility: number,
+): TrackingSideSelection | undefined {
   const leftScore = sideVisibilityScore(frame, 'left', minVisibility);
   const rightScore = sideVisibilityScore(frame, 'right', minVisibility);
 
@@ -266,14 +297,16 @@ function selectTrackingSide(frame: PoseFrame, minVisibility: number): TrackingSi
   }
 
   if (rightScore === undefined) {
-    return 'left';
+    return { side: 'left', visibilityScore: leftScore ?? 0 };
   }
 
   if (leftScore === undefined) {
-    return 'right';
+    return { side: 'right', visibilityScore: rightScore };
   }
 
-  return leftScore >= rightScore ? 'left' : 'right';
+  return leftScore >= rightScore
+    ? { side: 'left', visibilityScore: leftScore }
+    : { side: 'right', visibilityScore: rightScore };
 }
 
 function sideVisibilityScore(
@@ -315,6 +348,16 @@ function landmarkVisibility(landmark: PoseLandmark | undefined): number {
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
+
+function movementConfidence(poseConfidence: number, trackingVisibility: number): number {
+  return clamp01(poseConfidence * 0.55 + trackingVisibility * 0.45);
+}
+
+const trackingLostRecognition: MovementRecognition = {
+  confidence: 0,
+  status: 'tracking_lost',
+  evidence: [],
+};
 
 const trackingLostWarning: FormWarning = {
   code: 'tracking_lost',

@@ -1,3 +1,3 @@
-export * from './exercise-detector.js';
-export * from './exercise-registry.js';
-export * from './push-up-detector.js';
+export * from './movement-interpreter.js';
+export * from './movement-registry.js';
+export * from './push-up-interpreter.js';

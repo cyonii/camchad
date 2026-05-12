@@ -1,7 +1,7 @@
 import type {
   CameraAngle,
-  ExerciseDetectorState,
-  ExerciseType,
+  MovementInterpreterState,
+  MovementType,
   RepEvent,
 } from '@home-workout/movement-core';
 
@@ -53,7 +53,7 @@ export class WorkoutSessionService {
     return this.activeSession;
   }
 
-  public startExercise(exerciseType: ExerciseType, cameraAngle: CameraAngle): ExerciseSet {
+  public startExercise(movementType: MovementType, cameraAngle: CameraAngle): ExerciseSet {
     if (!this.activeSession) {
       throw new Error('Cannot start an exercise without an active workout session.');
     }
@@ -65,7 +65,7 @@ export class WorkoutSessionService {
     this.recordedRepNumbers = new Set();
     this.activeSet = {
       id: this.ids.createId('set'),
-      exerciseType,
+      movementType,
       cameraAngle,
       startedAt: this.clock.now().toISOString(),
       reps: 0,
@@ -78,7 +78,7 @@ export class WorkoutSessionService {
     return this.activeSet;
   }
 
-  public updateExercise(state: ExerciseDetectorState): ExerciseSet {
+  public updateExercise(state: MovementInterpreterState): ExerciseSet {
     if (!this.activeSet) {
       throw new Error('Cannot update exercise because no exercise set is active.');
     }

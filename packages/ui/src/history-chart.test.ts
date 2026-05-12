@@ -72,7 +72,7 @@ function session(
     exercises: [
       {
         id: `set-${id}`,
-        exerciseType: 'push_up',
+        movementType: 'push_up',
         cameraAngle: 'side',
         startedAt,
         reps: validReps + partialReps,

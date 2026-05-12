@@ -19,8 +19,8 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
 
-import type { CameraAngle, ExerciseDetectorState, RepEvent } from '@home-workout/movement-core';
-import { defaultPushUpConfig, PushUpDetector } from '@home-workout/movement-core';
+import type { CameraAngle, MovementInterpreterState, RepEvent } from '@home-workout/movement-core';
+import { defaultPushUpConfig, PushUpMovementInterpreter } from '@home-workout/movement-core';
 import {
   ExponentialPoseSmoother,
   MediaPipePoseEstimator,
@@ -48,8 +48,13 @@ export interface WorkoutAppProps {
   readonly platform: WorkoutPlatform;
 }
 
-const initialDetectorState: ExerciseDetectorState = {
-  exerciseType: 'push_up',
+const initialDetectorState: MovementInterpreterState = {
+  movementType: 'push_up',
+  recognition: {
+    confidence: 0,
+    status: 'tracking_lost',
+    evidence: [],
+  },
   phase: 'setup_needed',
   reps: 0,
   validReps: 0,
@@ -193,7 +198,7 @@ function WorkoutView({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const estimatorRef = useRef<PoseEstimator | null>(null);
   const smootherRef = useRef(new ExponentialPoseSmoother());
-  const detectorRef = useRef(new PushUpDetector());
+  const detectorRef = useRef(new PushUpMovementInterpreter());
   const animationFrameRef = useRef<number | undefined>(undefined);
   const sessionRef = useRef<WorkoutSession | undefined>(undefined);
   const repEventsRef = useRef<RepEvent[]>([]);
@@ -201,14 +206,15 @@ function WorkoutView({
   const startTokenRef = useRef(0);
   const startInFlightRef = useRef(false);
   const lastInferenceAtRef = useRef(0);
-  const detectorStateRef = useRef<ExerciseDetectorState>(initialDetectorState);
+  const detectorStateRef = useRef<MovementInterpreterState>(initialDetectorState);
 
   const [cameraAngle, setCameraAngle] = useState<CameraAngle>('side');
   const [isStarting, setIsStarting] = useState(false);
   const [isPreviewActive, setIsPreviewActive] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
   const [status, setStatus] = useState('Ready');
-  const [detectorState, setDetectorState] = useState<ExerciseDetectorState>(initialDetectorState);
+  const [detectorState, setDetectorState] =
+    useState<MovementInterpreterState>(initialDetectorState);
   const [cameraError, setCameraError] = useState<string | undefined>();
   const [telemetryMode, setTelemetryMode] = useState<TelemetryMode>(() => readTelemetryMode());
 
@@ -313,7 +319,7 @@ function WorkoutView({
       }
 
       setStatus('Starting pose engine');
-      detectorRef.current = new PushUpDetector({
+      detectorRef.current = new PushUpMovementInterpreter({
         ...defaultPushUpConfig,
         cameraAngle,
       });
@@ -539,7 +545,7 @@ function StageTelemetryChrome({
 
 interface SidebarTelemetryProps {
   readonly status: string;
-  readonly detectorState: ExerciseDetectorState;
+  readonly detectorState: MovementInterpreterState;
   readonly telemetryMode: TelemetryMode;
   readonly onTelemetryModeChange: (mode: TelemetryMode) => void;
 }
@@ -1181,12 +1187,12 @@ function createExerciseSet(
   startedAt: string,
   endedAt: string,
   cameraAngle: CameraAngle,
-  state: ExerciseDetectorState,
+  state: MovementInterpreterState,
   repEvents: readonly RepEvent[],
 ): ExerciseSet {
   return {
     id: `set_${crypto.randomUUID()}`,
-    exerciseType: 'push_up',
+    movementType: 'push_up',
     cameraAngle,
     startedAt,
     endedAt,

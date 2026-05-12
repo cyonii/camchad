@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { PushUpDetector } from './push-up-detector.js';
+import { PushUpMovementInterpreter } from './push-up-interpreter.js';
 import { makePushUpFrame } from './test-fixtures.js';
 
-describe('PushUpDetector', () => {
+describe('PushUpMovementInterpreter', () => {
   it('counts a complete top-bottom-top push-up once', () => {
-    const detector = new PushUpDetector();
+    const detector = new PushUpMovementInterpreter();
 
     detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
     detector.processPose(makePushUpFrame({ timestampMs: 100, elbowAngle: 130 }));
@@ -20,8 +20,22 @@ describe('PushUpDetector', () => {
     expect(state.lastRep?.depthScore).toBe(1);
   });
 
+  it('recognizes push-up movement before validating a complete rep', () => {
+    const interpreter = new PushUpMovementInterpreter();
+
+    interpreter.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
+    const state = interpreter.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 132 }));
+
+    expect(state.recognition).toMatchObject({
+      movementType: 'push_up',
+      status: 'active',
+    });
+    expect(state.recognition.confidence).toBeGreaterThan(0.8);
+    expect(state.reps).toBe(0);
+  });
+
   it('counts from the visible side when the far side is obscured', () => {
-    const detector = new PushUpDetector();
+    const detector = new PushUpMovementInterpreter();
 
     detector.processPose(
       makePushUpFrame({ timestampMs: 0, elbowAngle: 158, rightVisibility: 0.1 }),
@@ -46,7 +60,7 @@ describe('PushUpDetector', () => {
   });
 
   it('records a partial rep when top returns before bottom depth', () => {
-    const detector = new PushUpDetector();
+    const detector = new PushUpMovementInterpreter();
 
     detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
     detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 130 }));
@@ -59,7 +73,7 @@ describe('PushUpDetector', () => {
   });
 
   it('warns on mild body alignment drift without blocking the rep', () => {
-    const detector = new PushUpDetector();
+    const detector = new PushUpMovementInterpreter();
 
     detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165, hipOffsetY: 0.34 }));
     detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 94, hipOffsetY: 0.34 }));
@@ -72,7 +86,7 @@ describe('PushUpDetector', () => {
   });
 
   it('does not count while body alignment is severely invalid', () => {
-    const detector = new PushUpDetector();
+    const detector = new PushUpMovementInterpreter();
 
     detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165, hipOffsetY: 0.8 }));
     detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 110, hipOffsetY: 0.8 }));
@@ -85,11 +99,12 @@ describe('PushUpDetector', () => {
   });
 
   it('enters tracking lost state when landmarks are unavailable', () => {
-    const detector = new PushUpDetector();
+    const detector = new PushUpMovementInterpreter();
 
     const state = detector.processPose(undefined);
 
     expect(state.phase).toBe('tracking_lost');
+    expect(state.recognition.status).toBe('tracking_lost');
     expect(state.warnings[0]?.code).toBe('tracking_lost');
   });
 });
