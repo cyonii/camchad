@@ -26,6 +26,7 @@ import {
 import type { ExerciseSet, WorkoutSession, WorkoutSummary } from '@home-workout/workout-history';
 
 import type { WorkoutPlatform } from './platform.js';
+import { buildHistoryChartModel, type HistoryChartModel } from './history-chart.js';
 
 type View = 'workout' | 'history' | 'settings';
 
@@ -483,6 +484,8 @@ function HistoryView({
   readonly sessions: readonly WorkoutSession[];
   readonly summary: WorkoutSummary;
 }): ReactElement {
+  const chartModel = buildHistoryChartModel(sessions);
+
   return (
     <section className="stack">
       <div className="page-heading">
@@ -496,6 +499,8 @@ function HistoryView({
           <Metric label="Partial" value={String(summary.partialReps)} />
         </div>
       </div>
+
+      <WorkoutLogChart model={chartModel} />
 
       <div className="history-list">
         {sessions.length === 0 ? (
@@ -519,6 +524,126 @@ function HistoryView({
           })
         )}
       </div>
+    </section>
+  );
+}
+
+function WorkoutLogChart({ model }: { readonly model: HistoryChartModel }): ReactElement {
+  const chartWidth = 720;
+  const chartHeight = 240;
+  const padding = { top: 24, right: 28, bottom: 44, left: 44 };
+  const plotWidth = chartWidth - padding.left - padding.right;
+  const plotHeight = chartHeight - padding.top - padding.bottom;
+  const gap = 12;
+  const barWidth =
+    model.points.length === 0
+      ? 0
+      : Math.max(
+          18,
+          (plotWidth - gap * Math.max(0, model.points.length - 1)) / model.points.length,
+        );
+
+  return (
+    <section className="chart-panel" aria-labelledby="workout-chart-title">
+      <div className="chart-heading">
+        <div>
+          <span>Progress</span>
+          <h2 id="workout-chart-title">Reps by workout</h2>
+        </div>
+        <div className="chart-legend" aria-label="Chart legend">
+          <span>
+            <i className="legend-valid" />
+            Valid
+          </span>
+          <span>
+            <i className="legend-partial" />
+            Partial
+          </span>
+        </div>
+      </div>
+
+      {model.points.length === 0 ? (
+        <div className="chart-empty">Complete a workout to see rep trends.</div>
+      ) : (
+        <svg className="rep-chart" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img">
+          <title>Valid and partial push-up reps by workout</title>
+          <line
+            className="chart-axis"
+            x1={padding.left}
+            y1={padding.top + plotHeight}
+            x2={chartWidth - padding.right}
+            y2={padding.top + plotHeight}
+          />
+          <line
+            className="chart-axis"
+            x1={padding.left}
+            y1={padding.top}
+            x2={padding.left}
+            y2={padding.top + plotHeight}
+          />
+          <text className="chart-scale" x={padding.left - 10} y={padding.top + 5} textAnchor="end">
+            {model.maxReps}
+          </text>
+          <text
+            className="chart-scale"
+            x={padding.left - 10}
+            y={padding.top + plotHeight + 4}
+            textAnchor="end"
+          >
+            0
+          </text>
+
+          {model.points.map((point, index) => {
+            const x = padding.left + index * (barWidth + gap);
+            const validHeight = (point.validReps / model.maxReps) * plotHeight;
+            const partialHeight = (point.partialReps / model.maxReps) * plotHeight;
+            const validY = padding.top + plotHeight - validHeight;
+            const partialY = validY - partialHeight;
+
+            return (
+              <g key={point.sessionId}>
+                <title>
+                  {`${point.label}: ${point.validReps} valid, ${point.partialReps} partial reps`}
+                </title>
+                <rect
+                  className="bar-valid"
+                  x={x}
+                  y={validY}
+                  width={barWidth}
+                  height={Math.max(0, validHeight)}
+                  rx="4"
+                />
+                {point.partialReps > 0 ? (
+                  <rect
+                    className="bar-partial"
+                    x={x}
+                    y={partialY}
+                    width={barWidth}
+                    height={Math.max(0, partialHeight)}
+                    rx="4"
+                  />
+                ) : null}
+                <text
+                  className="bar-value"
+                  x={x + barWidth / 2}
+                  y={Math.max(14, partialY - 6)}
+                  textAnchor="middle"
+                >
+                  {point.totalReps}
+                </text>
+                <text
+                  className="chart-label"
+                  x={x + barWidth / 2}
+                  y={chartHeight - 16}
+                  textAnchor="middle"
+                >
+                  {point.label}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      )}
     </section>
   );
 }
