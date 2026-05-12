@@ -61,6 +61,7 @@ const initialDetectorState: ExerciseDetectorState = {
 
 const themePreferenceStorageKey = 'home-workout:theme-preference';
 const overlayPositionStorageKey = 'home-workout:overlay-position';
+const poseInferenceIntervalMs = 80;
 
 export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement {
   const [view, setView] = useState<View>('workout');
@@ -186,6 +187,7 @@ function WorkoutView({
   const seenRepNumbersRef = useRef(new Set<number>());
   const startTokenRef = useRef(0);
   const startInFlightRef = useRef(false);
+  const lastInferenceAtRef = useRef(0);
   const detectorStateRef = useRef<ExerciseDetectorState>(initialDetectorState);
 
   const [cameraAngle, setCameraAngle] = useState<CameraAngle>('side');
@@ -211,11 +213,17 @@ function WorkoutView({
     const video = videoRef.current;
     const estimator = estimatorRef.current;
 
+    if (timestampMs - lastInferenceAtRef.current < poseInferenceIntervalMs) {
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+      return;
+    }
+
     if (!video || !estimator || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
 
+    lastInferenceAtRef.current = timestampMs;
     let poseFrame: PoseFrame | undefined;
 
     try {
@@ -298,6 +306,7 @@ function WorkoutView({
         ...defaultPushUpConfig,
         cameraAngle,
       });
+      lastInferenceAtRef.current = 0;
       smootherRef.current.reset();
       repEventsRef.current = [];
       seenRepNumbersRef.current = new Set();
@@ -362,6 +371,7 @@ function WorkoutView({
 
     void estimatorRef.current?.dispose();
     estimatorRef.current = null;
+    lastInferenceAtRef.current = 0;
     stopCamera(videoRef.current);
     clearCanvas(canvasRef.current);
 
@@ -443,7 +453,11 @@ function WorkoutView({
             />
             <Metric
               label="Confidence"
-              value={detectorState.phase === 'tracking_lost' ? 'Lost' : 'Live'}
+              value={
+                detectorState.phase === 'tracking_lost'
+                  ? 'Lost'
+                  : formatMetric(detectorState.metrics.poseConfidence, '%')
+              }
             />
           </div>
 
@@ -594,7 +608,7 @@ function WorkoutLogChart({ model }: { readonly model: HistoryChartModel }): Reac
         </div>
       </div>
 
-      {model.points.length === 0 ? (
+      {!model.hasWorkouts ? (
         <div className="chart-empty">Complete a workout to see rep trends.</div>
       ) : (
         <svg className="rep-chart" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img">
@@ -635,16 +649,29 @@ function WorkoutLogChart({ model }: { readonly model: HistoryChartModel }): Reac
             return (
               <g key={point.sessionId}>
                 <title>
-                  {`${point.label}: ${point.validReps} valid, ${point.partialReps} partial reps`}
+                  {point.hasWorkout
+                    ? `${point.label}: ${point.validReps} valid, ${point.partialReps} partial reps`
+                    : `${point.label}: no workout`}
                 </title>
-                <rect
-                  className="bar-valid"
-                  x={x}
-                  y={validY}
-                  width={barWidth}
-                  height={Math.max(0, validHeight)}
-                  rx="4"
-                />
+                {point.totalReps > 0 ? (
+                  <rect
+                    className="bar-valid"
+                    x={x}
+                    y={validY}
+                    width={barWidth}
+                    height={Math.max(0, validHeight)}
+                    rx="4"
+                  />
+                ) : (
+                  <rect
+                    className="bar-empty"
+                    x={x}
+                    y={padding.top + plotHeight - 2}
+                    width={barWidth}
+                    height="2"
+                    rx="1"
+                  />
+                )}
                 {point.partialReps > 0 ? (
                   <rect
                     className="bar-partial"
@@ -655,14 +682,16 @@ function WorkoutLogChart({ model }: { readonly model: HistoryChartModel }): Reac
                     rx="4"
                   />
                 ) : null}
-                <text
-                  className="bar-value"
-                  x={x + barWidth / 2}
-                  y={Math.max(14, partialY - 6)}
-                  textAnchor="middle"
-                >
-                  {point.totalReps}
-                </text>
+                {point.totalReps > 0 ? (
+                  <text
+                    className="bar-value"
+                    x={x + barWidth / 2}
+                    y={Math.max(14, partialY - 6)}
+                    textAnchor="middle"
+                  >
+                    {point.totalReps}
+                  </text>
+                ) : null}
                 <text
                   className="chart-label"
                   x={x + barWidth / 2}

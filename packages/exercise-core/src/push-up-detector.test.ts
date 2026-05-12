@@ -20,11 +20,36 @@ describe('PushUpDetector', () => {
     expect(state.lastRep?.depthScore).toBe(1);
   });
 
+  it('counts from the visible side when the far side is obscured', () => {
+    const detector = new PushUpDetector();
+
+    detector.processPose(
+      makePushUpFrame({ timestampMs: 0, elbowAngle: 158, rightVisibility: 0.1 }),
+    );
+    detector.processPose(
+      makePushUpFrame({ timestampMs: 100, elbowAngle: 135, rightVisibility: 0.1 }),
+    );
+    detector.processPose(
+      makePushUpFrame({ timestampMs: 200, elbowAngle: 116, rightVisibility: 0.1 }),
+    );
+    detector.processPose(
+      makePushUpFrame({ timestampMs: 340, elbowAngle: 135, rightVisibility: 0.1 }),
+    );
+    const state = detector.processPose(
+      makePushUpFrame({ timestampMs: 460, elbowAngle: 154, rightVisibility: 0.1 }),
+    );
+
+    expect(state.reps).toBe(1);
+    expect(state.validReps).toBe(1);
+    expect(state.metrics.poseConfidence).toBeCloseTo(0.95);
+    expect(state.metrics.trackingSide).toBe(0);
+  });
+
   it('records a partial rep when top returns before bottom depth', () => {
     const detector = new PushUpDetector();
 
     detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
-    detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 132 }));
+    detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 130 }));
     const state = detector.processPose(makePushUpFrame({ timestampMs: 260, elbowAngle: 164 }));
 
     expect(state.reps).toBe(1);
@@ -33,18 +58,30 @@ describe('PushUpDetector', () => {
     expect(state.lastRep?.warnings.some((warning) => warning.code === 'partial_depth')).toBe(true);
   });
 
-  it('does not count while body alignment is invalid', () => {
+  it('warns on mild body alignment drift without blocking the rep', () => {
     const detector = new PushUpDetector();
 
-    detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165, hipOffsetY: 0.18 }));
-    detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 94, hipOffsetY: 0.18 }));
+    detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165, hipOffsetY: 0.34 }));
+    detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 94, hipOffsetY: 0.34 }));
     const state = detector.processPose(
-      makePushUpFrame({ timestampMs: 260, elbowAngle: 165, hipOffsetY: 0.18 }),
+      makePushUpFrame({ timestampMs: 260, elbowAngle: 165, hipOffsetY: 0.34 }),
+    );
+
+    expect(state.reps).toBe(1);
+    expect(state.warnings.some((warning) => warning.code === 'body_alignment')).toBe(true);
+  });
+
+  it('does not count while body alignment is severely invalid', () => {
+    const detector = new PushUpDetector();
+
+    detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165, hipOffsetY: 0.8 }));
+    detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 110, hipOffsetY: 0.8 }));
+    const state = detector.processPose(
+      makePushUpFrame({ timestampMs: 260, elbowAngle: 165, hipOffsetY: 0.8 }),
     );
 
     expect(state.phase).toBe('invalid_form');
     expect(state.reps).toBe(0);
-    expect(state.warnings.some((warning) => warning.code === 'body_alignment')).toBe(true);
   });
 
   it('enters tracking lost state when landmarks are unavailable', () => {

@@ -10,10 +10,14 @@ interface PushUpFrameOptions {
   readonly elbowAngle: number;
   readonly hipOffsetY?: number;
   readonly visibility?: number;
+  readonly leftVisibility?: number;
+  readonly rightVisibility?: number;
 }
 
 export function makePushUpFrame(options: PushUpFrameOptions): PoseFrame {
   const visibility = options.visibility ?? 0.95;
+  const leftVisibility = options.leftVisibility ?? visibility;
+  const rightVisibility = options.rightVisibility ?? visibility;
   const shoulder = { x: 0.25, y: 0.5 };
   const upperArmLength = 0.16;
   const forearmLength = 0.16;
@@ -27,20 +31,20 @@ export function makePushUpFrame(options: PushUpFrameOptions): PoseFrame {
     y: elbow.y + Math.sin(radians) * forearmLength,
   };
   const hipY = 0.5 + (options.hipOffsetY ?? 0);
-  const left = sideLandmarks('left', shoulder, elbow, wrist, hipY, visibility);
+  const left = sideLandmarks('left', shoulder, elbow, wrist, hipY, leftVisibility);
   const right = sideLandmarks(
     'right',
     { x: shoulder.x, y: shoulder.y + 0.01 },
     { x: elbow.x, y: elbow.y + 0.01 },
     { x: wrist.x, y: wrist.y + 0.01 },
     hipY + 0.01,
-    visibility,
+    rightVisibility,
   );
 
   return {
     timestampMs: options.timestampMs,
     landmarks: toLandmarkMap([...left, ...right]),
-    confidence: visibility,
+    confidence: Math.max(leftVisibility, rightVisibility),
   };
 }
 

@@ -6,42 +6,56 @@ import { buildHistoryChartModel } from './history-chart.js';
 
 describe('buildHistoryChartModel', () => {
   it('returns an empty model with a stable scale for no sessions', () => {
-    expect(buildHistoryChartModel([])).toEqual({
-      points: [],
-      maxReps: 1,
+    const model = buildHistoryChartModel([], 12, new Date('2026-05-12T08:00:00.000Z'));
+
+    expect(model).toEqual({
+      points: expect.arrayContaining([
+        expect.objectContaining({
+          hasWorkout: false,
+          totalReps: 0,
+        }),
+      ]),
+      maxReps: 10,
+      hasWorkouts: false,
       totalValidReps: 0,
       totalPartialReps: 0,
     });
+    expect(model.points).toHaveLength(12);
   });
 
-  it('sorts sessions chronologically and aggregates valid and partial reps', () => {
-    const model = buildHistoryChartModel([
-      session('late', '2026-05-12T08:00:00.000Z', 5, 1),
-      session('early', '2026-05-10T08:00:00.000Z', 3, 2),
-    ]);
+  it('aggregates sessions into calendar days with blank surrounding days', () => {
+    const model = buildHistoryChartModel(
+      [
+        session('morning', '2026-05-12T08:00:00.000Z', 5, 1),
+        session('evening', '2026-05-12T18:00:00.000Z', 3, 2),
+      ],
+      12,
+      new Date('2026-05-12T08:00:00.000Z'),
+    );
 
-    expect(model.points.map((point) => point.sessionId)).toEqual(['early', 'late']);
-    expect(model.points.map((point) => point.totalReps)).toEqual([5, 6]);
-    expect(model.maxReps).toBe(6);
+    const workoutPoint = model.points.find((point) => point.hasWorkout);
+
+    expect(workoutPoint).toMatchObject({
+      validReps: 8,
+      partialReps: 3,
+      totalReps: 11,
+    });
+    expect(model.points.some((point) => !point.hasWorkout)).toBe(true);
+    expect(model.maxReps).toBe(20);
+    expect(model.hasWorkouts).toBe(true);
     expect(model.totalValidReps).toBe(8);
     expect(model.totalPartialReps).toBe(3);
   });
 
-  it('limits chart points to the most recent sessions', () => {
-    const sessions = Array.from({ length: 14 }, (_, index) =>
-      session(
-        `session-${index}`,
-        `2026-05-${String(index + 1).padStart(2, '0')}T08:00:00.000Z`,
-        index,
-        0,
-      ),
+  it('uses a minimum visual scale so tiny workouts do not fill the graph', () => {
+    const model = buildHistoryChartModel(
+      [session('tiny', '2026-05-12T08:00:00.000Z', 1, 0)],
+      12,
+      new Date('2026-05-12T08:00:00.000Z'),
     );
 
-    const model = buildHistoryChartModel(sessions, 12);
-
-    expect(model.points).toHaveLength(12);
-    expect(model.points[0]?.sessionId).toBe('session-2');
-    expect(model.points.at(-1)?.sessionId).toBe('session-13');
+    expect(model.maxReps).toBe(10);
+    expect(model.points.find((point) => point.hasWorkout)?.totalReps).toBe(1);
   });
 });
 

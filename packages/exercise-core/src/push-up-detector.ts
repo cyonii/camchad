@@ -1,8 +1,6 @@
 import {
   angleDegrees,
   lineDeviationRatio,
-  midpoint,
-  requiredLandmarksVisible,
   type LandmarkName,
   type PoseFrame,
   type PoseLandmark,
@@ -17,37 +15,24 @@ import type {
   RepEvent,
 } from './exercise-detector.js';
 
-const requiredPushUpLandmarks: readonly LandmarkName[] = [
-  'left_shoulder',
-  'left_elbow',
-  'left_wrist',
-  'left_hip',
-  'left_knee',
-  'left_ankle',
-  'right_shoulder',
-  'right_elbow',
-  'right_wrist',
-  'right_hip',
-  'right_knee',
-  'right_ankle',
-];
-
 export interface PushUpDetectorConfig {
   readonly cameraAngle: CameraAngle;
   readonly minVisibility: number;
   readonly topElbowAngle: number;
   readonly bottomElbowAngle: number;
   readonly maxBodyLineDeviation: number;
+  readonly maxInvalidBodyLineDeviation: number;
   readonly minBottomHoldMs: number;
 }
 
 export const defaultPushUpConfig: PushUpDetectorConfig = {
   cameraAngle: 'side',
-  minVisibility: 0.55,
-  topElbowAngle: 153,
-  bottomElbowAngle: 105,
-  maxBodyLineDeviation: 0.1,
-  minBottomHoldMs: 120,
+  minVisibility: 0.45,
+  topElbowAngle: 148,
+  bottomElbowAngle: 122,
+  maxBodyLineDeviation: 0.16,
+  maxInvalidBodyLineDeviation: 0.28,
+  minBottomHoldMs: 80,
 };
 
 export class PushUpDetector implements ExerciseDetector {
@@ -72,17 +57,20 @@ export class PushUpDetector implements ExerciseDetector {
       return this.getState();
     }
 
-    if (!requiredLandmarksVisible(frame, requiredPushUpLandmarks, this.config.minVisibility)) {
+    const trackingSide = selectTrackingSide(frame, this.config.minVisibility);
+
+    if (!trackingSide) {
       this.phase = 'tracking_lost';
       this.warnings = [lowConfidenceWarning];
       return this.getState();
     }
 
-    const sample = readPushUpSample(frame);
-    const elbowAngle = Math.min(sample.leftElbowAngle, sample.rightElbowAngle);
-    const bodyLineDeviation = Math.min(sample.leftBodyLineDeviation, sample.rightBodyLineDeviation);
+    const sample = readPushUpSample(frame, trackingSide);
+    const elbowAngle = sample.elbowAngle;
+    const bodyLineDeviation = sample.bodyLineDeviation;
     const alignmentScore = clamp01(1 - bodyLineDeviation / this.config.maxBodyLineDeviation);
-    const isAligned = bodyLineDeviation <= this.config.maxBodyLineDeviation;
+    const hasAlignmentWarning = bodyLineDeviation > this.config.maxBodyLineDeviation;
+    const hasInvalidAlignment = bodyLineDeviation > this.config.maxInvalidBodyLineDeviation;
     const reachedBottom = elbowAngle <= this.config.bottomElbowAngle;
     const reachedTop = elbowAngle >= this.config.topElbowAngle;
 
@@ -91,12 +79,14 @@ export class PushUpDetector implements ExerciseDetector {
       elbowAngle,
       bodyLineDeviation,
       alignmentScore,
-      shoulderY: sample.shoulderCenter.y,
-      hipY: sample.hipCenter.y,
+      poseConfidence: frame.confidence,
+      trackingSide: trackingSide === 'left' ? 0 : 1,
+      shoulderY: sample.shoulder.y,
+      hipY: sample.hip.y,
     };
-    this.warnings = this.buildWarnings(isAligned);
+    this.warnings = this.buildWarnings(hasAlignmentWarning);
 
-    if (!isAligned) {
+    if (hasInvalidAlignment) {
       this.phase = 'invalid_form';
       return this.getState();
     }
@@ -176,10 +166,10 @@ export class PushUpDetector implements ExerciseDetector {
     };
   }
 
-  private buildWarnings(isAligned: boolean): FormWarning[] {
+  private buildWarnings(hasAlignmentWarning: boolean): FormWarning[] {
     const warnings: FormWarning[] = [];
 
-    if (!isAligned) {
+    if (hasAlignmentWarning) {
       warnings.push({
         code: 'body_alignment',
         message: 'Keep shoulders, hips, and ankles in a straighter line.',
@@ -244,40 +234,68 @@ export class PushUpDetector implements ExerciseDetector {
 }
 
 interface PushUpSample {
-  readonly leftElbowAngle: number;
-  readonly rightElbowAngle: number;
-  readonly leftBodyLineDeviation: number;
-  readonly rightBodyLineDeviation: number;
-  readonly shoulderCenter: PoseLandmark;
-  readonly hipCenter: PoseLandmark;
+  readonly elbowAngle: number;
+  readonly bodyLineDeviation: number;
+  readonly shoulder: PoseLandmark;
+  readonly hip: PoseLandmark;
 }
 
-function readPushUpSample(frame: PoseFrame): PushUpSample {
-  const leftShoulder = mustGet(frame, 'left_shoulder');
-  const leftElbow = mustGet(frame, 'left_elbow');
-  const leftWrist = mustGet(frame, 'left_wrist');
-  const leftHip = mustGet(frame, 'left_hip');
-  const leftAnkle = mustGet(frame, 'left_ankle');
-  const rightShoulder = mustGet(frame, 'right_shoulder');
-  const rightElbow = mustGet(frame, 'right_elbow');
-  const rightWrist = mustGet(frame, 'right_wrist');
-  const rightHip = mustGet(frame, 'right_hip');
-  const rightAnkle = mustGet(frame, 'right_ankle');
+type TrackingSide = 'left' | 'right';
+
+function readPushUpSample(frame: PoseFrame, side: TrackingSide): PushUpSample {
+  const shoulder = mustGet(frame, `${side}_shoulder` as LandmarkName);
+  const elbow = mustGet(frame, `${side}_elbow` as LandmarkName);
+  const wrist = mustGet(frame, `${side}_wrist` as LandmarkName);
+  const hip = mustGet(frame, `${side}_hip` as LandmarkName);
+  const ankle = mustGet(frame, `${side}_ankle` as LandmarkName);
 
   return {
-    leftElbowAngle: angleDegrees(leftShoulder, leftElbow, leftWrist),
-    rightElbowAngle: angleDegrees(rightShoulder, rightElbow, rightWrist),
-    leftBodyLineDeviation: lineDeviationRatio(leftShoulder, leftHip, leftAnkle),
-    rightBodyLineDeviation: lineDeviationRatio(rightShoulder, rightHip, rightAnkle),
-    shoulderCenter: {
-      ...leftShoulder,
-      ...midpoint(leftShoulder, rightShoulder),
-    },
-    hipCenter: {
-      ...leftHip,
-      ...midpoint(leftHip, rightHip),
-    },
+    elbowAngle: angleDegrees(shoulder, elbow, wrist),
+    bodyLineDeviation: lineDeviationRatio(shoulder, hip, ankle),
+    shoulder,
+    hip,
   };
+}
+
+function selectTrackingSide(frame: PoseFrame, minVisibility: number): TrackingSide | undefined {
+  const leftScore = sideVisibilityScore(frame, 'left', minVisibility);
+  const rightScore = sideVisibilityScore(frame, 'right', minVisibility);
+
+  if (leftScore === undefined && rightScore === undefined) {
+    return undefined;
+  }
+
+  if (rightScore === undefined) {
+    return 'left';
+  }
+
+  if (leftScore === undefined) {
+    return 'right';
+  }
+
+  return leftScore >= rightScore ? 'left' : 'right';
+}
+
+function sideVisibilityScore(
+  frame: PoseFrame,
+  side: TrackingSide,
+  minVisibility: number,
+): number | undefined {
+  const landmarks = [
+    frame.landmarks.get(`${side}_shoulder`),
+    frame.landmarks.get(`${side}_elbow`),
+    frame.landmarks.get(`${side}_wrist`),
+    frame.landmarks.get(`${side}_hip`),
+    frame.landmarks.get(`${side}_ankle`),
+  ];
+
+  if (landmarks.some((landmark) => !landmark || landmarkVisibility(landmark) < minVisibility)) {
+    return undefined;
+  }
+
+  return (
+    landmarks.reduce((sum, landmark) => sum + landmarkVisibility(landmark), 0) / landmarks.length
+  );
 }
 
 function mustGet(frame: PoseFrame, name: LandmarkName): PoseLandmark {
@@ -288,6 +306,10 @@ function mustGet(frame: PoseFrame, name: LandmarkName): PoseLandmark {
   }
 
   return landmark;
+}
+
+function landmarkVisibility(landmark: PoseLandmark | undefined): number {
+  return landmark?.visibility ?? landmark?.presence ?? 0;
 }
 
 function clamp01(value: number): number {

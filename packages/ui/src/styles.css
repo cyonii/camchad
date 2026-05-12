@@ -633,6 +633,10 @@ button:disabled {
   fill: var(--chart-partial);
 }
 
+.bar-empty {
+  fill: var(--border);
+}
+
 .history-item,
 .setting-row {
   display: flex;
