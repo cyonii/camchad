@@ -11,11 +11,21 @@ export default tseslint.config(
       '**/dist-electron/**',
       'node_modules/**',
       'apps/desktop/public/vendor/**',
+      'apps/web/public/vendor/**',
       '**/*.d.ts',
     ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        fetch: 'readonly',
+      },
+    },
+  },
   {
     files: ['**/*.{ts,tsx}'],
     rules: {

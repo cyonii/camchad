@@ -36,4 +36,10 @@ packages/
 
 ## Development
 
-Setup commands will be added as the implementation lands.
+```bash
+npm install
+npm run sync:mediapipe-assets
+npm run validate
+```
+
+The asset sync command copies MediaPipe WASM files from `@mediapipe/tasks-vision` and downloads the Pose Landmarker Lite model into each app's local `public/vendor/mediapipe` directory. Runtime inference should not fetch model assets from the network.

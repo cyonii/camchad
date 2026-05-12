@@ -13,6 +13,7 @@ dist-electron/
 .env.*
 !.env.example
 apps/desktop/public/vendor/
+apps/web/public/vendor/
 videos/
 release/
 out/

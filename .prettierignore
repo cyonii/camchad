@@ -6,4 +6,5 @@ dist-electron
 **/dist-electron
 package-lock.json
 apps/desktop/public/vendor
+apps/web/public/vendor
 *.tsbuildinfo
