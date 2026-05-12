@@ -1,9 +1,5 @@
 import {
   Activity,
-  ArrowDownLeft,
-  ArrowDownRight,
-  ArrowUpLeft,
-  ArrowUpRight,
   Bell,
   Camera,
   CheckCircle2,
@@ -11,14 +7,18 @@ import {
   History,
   Monitor,
   Moon,
+  Move,
   Pause,
+  PanelRight,
   Play,
+  Power,
+  RotateCcw,
   Settings,
   Square,
   Sun,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ReactElement } from 'react';
+import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactElement } from 'react';
 
 import type { CameraAngle, ExerciseDetectorState, RepEvent } from '@home-workout/exercise-core';
 import { defaultPushUpConfig, PushUpDetector } from '@home-workout/exercise-core';
@@ -36,7 +36,12 @@ import { buildHistoryChartModel, type HistoryChartModel } from './history-chart.
 
 type View = 'workout' | 'history' | 'settings';
 type ThemePreference = 'system' | 'light' | 'dark';
-type OverlayPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+type TelemetryMode = 'fixed' | 'floating';
+
+interface HudPosition {
+  readonly x: number;
+  readonly y: number;
+}
 
 export interface WorkoutAssets {
   readonly logoAssetPath?: string;
@@ -60,8 +65,10 @@ const initialDetectorState: ExerciseDetectorState = {
 };
 
 const themePreferenceStorageKey = 'home-workout:theme-preference';
-const overlayPositionStorageKey = 'home-workout:overlay-position';
+const telemetryModeStorageKey = 'home-workout:telemetry-mode';
+const telemetryHudPositionStorageKey = 'home-workout:telemetry-hud-position';
 const poseInferenceIntervalMs = 80;
+const defaultHudPosition: HudPosition = { x: 24, y: 24 };
 
 export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement {
   const [view, setView] = useState<View>('workout');
@@ -104,6 +111,10 @@ export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement 
     [loadHistory, platform.history],
   );
 
+  const exitApp = useCallback(() => {
+    void platform.appLifecycle?.exit();
+  }, [platform.appLifecycle]);
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -141,10 +152,20 @@ export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement 
           </NavButton>
         </nav>
 
-        <div className="sidebar-summary">
-          <span>Total reps</span>
-          <strong>{summary.totalReps}</strong>
-          <small>{summary.totalSessions} saved sessions</small>
+        <div className="sidebar-footer">
+          <div className="sidebar-summary">
+            <span>Total reps</span>
+            <strong>{summary.totalReps}</strong>
+            <small>{summary.totalSessions} saved sessions</small>
+          </div>
+
+          <div className="sidebar-actions">
+            <ThemeCycleButton value={themePreference} onChange={setThemePreference} />
+            <button className="sidebar-icon-action exit-action" type="button" onClick={exitApp}>
+              <Power size={18} aria-hidden="true" />
+              <span>Exit</span>
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -178,10 +199,21 @@ function WorkoutView({
 }): ReactElement {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const telemetryPanelRef = useRef<HTMLDivElement | null>(null);
   const estimatorRef = useRef<PoseEstimator | null>(null);
   const smootherRef = useRef(new ExponentialPoseSmoother());
   const detectorRef = useRef(new PushUpDetector());
   const animationFrameRef = useRef<number | undefined>(undefined);
+  const telemetryDragRef = useRef<
+    | {
+        readonly pointerId: number;
+        readonly startX: number;
+        readonly startY: number;
+        readonly origin: HudPosition;
+      }
+    | undefined
+  >(undefined);
   const sessionRef = useRef<WorkoutSession | undefined>(undefined);
   const repEventsRef = useRef<RepEvent[]>([]);
   const seenRepNumbersRef = useRef(new Set<number>());
@@ -197,8 +229,9 @@ function WorkoutView({
   const [status, setStatus] = useState('Ready');
   const [detectorState, setDetectorState] = useState<ExerciseDetectorState>(initialDetectorState);
   const [cameraError, setCameraError] = useState<string | undefined>();
-  const [overlayPosition, setOverlayPosition] = useState<OverlayPosition>(() =>
-    readOverlayPosition(),
+  const [telemetryMode, setTelemetryMode] = useState<TelemetryMode>(() => readTelemetryMode());
+  const [telemetryHudPosition, setTelemetryHudPosition] = useState<HudPosition>(() =>
+    readTelemetryHudPosition(),
   );
 
   useEffect(() => {
@@ -206,8 +239,12 @@ function WorkoutView({
   }, [detectorState]);
 
   useEffect(() => {
-    writeOverlayPosition(overlayPosition);
-  }, [overlayPosition]);
+    writeTelemetryMode(telemetryMode);
+  }, [telemetryMode]);
+
+  useEffect(() => {
+    writeTelemetryHudPosition(telemetryHudPosition);
+  }, [telemetryHudPosition]);
 
   const processFrame = useCallback((timestampMs: number): void => {
     const video = videoRef.current;
@@ -408,118 +445,346 @@ function WorkoutView({
     setStatus('Ready');
   }, [cameraAngle, onSessionSaved]);
 
+  const clampTelemetryHudPosition = useCallback((position: HudPosition): HudPosition => {
+    const stage = stageRef.current;
+    const panel = telemetryPanelRef.current;
+
+    if (!stage || !panel) {
+      return {
+        x: Math.max(12, position.x),
+        y: Math.max(12, position.y),
+      };
+    }
+
+    const stageBounds = stage.getBoundingClientRect();
+    const panelBounds = panel.getBoundingClientRect();
+    const inset = 16;
+    const maxX = Math.max(inset, stageBounds.width - panelBounds.width - inset);
+    const maxY = Math.max(inset, stageBounds.height - panelBounds.height - inset);
+
+    return {
+      x: Math.min(Math.max(inset, position.x), maxX),
+      y: Math.min(Math.max(inset, position.y), maxY),
+    };
+  }, []);
+
+  const startTelemetryDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>): void => {
+      if (telemetryMode !== 'floating' || event.button !== 0) {
+        return;
+      }
+
+      event.currentTarget.setPointerCapture(event.pointerId);
+      telemetryDragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        origin: telemetryHudPosition,
+      };
+    },
+    [telemetryHudPosition, telemetryMode],
+  );
+
+  const moveTelemetryDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>): void => {
+      const drag = telemetryDragRef.current;
+
+      if (!drag || drag.pointerId !== event.pointerId) {
+        return;
+      }
+
+      setTelemetryHudPosition(
+        clampTelemetryHudPosition({
+          x: drag.origin.x + event.clientX - drag.startX,
+          y: drag.origin.y + event.clientY - drag.startY,
+        }),
+      );
+    },
+    [clampTelemetryHudPosition],
+  );
+
+  const endTelemetryDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>): void => {
+    const drag = telemetryDragRef.current;
+
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+
+    telemetryDragRef.current = undefined;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  }, []);
+
+  const resetTelemetryHudPosition = useCallback(() => {
+    setTelemetryHudPosition(clampTelemetryHudPosition(defaultHudPosition));
+  }, [clampTelemetryHudPosition]);
+
   return (
-    <section className="workout-layout">
-      <div className="workout-stage-panel">
-        <div className="video-stage">
-          <video ref={videoRef} muted playsInline autoPlay />
-          <canvas ref={canvasRef} />
-          {!isPreviewActive ? (
-            <div className="video-placeholder">
-              <Camera size={34} aria-hidden="true" />
-              <span>Camera preview appears here</span>
+    <section className={`workout-layout telemetry-${telemetryMode}`}>
+      <div className="workout-command-grid">
+        <div className="workout-stage-panel" ref={stageRef}>
+          <div className="video-stage">
+            <video ref={videoRef} muted playsInline autoPlay />
+            <canvas ref={canvasRef} />
+            {!isPreviewActive ? (
+              <div className="video-placeholder">
+                <Camera size={34} aria-hidden="true" />
+                <span>Camera preview appears here</span>
+              </div>
+            ) : null}
+            <StageTelemetryChrome status={status} isTracking={isTracking} />
+
+            {telemetryMode === 'floating' ? (
+              <TelemetryPanel
+                ref={telemetryPanelRef}
+                mode="floating"
+                status={status}
+                detectorState={detectorState}
+                style={{
+                  transform: `translate3d(${telemetryHudPosition.x}px, ${telemetryHudPosition.y}px, 0)`,
+                }}
+                onDragStart={startTelemetryDrag}
+                onDragMove={moveTelemetryDrag}
+                onDragEnd={endTelemetryDrag}
+                onResetPosition={resetTelemetryHudPosition}
+              />
+            ) : null}
+          </div>
+
+          {cameraError ? (
+            <div className="alert camera-alert">
+              <CircleAlert size={18} aria-hidden="true" />
+              <span>{cameraError}</span>
             </div>
           ) : null}
         </div>
 
-        {cameraError ? (
-          <div className="alert camera-alert">
-            <CircleAlert size={18} aria-hidden="true" />
-            <span>{cameraError}</span>
-          </div>
+        {telemetryMode === 'fixed' ? (
+          <TelemetryPanel
+            ref={telemetryPanelRef}
+            mode="fixed"
+            status={status}
+            detectorState={detectorState}
+          />
         ) : null}
+      </div>
 
-        <div className={`workout-overlay overlay-${overlayPosition}`}>
-          <div className="overlay-heading">
-            <div>
-              <span>Push-ups</span>
-              <strong>{status}</strong>
-            </div>
-            <OverlayPositionControl value={overlayPosition} onChange={setOverlayPosition} />
-          </div>
+      <div className="bottom-command-deck">
+        <fieldset className="segmented-control camera-angle-control">
+          <legend>Camera angle</legend>
+          <button
+            type="button"
+            className={cameraAngle === 'side' ? 'active' : undefined}
+            onClick={() => setCameraAngle('side')}
+            disabled={isStarting || isTracking}
+          >
+            Side
+          </button>
+          <button
+            type="button"
+            className={cameraAngle === 'front_diagonal' ? 'active' : undefined}
+            onClick={() => setCameraAngle('front_diagonal')}
+            disabled={isStarting || isTracking}
+          >
+            Diagonal
+          </button>
+        </fieldset>
 
-          <div className="rep-counter">
-            <span>Valid reps</span>
-            <strong>{detectorState.validReps}</strong>
-            <small>{detectorState.partialReps} partial reps</small>
-          </div>
+        <div className="telemetry-mode-control" role="group" aria-label="Telemetry panel mode">
+          <button
+            type="button"
+            aria-pressed={telemetryMode === 'fixed'}
+            onClick={() => setTelemetryMode('fixed')}
+          >
+            <PanelRight size={17} aria-hidden="true" />
+            Fixed
+          </button>
+          <button
+            type="button"
+            aria-pressed={telemetryMode === 'floating'}
+            onClick={() => setTelemetryMode('floating')}
+          >
+            <Move size={17} aria-hidden="true" />
+            Floating
+          </button>
+        </div>
 
-          <div className="metric-grid">
-            <Metric label="Phase" value={formatPhase(detectorState.phase)} />
-            <Metric label="Elbow" value={formatMetric(detectorState.metrics.elbowAngle, 'deg')} />
-            <Metric
-              label="Alignment"
-              value={formatMetric(detectorState.metrics.alignmentScore, '%')}
-            />
-            <Metric
-              label="Confidence"
-              value={
-                detectorState.phase === 'tracking_lost'
-                  ? 'Lost'
-                  : formatMetric(detectorState.metrics.poseConfidence, '%')
-              }
-            />
-          </div>
-
-          <fieldset className="segmented-control">
-            <legend>Camera angle</legend>
-            <button
-              type="button"
-              className={cameraAngle === 'side' ? 'active' : undefined}
-              onClick={() => setCameraAngle('side')}
-              disabled={isStarting || isTracking}
-            >
-              Side
+        <div className="control-row">
+          {!isTracking && !isStarting ? (
+            <button className="primary-action" type="button" onClick={() => void startWorkout()}>
+              <Play size={18} aria-hidden="true" />
+              Start
             </button>
-            <button
-              type="button"
-              className={cameraAngle === 'front_diagonal' ? 'active' : undefined}
-              onClick={() => setCameraAngle('front_diagonal')}
-              disabled={isStarting || isTracking}
-            >
-              Diagonal
-            </button>
-          </fieldset>
-
-          <div className="form-feedback">
-            <span>Form</span>
-            {detectorState.warnings.length === 0 ? (
-              <p>
-                <CheckCircle2 size={18} aria-hidden="true" />
-                Tracking conditions look usable.
-              </p>
-            ) : (
-              detectorState.warnings.map((warning) => (
-                <p key={warning.code}>
-                  <CircleAlert size={18} aria-hidden="true" />
-                  {warning.message}
-                </p>
-              ))
-            )}
-          </div>
-
-          <div className="control-row">
-            {!isTracking && !isStarting ? (
-              <button className="primary-action" type="button" onClick={() => void startWorkout()}>
-                <Play size={18} aria-hidden="true" />
-                Start
+          ) : (
+            <>
+              <button className="secondary-action" type="button" disabled>
+                <Pause size={18} aria-hidden="true" />
+                {isStarting ? 'Starting' : 'Pause'}
               </button>
-            ) : (
-              <>
-                <button className="secondary-action" type="button" disabled>
-                  <Pause size={18} aria-hidden="true" />
-                  {isStarting ? 'Starting' : 'Pause'}
-                </button>
-                <button className="danger-action" type="button" onClick={() => void stopWorkout()}>
-                  <Square size={18} aria-hidden="true" />
-                  Stop
-                </button>
-              </>
-            )}
-          </div>
+              <button className="danger-action" type="button" onClick={() => void stopWorkout()}>
+                <Square size={18} aria-hidden="true" />
+                Stop
+              </button>
+            </>
+          )}
         </div>
       </div>
     </section>
+  );
+}
+
+function StageTelemetryChrome({
+  status,
+  isTracking,
+}: {
+  readonly status: string;
+  readonly isTracking: boolean;
+}): ReactElement {
+  return (
+    <>
+      <div className="stage-feed-label">
+        <span className={isTracking ? 'status-dot active' : 'status-dot'} />
+        Live feed
+      </div>
+      <div className="stage-resolution-label">1280p / 30 FPS</div>
+      <div className="stage-status-rail">
+        <span>{status}</span>
+      </div>
+      <div className="stage-corner stage-corner-top-left" />
+      <div className="stage-corner stage-corner-top-right" />
+      <div className="stage-corner stage-corner-bottom-left" />
+      <div className="stage-corner stage-corner-bottom-right" />
+    </>
+  );
+}
+
+interface TelemetryPanelProps {
+  readonly mode: TelemetryMode;
+  readonly status: string;
+  readonly detectorState: ExerciseDetectorState;
+  readonly style?: CSSProperties;
+  readonly onDragStart?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  readonly onDragMove?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  readonly onDragEnd?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  readonly onResetPosition?: () => void;
+}
+
+const TelemetryPanel = forwardRef<HTMLDivElement, TelemetryPanelProps>(function TelemetryPanel(
+  { mode, status, detectorState, style, onDragStart, onDragMove, onDragEnd, onResetPosition },
+  ref,
+): ReactElement {
+  const confidence =
+    detectorState.phase === 'tracking_lost'
+      ? 'Lost'
+      : formatMetric(detectorState.metrics.poseConfidence, '%');
+
+  return (
+    <aside
+      className={`telemetry-panel telemetry-panel-${mode}`}
+      ref={ref}
+      style={style}
+      aria-label="Push-up telemetry"
+    >
+      <div
+        className="telemetry-panel-header"
+        onPointerDown={onDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+      >
+        <div>
+          <span>Push-ups</span>
+          <strong>{status}</strong>
+        </div>
+        {mode === 'floating' ? (
+          <div className="telemetry-drag-actions">
+            <Move size={16} aria-hidden="true" />
+            <button
+              className="icon-action subtle"
+              type="button"
+              onClick={onResetPosition}
+              aria-label="Reset telemetry HUD position"
+              title="Reset HUD position"
+            >
+              <RotateCcw size={15} aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="rep-counter">
+        <div>
+          <span>Valid reps</span>
+          <strong>{detectorState.validReps}</strong>
+          <small>{detectorState.partialReps} partial reps</small>
+        </div>
+        <QualityDial value={detectorState.metrics.poseConfidence} phase={detectorState.phase} />
+      </div>
+
+      <div className="metric-grid">
+        <Metric label="Phase" value={formatPhase(detectorState.phase)} />
+        <Metric label="Elbow angle" value={formatMetric(detectorState.metrics.elbowAngle, 'deg')} />
+        <Metric label="Alignment" value={formatMetric(detectorState.metrics.alignmentScore, '%')} />
+        <Metric label="Confidence" value={confidence} />
+      </div>
+
+      <div className="form-feedback">
+        <span>Form feedback</span>
+        {detectorState.warnings.length === 0 ? (
+          <p>
+            <CheckCircle2 size={18} aria-hidden="true" />
+            Tracking conditions look usable.
+          </p>
+        ) : (
+          detectorState.warnings.map((warning) => (
+            <p key={warning.code}>
+              <CircleAlert size={18} aria-hidden="true" />
+              {warning.message}
+            </p>
+          ))
+        )}
+      </div>
+
+      <div className="rep-history-strip" aria-label="Current rep history">
+        <span>Rep history</span>
+        <div>
+          {Array.from({ length: 10 }, (_, index) => {
+            const completedReps = detectorState.validReps + detectorState.partialReps;
+            const isActive = index < Math.min(10, completedReps);
+            const isPartial =
+              isActive &&
+              detectorState.partialReps > 0 &&
+              index >= Math.max(0, detectorState.validReps);
+
+            return (
+              <i
+                key={index}
+                className={
+                  isActive ? (isPartial ? 'rep-history-partial' : 'rep-history-valid') : undefined
+                }
+              />
+            );
+          })}
+        </div>
+      </div>
+    </aside>
+  );
+});
+
+function QualityDial({
+  value,
+  phase,
+}: {
+  readonly value: number | undefined;
+  readonly phase: string;
+}): ReactElement {
+  const quality = value === undefined || phase === 'tracking_lost' ? 0 : Math.round(value * 100);
+  const clampedQuality = Math.min(100, Math.max(0, quality));
+
+  return (
+    <div className="quality-dial" style={{ '--quality': `${clampedQuality}%` } as CSSProperties}>
+      <strong>{phase === 'tracking_lost' ? '--' : clampedQuality}</strong>
+      <span>Quality</span>
+    </div>
   );
 }
 
@@ -759,38 +1024,7 @@ function SettingsView({
             <strong>Theme</strong>
             <span>Follow the system by default, or pin the interface.</span>
           </div>
-          <div className="theme-control" role="group" aria-label="Theme">
-            <button
-              className="icon-action"
-              type="button"
-              aria-pressed={themePreference === 'system'}
-              aria-label="Use system theme"
-              title="System"
-              onClick={() => onThemePreferenceChange('system')}
-            >
-              <Monitor size={18} aria-hidden="true" />
-            </button>
-            <button
-              className="icon-action"
-              type="button"
-              aria-pressed={themePreference === 'light'}
-              aria-label="Use light theme"
-              title="Light"
-              onClick={() => onThemePreferenceChange('light')}
-            >
-              <Sun size={18} aria-hidden="true" />
-            </button>
-            <button
-              className="icon-action"
-              type="button"
-              aria-pressed={themePreference === 'dark'}
-              aria-label="Use dark theme"
-              title="Dark"
-              onClick={() => onThemePreferenceChange('dark')}
-            >
-              <Moon size={18} aria-hidden="true" />
-            </button>
-          </div>
+          <ThemeSegmentedControl value={themePreference} onChange={onThemePreferenceChange} />
         </div>
 
         <div className="setting-row">
@@ -818,52 +1052,74 @@ function SettingsView({
   );
 }
 
-function OverlayPositionControl({
+function ThemeCycleButton({
   value,
   onChange,
 }: {
-  readonly value: OverlayPosition;
-  readonly onChange: (position: OverlayPosition) => void;
+  readonly value: ThemePreference;
+  readonly onChange: (preference: ThemePreference) => void;
 }): ReactElement {
-  const positions: readonly {
-    readonly value: OverlayPosition;
-    readonly label: string;
-    readonly icon: ReactElement;
-  }[] = [
-    { value: 'top-left', label: 'Top left', icon: <ArrowUpLeft size={15} aria-hidden="true" /> },
-    {
-      value: 'top-right',
-      label: 'Top right',
-      icon: <ArrowUpRight size={15} aria-hidden="true" />,
-    },
-    {
-      value: 'bottom-left',
-      label: 'Bottom left',
-      icon: <ArrowDownLeft size={15} aria-hidden="true" />,
-    },
-    {
-      value: 'bottom-right',
-      label: 'Bottom right',
-      icon: <ArrowDownRight size={15} aria-hidden="true" />,
-    },
-  ];
+  const option = themeOptions.find((themeOption) => themeOption.value === value) ?? themeOptions[0];
 
   return (
-    <div className="overlay-position-control" role="group" aria-label="Overlay position">
-      {positions.map((position) => (
+    <button
+      className="sidebar-icon-action theme-cycle-control"
+      type="button"
+      onClick={() => onChange(nextThemePreference(value))}
+      aria-label={`Theme: ${option.label}. Click to cycle theme.`}
+      title={`Theme: ${option.label}`}
+    >
+      {option.icon}
+      <span>{option.shortLabel}</span>
+    </button>
+  );
+}
+
+function ThemeSegmentedControl({
+  value,
+  onChange,
+}: {
+  readonly value: ThemePreference;
+  readonly onChange: (preference: ThemePreference) => void;
+}): ReactElement {
+  return (
+    <div className="theme-segmented-control" role="group" aria-label="Theme">
+      {themeOptions.map((option) => (
         <button
-          key={position.value}
+          key={option.value}
           type="button"
-          aria-label={`Move overlay to ${position.label.toLowerCase()}`}
-          aria-pressed={value === position.value}
-          title={position.label}
-          onClick={() => onChange(position.value)}
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
         >
-          {position.icon}
+          {option.icon}
+          <span>{option.label}</span>
         </button>
       ))}
     </div>
   );
+}
+
+const themeOptions: readonly {
+  readonly value: ThemePreference;
+  readonly label: string;
+  readonly shortLabel: string;
+  readonly icon: ReactElement;
+}[] = [
+  {
+    value: 'system',
+    label: 'System',
+    shortLabel: 'SYS',
+    icon: <Monitor size={18} aria-hidden="true" />,
+  },
+  { value: 'dark', label: 'Dark', shortLabel: 'DRK', icon: <Moon size={18} aria-hidden="true" /> },
+  { value: 'light', label: 'Frost', shortLabel: 'FST', icon: <Sun size={18} aria-hidden="true" /> },
+];
+
+function nextThemePreference(value: ThemePreference): ThemePreference {
+  const index = themeOptions.findIndex((option) => option.value === value);
+  const nextOption = themeOptions[(index + 1) % themeOptions.length] ?? themeOptions[0];
+
+  return nextOption.value;
 }
 
 function readThemePreference(): ThemePreference {
@@ -901,28 +1157,54 @@ function applyThemePreference(preference: ThemePreference): void {
   document.documentElement.dataset.theme = preference;
 }
 
-function readOverlayPosition(): OverlayPosition {
+function readTelemetryMode(): TelemetryMode {
   try {
-    const storedPosition = localStorage.getItem(overlayPositionStorageKey);
+    const storedMode = localStorage.getItem(telemetryModeStorageKey);
 
-    if (
-      storedPosition === 'top-left' ||
-      storedPosition === 'top-right' ||
-      storedPosition === 'bottom-left' ||
-      storedPosition === 'bottom-right'
-    ) {
-      return storedPosition;
+    if (storedMode === 'fixed' || storedMode === 'floating') {
+      return storedMode;
     }
   } catch {
-    return 'top-right';
+    return 'fixed';
   }
 
-  return 'top-right';
+  return 'fixed';
 }
 
-function writeOverlayPosition(position: OverlayPosition): void {
+function writeTelemetryMode(mode: TelemetryMode): void {
   try {
-    localStorage.setItem(overlayPositionStorageKey, position);
+    localStorage.setItem(telemetryModeStorageKey, mode);
+  } catch {
+    // A blocked storage write should not prevent live workout tracking.
+  }
+}
+
+function readTelemetryHudPosition(): HudPosition {
+  try {
+    const rawPosition = localStorage.getItem(telemetryHudPositionStorageKey);
+
+    if (!rawPosition) {
+      return defaultHudPosition;
+    }
+
+    const parsedPosition = JSON.parse(rawPosition) as Partial<HudPosition>;
+
+    if (typeof parsedPosition.x === 'number' && typeof parsedPosition.y === 'number') {
+      return {
+        x: parsedPosition.x,
+        y: parsedPosition.y,
+      };
+    }
+  } catch {
+    return defaultHudPosition;
+  }
+
+  return defaultHudPosition;
+}
+
+function writeTelemetryHudPosition(position: HudPosition): void {
+  try {
+    localStorage.setItem(telemetryHudPositionStorageKey, JSON.stringify(position));
   } catch {
     // A blocked storage write should not prevent live workout tracking.
   }
@@ -1034,10 +1316,6 @@ function drawOverlay(
     return;
   }
 
-  context.fillStyle = '#27ae60';
-  context.strokeStyle = '#f2c94c';
-  context.lineWidth = 4;
-
   const pairs: readonly [LandmarkName, LandmarkName][] = [
     ['left_shoulder', 'left_elbow'],
     ['left_elbow', 'left_wrist'],
@@ -1051,6 +1329,52 @@ function drawOverlay(
     ['right_knee', 'right_ankle'],
   ];
 
+  context.save();
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+  context.shadowColor = 'rgb(235 223 54 / 55%)';
+  context.shadowBlur = 12;
+  context.strokeStyle = 'rgb(235 223 54 / 84%)';
+  context.lineWidth = Math.max(2, canvas.width / 520);
+
+  drawPoseConnections(context, frame, pairs, canvas.width, canvas.height);
+
+  context.shadowBlur = 0;
+  context.strokeStyle = 'rgb(255 245 91 / 92%)';
+  context.lineWidth = Math.max(1, canvas.width / 920);
+
+  drawPoseConnections(context, frame, pairs, canvas.width, canvas.height);
+
+  context.fillStyle = 'rgb(89 199 121 / 94%)';
+  context.shadowColor = 'rgb(89 199 121 / 58%)';
+  context.shadowBlur = 10;
+
+  for (const landmark of frame.landmarks.values()) {
+    if ((landmark.visibility ?? 0) < 0.5) {
+      continue;
+    }
+
+    context.beginPath();
+    context.arc(
+      landmark.x * canvas.width,
+      landmark.y * canvas.height,
+      Math.max(4, canvas.width / 260),
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+  }
+
+  context.restore();
+}
+
+function drawPoseConnections(
+  context: CanvasRenderingContext2D,
+  frame: PoseFrame,
+  pairs: readonly [LandmarkName, LandmarkName][],
+  width: number,
+  height: number,
+): void {
   for (const [from, to] of pairs) {
     const a = frame.landmarks.get(from);
     const b = frame.landmarks.get(to);
@@ -1060,19 +1384,9 @@ function drawOverlay(
     }
 
     context.beginPath();
-    context.moveTo(a.x * canvas.width, a.y * canvas.height);
-    context.lineTo(b.x * canvas.width, b.y * canvas.height);
+    context.moveTo(a.x * width, a.y * height);
+    context.lineTo(b.x * width, b.y * height);
     context.stroke();
-  }
-
-  for (const landmark of frame.landmarks.values()) {
-    if ((landmark.visibility ?? 0) < 0.5) {
-      continue;
-    }
-
-    context.beginPath();
-    context.arc(landmark.x * canvas.width, landmark.y * canvas.height, 5, 0, Math.PI * 2);
-    context.fill();
   }
 }
 
