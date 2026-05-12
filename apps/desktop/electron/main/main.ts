@@ -208,6 +208,10 @@ ipcMain.handle('notify:workout-reminder', (_event, body: string): void => {
   }
 });
 
+ipcMain.handle('app:exit', (): void => {
+  app.quit();
+});
+
 void app.whenReady().then(() => {
   configureMediaPermissions();
   void createWindow();

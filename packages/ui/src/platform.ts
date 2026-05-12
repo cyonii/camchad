@@ -24,11 +24,16 @@ export interface CameraPermissionClient {
   ensureCameraPermission(): Promise<CameraPermissionResult>;
 }
 
+export interface AppLifecycleClient {
+  exit(): Promise<void>;
+}
+
 export interface WorkoutPlatform {
   readonly history: HistoryClient;
   readonly settings?: SettingsClient;
   readonly notifications?: NotificationClient;
   readonly cameraPermission?: CameraPermissionClient;
+  readonly appLifecycle?: AppLifecycleClient;
 }
 
 export const localBrowserHistoryClient: HistoryClient = {
@@ -59,6 +64,16 @@ export const localBrowserHistoryClient: HistoryClient = {
 export const browserCameraPermissionClient: CameraPermissionClient = {
   async ensureCameraPermission(): Promise<CameraPermissionResult> {
     return { granted: true };
+  },
+};
+
+export const browserAppLifecycleClient: AppLifecycleClient = {
+  async exit(): Promise<void> {
+    window.close();
+
+    if (!window.closed) {
+      document.documentElement.dataset.appExitRequested = 'true';
+    }
   },
 };
 

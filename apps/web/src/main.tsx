@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 
 import {
+  browserAppLifecycleClient,
   browserCameraPermissionClient,
   localBrowserHistoryClient,
   WorkoutApp,
@@ -19,6 +20,7 @@ createRoot(document.getElementById('root') as HTMLElement).render(
       platform={{
         history: localBrowserHistoryClient,
         cameraPermission: browserCameraPermissionClient,
+        appLifecycle: browserAppLifecycleClient,
       }}
     />
   </React.StrictMode>,

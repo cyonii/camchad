@@ -18,6 +18,9 @@ const api = {
     workoutReminder: (body: string): Promise<void> =>
       ipcRenderer.invoke('notify:workout-reminder', body),
   },
+  app: {
+    exit: (): Promise<void> => ipcRenderer.invoke('app:exit'),
+  },
 };
 
 contextBridge.exposeInMainWorld('homeWorkout', api);

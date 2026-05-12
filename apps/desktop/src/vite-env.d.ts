@@ -18,6 +18,9 @@ declare global {
       notifications: {
         workoutReminder(body: string): Promise<void>;
       };
+      app: {
+        exit(): Promise<void>;
+      };
     };
   }
 }

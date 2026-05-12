@@ -32,6 +32,9 @@ const platform: WorkoutPlatform = {
   notifications: {
     workoutReminder: (body) => desktopApi.notifications.workoutReminder(body),
   },
+  appLifecycle: {
+    exit: () => desktopApi.app.exit(),
+  },
 };
 
 createRoot(document.getElementById('root') as HTMLElement).render(
