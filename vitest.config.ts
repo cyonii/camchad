@@ -12,6 +12,7 @@ export default defineConfig({
     alias: {
       '@home-workout/pose-core': `${root}packages/pose-core/src/index.ts`,
       '@home-workout/exercise-core': `${root}packages/exercise-core/src/index.ts`,
+      '@home-workout/workout-history': `${root}packages/workout-history/src/index.ts`,
     },
   },
 });

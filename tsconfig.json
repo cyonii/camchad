@@ -6,6 +6,9 @@
     },
     {
       "path": "./packages/exercise-core"
+    },
+    {
+      "path": "./packages/workout-history"
     }
   ]
 }
