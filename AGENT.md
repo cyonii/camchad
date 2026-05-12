@@ -30,3 +30,5 @@ Treat this repository as production-grade software. Optimise for correctness, re
 - Do not wait for video metadata before calling `video.play()` on a MediaStream in Electron. Attach stream, call play, then wait for usable video dimensions/current data.
 - The UI must separate startup, preview active, and tracking states. Camera preview and pose tracking readiness are different milestones.
 - Desktop packaging should be proven by running the actual package script. Commit build configuration, icons, and documentation; keep generated release artifacts ignored.
+- The Electron development renderer is not the browser web app. `npm run dev` starts the native app; use `npm run dev:web` for browser testing.
+- Packaged Electron renderer assets must use relative paths because `loadFile` runs from a `file://` URL inside the app bundle.

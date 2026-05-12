@@ -51,11 +51,15 @@ Run the desktop app:
 npm run dev
 ```
 
+This starts the Electron development flow. It also starts the desktop renderer dev server, but that renderer expects Electron's preload API and is not the browser web app.
+
 Run the web app:
 
 ```bash
 npm run dev:web
 ```
+
+Use this command when you want to test the app directly in a browser. Do not use the Electron renderer URL from `npm run dev` as the web app.
 
 ## Desktop Packaging
 
@@ -83,6 +87,13 @@ ditto "release/desktop/mac-arm64/Home Workout Tracker.app" "/Applications/Home W
 If your output directory differs, replace `mac-arm64` with the directory that exists under `release/desktop`.
 
 This local package is ad-hoc signed for development. For a distributable release outside your machine, add Developer ID signing and notarization before shipping.
+
+After rebuilding, reinstall the app bundle if you want the copy in `/Applications` to reflect the latest local build:
+
+```bash
+rm -rf "/Applications/Home Workout Tracker.app"
+ditto "release/desktop/mac-arm64/Home Workout Tracker.app" "/Applications/Home Workout Tracker.app"
+```
 
 ## Camera Notes
 
