@@ -12,13 +12,12 @@ import {
   PanelRight,
   Play,
   Power,
-  RotateCcw,
   Settings,
   Square,
   Sun,
 } from 'lucide-react';
-import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactElement } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { CSSProperties, ReactElement } from 'react';
 
 import type { CameraAngle, ExerciseDetectorState, RepEvent } from '@home-workout/exercise-core';
 import { defaultPushUpConfig, PushUpDetector } from '@home-workout/exercise-core';
@@ -36,12 +35,7 @@ import { buildHistoryChartModel, type HistoryChartModel } from './history-chart.
 
 type View = 'workout' | 'history' | 'settings';
 type ThemePreference = 'system' | 'light' | 'dark';
-type TelemetryMode = 'fixed' | 'floating';
-
-interface HudPosition {
-  readonly x: number;
-  readonly y: number;
-}
+type TelemetryMode = 'fixed' | 'engraved';
 
 export interface WorkoutAssets {
   readonly logoAssetPath?: string;
@@ -66,9 +60,7 @@ const initialDetectorState: ExerciseDetectorState = {
 
 const themePreferenceStorageKey = 'home-workout:theme-preference';
 const telemetryModeStorageKey = 'home-workout:telemetry-mode';
-const telemetryHudPositionStorageKey = 'home-workout:telemetry-hud-position';
 const poseInferenceIntervalMs = 80;
-const defaultHudPosition: HudPosition = { x: 24, y: 24 };
 
 export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement {
   const [view, setView] = useState<View>('workout');
@@ -199,21 +191,10 @@ function WorkoutView({
 }): ReactElement {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const stageRef = useRef<HTMLDivElement | null>(null);
-  const telemetryPanelRef = useRef<HTMLDivElement | null>(null);
   const estimatorRef = useRef<PoseEstimator | null>(null);
   const smootherRef = useRef(new ExponentialPoseSmoother());
   const detectorRef = useRef(new PushUpDetector());
   const animationFrameRef = useRef<number | undefined>(undefined);
-  const telemetryDragRef = useRef<
-    | {
-        readonly pointerId: number;
-        readonly startX: number;
-        readonly startY: number;
-        readonly origin: HudPosition;
-      }
-    | undefined
-  >(undefined);
   const sessionRef = useRef<WorkoutSession | undefined>(undefined);
   const repEventsRef = useRef<RepEvent[]>([]);
   const seenRepNumbersRef = useRef(new Set<number>());
@@ -230,9 +211,6 @@ function WorkoutView({
   const [detectorState, setDetectorState] = useState<ExerciseDetectorState>(initialDetectorState);
   const [cameraError, setCameraError] = useState<string | undefined>();
   const [telemetryMode, setTelemetryMode] = useState<TelemetryMode>(() => readTelemetryMode());
-  const [telemetryHudPosition, setTelemetryHudPosition] = useState<HudPosition>(() =>
-    readTelemetryHudPosition(),
-  );
 
   useEffect(() => {
     detectorStateRef.current = detectorState;
@@ -241,10 +219,6 @@ function WorkoutView({
   useEffect(() => {
     writeTelemetryMode(telemetryMode);
   }, [telemetryMode]);
-
-  useEffect(() => {
-    writeTelemetryHudPosition(telemetryHudPosition);
-  }, [telemetryHudPosition]);
 
   const processFrame = useCallback((timestampMs: number): void => {
     const video = videoRef.current;
@@ -445,83 +419,10 @@ function WorkoutView({
     setStatus('Ready');
   }, [cameraAngle, onSessionSaved]);
 
-  const clampTelemetryHudPosition = useCallback((position: HudPosition): HudPosition => {
-    const stage = stageRef.current;
-    const panel = telemetryPanelRef.current;
-
-    if (!stage || !panel) {
-      return {
-        x: Math.max(12, position.x),
-        y: Math.max(12, position.y),
-      };
-    }
-
-    const stageBounds = stage.getBoundingClientRect();
-    const panelBounds = panel.getBoundingClientRect();
-    const inset = 16;
-    const maxX = Math.max(inset, stageBounds.width - panelBounds.width - inset);
-    const maxY = Math.max(inset, stageBounds.height - panelBounds.height - inset);
-
-    return {
-      x: Math.min(Math.max(inset, position.x), maxX),
-      y: Math.min(Math.max(inset, position.y), maxY),
-    };
-  }, []);
-
-  const startTelemetryDrag = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>): void => {
-      if (telemetryMode !== 'floating' || event.button !== 0) {
-        return;
-      }
-
-      event.currentTarget.setPointerCapture(event.pointerId);
-      telemetryDragRef.current = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        origin: telemetryHudPosition,
-      };
-    },
-    [telemetryHudPosition, telemetryMode],
-  );
-
-  const moveTelemetryDrag = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>): void => {
-      const drag = telemetryDragRef.current;
-
-      if (!drag || drag.pointerId !== event.pointerId) {
-        return;
-      }
-
-      setTelemetryHudPosition(
-        clampTelemetryHudPosition({
-          x: drag.origin.x + event.clientX - drag.startX,
-          y: drag.origin.y + event.clientY - drag.startY,
-        }),
-      );
-    },
-    [clampTelemetryHudPosition],
-  );
-
-  const endTelemetryDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>): void => {
-    const drag = telemetryDragRef.current;
-
-    if (!drag || drag.pointerId !== event.pointerId) {
-      return;
-    }
-
-    telemetryDragRef.current = undefined;
-    event.currentTarget.releasePointerCapture(event.pointerId);
-  }, []);
-
-  const resetTelemetryHudPosition = useCallback(() => {
-    setTelemetryHudPosition(clampTelemetryHudPosition(defaultHudPosition));
-  }, [clampTelemetryHudPosition]);
-
   return (
     <section className={`workout-layout telemetry-${telemetryMode}`}>
       <div className="workout-command-grid">
-        <div className="workout-stage-panel" ref={stageRef}>
+        <div className="workout-stage-panel">
           <div className="video-stage">
             <video ref={videoRef} muted playsInline autoPlay />
             <canvas ref={canvasRef} />
@@ -533,19 +434,12 @@ function WorkoutView({
             ) : null}
             <StageTelemetryChrome status={status} isTracking={isTracking} />
 
-            {telemetryMode === 'floating' ? (
-              <TelemetryPanel
-                ref={telemetryPanelRef}
-                mode="floating"
+            {telemetryMode === 'engraved' ? (
+              <MirrorTelemetryOverlay
                 status={status}
                 detectorState={detectorState}
-                style={{
-                  transform: `translate3d(${telemetryHudPosition.x}px, ${telemetryHudPosition.y}px, 0)`,
-                }}
-                onDragStart={startTelemetryDrag}
-                onDragMove={moveTelemetryDrag}
-                onDragEnd={endTelemetryDrag}
-                onResetPosition={resetTelemetryHudPosition}
+                telemetryMode={telemetryMode}
+                onTelemetryModeChange={setTelemetryMode}
               />
             ) : null}
           </div>
@@ -559,73 +453,59 @@ function WorkoutView({
         </div>
 
         {telemetryMode === 'fixed' ? (
-          <TelemetryPanel
-            ref={telemetryPanelRef}
-            mode="fixed"
+          <SidebarTelemetryPanel
             status={status}
             detectorState={detectorState}
+            telemetryMode={telemetryMode}
+            onTelemetryModeChange={setTelemetryMode}
           />
         ) : null}
       </div>
 
       <div className="bottom-command-deck">
-        <fieldset className="segmented-control camera-angle-control">
-          <legend>Camera angle</legend>
-          <button
-            type="button"
-            className={cameraAngle === 'side' ? 'active' : undefined}
-            onClick={() => setCameraAngle('side')}
-            disabled={isStarting || isTracking}
-          >
-            Side
-          </button>
-          <button
-            type="button"
-            className={cameraAngle === 'front_diagonal' ? 'active' : undefined}
-            onClick={() => setCameraAngle('front_diagonal')}
-            disabled={isStarting || isTracking}
-          >
-            Diagonal
-          </button>
-        </fieldset>
-
-        <div className="telemetry-mode-control" role="group" aria-label="Telemetry panel mode">
-          <button
-            type="button"
-            aria-pressed={telemetryMode === 'fixed'}
-            onClick={() => setTelemetryMode('fixed')}
-          >
-            <PanelRight size={17} aria-hidden="true" />
-            Fixed
-          </button>
-          <button
-            type="button"
-            aria-pressed={telemetryMode === 'floating'}
-            onClick={() => setTelemetryMode('floating')}
-          >
-            <Move size={17} aria-hidden="true" />
-            Floating
-          </button>
+        <div className="command-module command-module-camera">
+          <span>Camera</span>
+          <div className="segmented-control compact-control" role="group" aria-label="Camera angle">
+            <button
+              type="button"
+              className={cameraAngle === 'side' ? 'active' : undefined}
+              onClick={() => setCameraAngle('side')}
+              disabled={isStarting || isTracking}
+            >
+              Side
+            </button>
+            <button
+              type="button"
+              className={cameraAngle === 'front_diagonal' ? 'active' : undefined}
+              onClick={() => setCameraAngle('front_diagonal')}
+              disabled={isStarting || isTracking}
+            >
+              Diagonal
+            </button>
+          </div>
         </div>
 
-        <div className="control-row">
-          {!isTracking && !isStarting ? (
-            <button className="primary-action" type="button" onClick={() => void startWorkout()}>
-              <Play size={18} aria-hidden="true" />
-              Start
-            </button>
-          ) : (
-            <>
-              <button className="secondary-action" type="button" disabled>
-                <Pause size={18} aria-hidden="true" />
-                {isStarting ? 'Starting' : 'Pause'}
+        <div className="command-module command-module-session">
+          <span>Session</span>
+          <div className="control-row">
+            {!isTracking && !isStarting ? (
+              <button className="primary-action" type="button" onClick={() => void startWorkout()}>
+                <Play size={18} aria-hidden="true" />
+                Start
               </button>
-              <button className="danger-action" type="button" onClick={() => void stopWorkout()}>
-                <Square size={18} aria-hidden="true" />
-                Stop
-              </button>
-            </>
-          )}
+            ) : (
+              <>
+                <button className="secondary-action" type="button" disabled>
+                  <Pause size={18} aria-hidden="true" />
+                  {isStarting ? 'Starting' : 'Pause'}
+                </button>
+                <button className="danger-action" type="button" onClick={() => void stopWorkout()}>
+                  <Square size={18} aria-hidden="true" />
+                  Stop
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </section>
@@ -657,61 +537,35 @@ function StageTelemetryChrome({
   );
 }
 
-interface TelemetryPanelProps {
-  readonly mode: TelemetryMode;
+interface SidebarTelemetryProps {
   readonly status: string;
   readonly detectorState: ExerciseDetectorState;
-  readonly style?: CSSProperties;
-  readonly onDragStart?: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  readonly onDragMove?: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  readonly onDragEnd?: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  readonly onResetPosition?: () => void;
+  readonly telemetryMode: TelemetryMode;
+  readonly onTelemetryModeChange: (mode: TelemetryMode) => void;
 }
 
-const TelemetryPanel = forwardRef<HTMLDivElement, TelemetryPanelProps>(function TelemetryPanel(
-  { mode, status, detectorState, style, onDragStart, onDragMove, onDragEnd, onResetPosition },
-  ref,
-): ReactElement {
+function SidebarTelemetryPanel({
+  status,
+  detectorState,
+  telemetryMode,
+  onTelemetryModeChange,
+}: SidebarTelemetryProps): ReactElement {
   const confidence =
     detectorState.phase === 'tracking_lost'
       ? 'Lost'
       : formatMetric(detectorState.metrics.poseConfidence, '%');
 
   return (
-    <aside
-      className={`telemetry-panel telemetry-panel-${mode}`}
-      ref={ref}
-      style={style}
-      aria-label="Push-up telemetry"
-    >
-      <div
-        className="telemetry-panel-header"
-        onPointerDown={onDragStart}
-        onPointerMove={onDragMove}
-        onPointerUp={onDragEnd}
-        onPointerCancel={onDragEnd}
-      >
+    <aside className="telemetry-panel telemetry-panel-fixed" aria-label="Push-up telemetry">
+      <div className="telemetry-panel-header">
         <div>
           <span>Push-ups</span>
           <strong>{status}</strong>
         </div>
-        {mode === 'floating' ? (
-          <div className="telemetry-drag-actions">
-            <Move size={16} aria-hidden="true" />
-            <button
-              className="icon-action subtle"
-              type="button"
-              onClick={onResetPosition}
-              aria-label="Reset telemetry HUD position"
-              title="Reset HUD position"
-            >
-              <RotateCcw size={15} aria-hidden="true" />
-            </button>
-          </div>
-        ) : null}
+        <TelemetryModeControl value={telemetryMode} onChange={onTelemetryModeChange} />
       </div>
 
-      <div className="rep-counter">
+      <div className="rep-counter telemetry-block">
         <div>
           <span>Valid reps</span>
           <strong>{detectorState.validReps}</strong>
@@ -720,14 +574,14 @@ const TelemetryPanel = forwardRef<HTMLDivElement, TelemetryPanelProps>(function 
         <QualityDial value={detectorState.metrics.poseConfidence} phase={detectorState.phase} />
       </div>
 
-      <div className="metric-grid">
+      <div className="metric-grid telemetry-block">
         <Metric label="Phase" value={formatPhase(detectorState.phase)} />
         <Metric label="Elbow angle" value={formatMetric(detectorState.metrics.elbowAngle, 'deg')} />
         <Metric label="Alignment" value={formatMetric(detectorState.metrics.alignmentScore, '%')} />
         <Metric label="Confidence" value={confidence} />
       </div>
 
-      <div className="form-feedback">
+      <div className="form-feedback telemetry-block">
         <span>Form feedback</span>
         {detectorState.warnings.length === 0 ? (
           <p>
@@ -744,7 +598,7 @@ const TelemetryPanel = forwardRef<HTMLDivElement, TelemetryPanelProps>(function 
         )}
       </div>
 
-      <div className="rep-history-strip" aria-label="Current rep history">
+      <div className="rep-history-strip telemetry-block" aria-label="Current rep history">
         <span>Rep history</span>
         <div>
           {Array.from({ length: 10 }, (_, index) => {
@@ -768,7 +622,90 @@ const TelemetryPanel = forwardRef<HTMLDivElement, TelemetryPanelProps>(function 
       </div>
     </aside>
   );
-});
+}
+
+function MirrorTelemetryOverlay({
+  status,
+  detectorState,
+  telemetryMode,
+  onTelemetryModeChange,
+}: SidebarTelemetryProps): ReactElement {
+  const confidence =
+    detectorState.phase === 'tracking_lost'
+      ? 'Lost'
+      : formatMetric(detectorState.metrics.poseConfidence, '%');
+  const formMessage =
+    detectorState.warnings.length === 0
+      ? 'Tracking conditions look usable.'
+      : detectorState.warnings[0]?.message;
+
+  return (
+    <aside className="mirror-telemetry" aria-label="Push-up mirror telemetry">
+      <div className="mirror-telemetry-controls">
+        <TelemetryModeControl value={telemetryMode} onChange={onTelemetryModeChange} />
+      </div>
+
+      <div className="mirror-telemetry-heading">
+        <span>Push-ups</span>
+        <strong>{status}</strong>
+      </div>
+
+      <dl className="mirror-telemetry-readout">
+        <div className="mirror-primary-metric">
+          <dt>Valid reps</dt>
+          <dd>{detectorState.validReps}</dd>
+        </div>
+        <div>
+          <dt>Partial</dt>
+          <dd>{detectorState.partialReps}</dd>
+        </div>
+        <div>
+          <dt>Phase</dt>
+          <dd>{formatPhase(detectorState.phase)}</dd>
+        </div>
+        <div>
+          <dt>Elbow</dt>
+          <dd>{formatMetric(detectorState.metrics.elbowAngle, 'deg')}</dd>
+        </div>
+        <div>
+          <dt>Alignment</dt>
+          <dd>{formatMetric(detectorState.metrics.alignmentScore, '%')}</dd>
+        </div>
+        <div>
+          <dt>Confidence</dt>
+          <dd>{confidence}</dd>
+        </div>
+      </dl>
+
+      <p className="mirror-form-message">{formMessage}</p>
+    </aside>
+  );
+}
+
+function TelemetryModeControl({
+  value,
+  onChange,
+}: {
+  readonly value: TelemetryMode;
+  readonly onChange: (mode: TelemetryMode) => void;
+}): ReactElement {
+  return (
+    <div className="telemetry-mode-control" role="group" aria-label="Telemetry panel mode">
+      <button type="button" aria-pressed={value === 'fixed'} onClick={() => onChange('fixed')}>
+        <PanelRight size={15} aria-hidden="true" />
+        Sidebar
+      </button>
+      <button
+        type="button"
+        aria-pressed={value === 'engraved'}
+        onClick={() => onChange('engraved')}
+      >
+        <Move size={15} aria-hidden="true" />
+        Mirror
+      </button>
+    </div>
+  );
+}
 
 function QualityDial({
   value,
@@ -1161,7 +1098,7 @@ function readTelemetryMode(): TelemetryMode {
   try {
     const storedMode = localStorage.getItem(telemetryModeStorageKey);
 
-    if (storedMode === 'fixed' || storedMode === 'floating') {
+    if (storedMode === 'fixed' || storedMode === 'engraved') {
       return storedMode;
     }
   } catch {
@@ -1174,37 +1111,6 @@ function readTelemetryMode(): TelemetryMode {
 function writeTelemetryMode(mode: TelemetryMode): void {
   try {
     localStorage.setItem(telemetryModeStorageKey, mode);
-  } catch {
-    // A blocked storage write should not prevent live workout tracking.
-  }
-}
-
-function readTelemetryHudPosition(): HudPosition {
-  try {
-    const rawPosition = localStorage.getItem(telemetryHudPositionStorageKey);
-
-    if (!rawPosition) {
-      return defaultHudPosition;
-    }
-
-    const parsedPosition = JSON.parse(rawPosition) as Partial<HudPosition>;
-
-    if (typeof parsedPosition.x === 'number' && typeof parsedPosition.y === 'number') {
-      return {
-        x: parsedPosition.x,
-        y: parsedPosition.y,
-      };
-    }
-  } catch {
-    return defaultHudPosition;
-  }
-
-  return defaultHudPosition;
-}
-
-function writeTelemetryHudPosition(position: HudPosition): void {
-  try {
-    localStorage.setItem(telemetryHudPositionStorageKey, JSON.stringify(position));
   } catch {
     // A blocked storage write should not prevent live workout tracking.
   }
