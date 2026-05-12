@@ -5,10 +5,13 @@ import {
   CheckCircle2,
   CircleAlert,
   History,
+  Monitor,
+  Moon,
   Pause,
   Play,
   Settings,
   Square,
+  Sun,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
@@ -28,6 +31,7 @@ import type { WorkoutPlatform } from './platform.js';
 import { buildHistoryChartModel, type HistoryChartModel } from './history-chart.js';
 
 type View = 'workout' | 'history' | 'settings';
+type ThemePreference = 'system' | 'light' | 'dark';
 
 export interface WorkoutAssets {
   readonly logoAssetPath?: string;
@@ -50,6 +54,8 @@ const initialDetectorState: ExerciseDetectorState = {
   metrics: {},
 };
 
+const themePreferenceStorageKey = 'home-workout:theme-preference';
+
 export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement {
   const [view, setView] = useState<View>('workout');
   const [sessions, setSessions] = useState<readonly WorkoutSession[]>([]);
@@ -60,6 +66,9 @@ export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement 
     partialReps: 0,
   });
   const [startupEnabled, setStartupEnabled] = useState(false);
+  const [themePreference, setThemePreference] = useState<ThemePreference>(() =>
+    readThemePreference(),
+  );
 
   const loadHistory = useCallback(async () => {
     const [nextSessions, nextSummary] = await Promise.all([
@@ -74,6 +83,11 @@ export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement 
     void loadHistory();
     void platform.settings?.getStartupEnabled().then(setStartupEnabled);
   }, [loadHistory, platform.settings]);
+
+  useEffect(() => {
+    applyThemePreference(themePreference);
+    writeThemePreference(themePreference);
+  }, [themePreference]);
 
   const saveSession = useCallback(
     async (session: WorkoutSession) => {
@@ -137,6 +151,8 @@ export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement 
             platform={platform}
             startupEnabled={startupEnabled}
             onStartupEnabledChange={setStartupEnabled}
+            themePreference={themePreference}
+            onThemePreferenceChange={setThemePreference}
           />
         ) : null}
       </main>
@@ -652,10 +668,14 @@ function SettingsView({
   platform,
   startupEnabled,
   onStartupEnabledChange,
+  themePreference,
+  onThemePreferenceChange,
 }: {
   readonly platform: WorkoutPlatform;
   readonly startupEnabled: boolean;
   readonly onStartupEnabledChange: (enabled: boolean) => void;
+  readonly themePreference: ThemePreference;
+  readonly onThemePreferenceChange: (preference: ThemePreference) => void;
 }): ReactElement {
   const [reminderStatus, setReminderStatus] = useState('No reminder sent this session.');
   const canUseStartup = Boolean(platform.settings);
@@ -691,6 +711,45 @@ function SettingsView({
 
         <div className="setting-row">
           <div>
+            <strong>Theme</strong>
+            <span>Follow the system by default, or pin the interface.</span>
+          </div>
+          <div className="theme-control" role="group" aria-label="Theme">
+            <button
+              className="icon-action"
+              type="button"
+              aria-pressed={themePreference === 'system'}
+              aria-label="Use system theme"
+              title="System"
+              onClick={() => onThemePreferenceChange('system')}
+            >
+              <Monitor size={18} aria-hidden="true" />
+            </button>
+            <button
+              className="icon-action"
+              type="button"
+              aria-pressed={themePreference === 'light'}
+              aria-label="Use light theme"
+              title="Light"
+              onClick={() => onThemePreferenceChange('light')}
+            >
+              <Sun size={18} aria-hidden="true" />
+            </button>
+            <button
+              className="icon-action"
+              type="button"
+              aria-pressed={themePreference === 'dark'}
+              aria-label="Use dark theme"
+              title="Dark"
+              onClick={() => onThemePreferenceChange('dark')}
+            >
+              <Moon size={18} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <div className="setting-row">
+          <div>
             <strong>Reminder test</strong>
             <span>Send a local OS notification without contacting a server.</span>
           </div>
@@ -712,6 +771,41 @@ function SettingsView({
       </div>
     </section>
   );
+}
+
+function readThemePreference(): ThemePreference {
+  try {
+    const storedPreference = localStorage.getItem(themePreferenceStorageKey);
+
+    if (
+      storedPreference === 'system' ||
+      storedPreference === 'light' ||
+      storedPreference === 'dark'
+    ) {
+      return storedPreference;
+    }
+  } catch {
+    return 'system';
+  }
+
+  return 'system';
+}
+
+function writeThemePreference(preference: ThemePreference): void {
+  try {
+    localStorage.setItem(themePreferenceStorageKey, preference);
+  } catch {
+    // A blocked storage write should not prevent the user from using the app.
+  }
+}
+
+function applyThemePreference(preference: ThemePreference): void {
+  if (preference === 'system') {
+    document.documentElement.removeAttribute('data-theme');
+    return;
+  }
+
+  document.documentElement.dataset.theme = preference;
 }
 
 function describeCameraStartupError(error: unknown): string {
