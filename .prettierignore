@@ -1,0 +1,9 @@
+node_modules
+coverage
+dist
+dist-electron
+**/dist
+**/dist-electron
+package-lock.json
+apps/desktop/public/vendor
+*.tsbuildinfo
