@@ -1,0 +1,24 @@
+appId: app.homeworkout.tracker
+productName: Home Workout Tracker
+copyright: Copyright © 2026
+electronVersion: 36.9.5
+
+directories:
+  output: ../../release/desktop
+
+files:
+  - package.json
+  - dist/**/*
+  - dist-electron/**/*
+
+asar: true
+npmRebuild: false
+
+mac:
+  category: public.app-category.healthcare-fitness
+  icon: build/icon.icns
+  target:
+    - dir
+  extendInfo:
+    NSCameraUsageDescription: Home Workout Tracker uses the camera locally to track exercise movement and count reps.
+    NSHighResolutionCapable: true

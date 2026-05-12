@@ -2,11 +2,14 @@
   "name": "@home-workout/desktop",
   "version": "0.1.0",
   "private": true,
+  "description": "Local-first camera-based home workout tracker desktop app.",
+  "author": "Home Workout Tracker",
   "type": "module",
   "main": "dist-electron/main/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"tsc -p tsconfig.electron.json --watch --preserveWatchOutput\" \"wait-on tcp:5173 dist-electron/main/main.js && electron dist-electron/main/main.js\"",
     "build": "tsc -p tsconfig.electron.json && vite build",
+    "package:mac": "electron-builder --config electron-builder.yml --mac dir",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "preview": "vite preview"
   },
@@ -20,7 +23,8 @@
     "@types/react-dom": "^19.1.5",
     "@vitejs/plugin-react": "^4.4.1",
     "concurrently": "^9.1.2",
-    "electron": "^36.2.0",
+    "electron": "36.9.5",
+    "electron-builder": "^26.8.1",
     "vite": "^6.3.5",
     "wait-on": "^8.0.3"
   }
