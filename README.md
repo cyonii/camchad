@@ -99,7 +99,15 @@ ditto "release/desktop/mac-arm64/Home Workout Tracker.app" "/Applications/Home W
 
 The web app is the simplest way to verify camera and pose behavior because browser camera permission handling is explicit and well surfaced.
 
-The Electron app asks macOS for camera access from the main process before the renderer calls `getUserMedia`. During local development, macOS can still attribute camera access to the launcher/Electron host. For example, launching from VS Code may use VS Code's camera permission, while launching from another terminal or automation app requires that launcher to have camera permission too.
+The packaged Electron app must include both `NSCameraUsageDescription` and the `com.apple.security.device.camera` entitlement. The main process requests consent with Electron's `systemPreferences.askForMediaAccess('camera')` before the renderer calls `getUserMedia`; without the entitlement, macOS can open a dead capture stream without registering the app in Camera settings.
+
+During local development, macOS can still attribute camera access to the launcher/Electron host. For example, launching from VS Code may use VS Code's camera permission, while launching from another terminal or automation app requires that launcher to have camera permission too.
+
+If the packaged app still does not appear under System Settings > Privacy & Security > Camera after pressing Start, reset only this app's camera privacy entry and open it again from `/Applications`:
+
+```bash
+tccutil reset Camera app.homeworkout.tracker
+```
 
 A distributable macOS build should add camera usage metadata, signing, and notarization before it is treated as production-ready.
 

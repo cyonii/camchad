@@ -24,8 +24,9 @@ Treat this repository as production-grade software. Optimise for correctness, re
 
 ## Lessons Already Learned
 
-- In Electron on macOS, renderer `getUserMedia` is not enough. The main process should explicitly request/check camera permission through Electron APIs before the renderer opens a stream.
-- In development, macOS may attribute camera access to the launcher or Electron host. Packaged builds need camera permission metadata and signing/notarization planning.
+- In packaged Electron on macOS, camera support requires both `NSCameraUsageDescription` and `com.apple.security.device.camera` in the signed app entitlements. Verify with `codesign -d --entitlements :-`.
+- Use Electron's main-process `systemPreferences.askForMediaAccess('camera')` before renderer `getUserMedia` in packaged builds. Without camera entitlements, macOS may open a dead stream and never list the app in Camera settings.
+- In development, macOS may attribute camera access to the launcher or Electron host. Packaged builds need camera permission metadata, camera entitlement, signing, and notarization planning.
 - macOS camera permission can differ by launcher. If the app works from VS Code but not from another terminal or automation environment, check the launcher's camera permission before rewriting capture code.
 - Do not wait for video metadata before calling `video.play()` on a MediaStream in Electron. Attach stream, call play, then wait for usable video dimensions/current data.
 - The UI must separate startup, preview active, and tracking states. Camera preview and pose tracking readiness are different milestones.
