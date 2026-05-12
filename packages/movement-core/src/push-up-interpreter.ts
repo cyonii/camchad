@@ -83,8 +83,10 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
     this.lowestElbowAngle = Math.min(this.lowestElbowAngle, elbowAngle);
     this.metrics = {
       elbowAngle,
+      primaryJointAngle: elbowAngle,
       bodyLineDeviation,
       alignmentScore,
+      rangeOfMotionScore: this.depthScore(),
       poseConfidence: frame.confidence,
       movementConfidence: movementConfidence(frame.confidence, trackingSide.visibilityScore),
       trackingSide: trackingSide.side === 'left' ? 0 : 1,

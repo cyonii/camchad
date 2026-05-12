@@ -56,6 +56,8 @@ describe('PushUpMovementInterpreter', () => {
     expect(state.reps).toBe(1);
     expect(state.validReps).toBe(1);
     expect(state.metrics.poseConfidence).toBeCloseTo(0.95);
+    expect(state.metrics.primaryJointAngle).toBeCloseTo(154);
+    expect(state.metrics.rangeOfMotionScore).toBeGreaterThan(0);
     expect(state.metrics.trackingSide).toBe(0);
   });
 
