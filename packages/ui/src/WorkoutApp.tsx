@@ -1,5 +1,9 @@
 import {
   Activity,
+  ArrowDownLeft,
+  ArrowDownRight,
+  ArrowUpLeft,
+  ArrowUpRight,
   Bell,
   Camera,
   CheckCircle2,
@@ -32,6 +36,7 @@ import { buildHistoryChartModel, type HistoryChartModel } from './history-chart.
 
 type View = 'workout' | 'history' | 'settings';
 type ThemePreference = 'system' | 'light' | 'dark';
+type OverlayPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 export interface WorkoutAssets {
   readonly logoAssetPath?: string;
@@ -55,6 +60,7 @@ const initialDetectorState: ExerciseDetectorState = {
 };
 
 const themePreferenceStorageKey = 'home-workout:theme-preference';
+const overlayPositionStorageKey = 'home-workout:overlay-position';
 
 export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement {
   const [view, setView] = useState<View>('workout');
@@ -189,10 +195,17 @@ function WorkoutView({
   const [status, setStatus] = useState('Ready');
   const [detectorState, setDetectorState] = useState<ExerciseDetectorState>(initialDetectorState);
   const [cameraError, setCameraError] = useState<string | undefined>();
+  const [overlayPosition, setOverlayPosition] = useState<OverlayPosition>(() =>
+    readOverlayPosition(),
+  );
 
   useEffect(() => {
     detectorStateRef.current = detectorState;
   }, [detectorState]);
+
+  useEffect(() => {
+    writeOverlayPosition(overlayPosition);
+  }, [overlayPosition]);
 
   const processFrame = useCallback((timestampMs: number): void => {
     const video = videoRef.current;
@@ -387,7 +400,7 @@ function WorkoutView({
 
   return (
     <section className="workout-layout">
-      <div className="video-panel">
+      <div className="workout-stage-panel">
         <div className="video-stage">
           <video ref={videoRef} muted playsInline autoPlay />
           <canvas ref={canvasRef} />
@@ -400,93 +413,96 @@ function WorkoutView({
         </div>
 
         {cameraError ? (
-          <div className="alert">
+          <div className="alert camera-alert">
             <CircleAlert size={18} aria-hidden="true" />
             <span>{cameraError}</span>
           </div>
         ) : null}
-      </div>
 
-      <div className="workout-panel">
-        <div className="panel-heading">
-          <span>Push-ups</span>
-          <strong>{status}</strong>
-        </div>
+        <div className={`workout-overlay overlay-${overlayPosition}`}>
+          <div className="overlay-heading">
+            <div>
+              <span>Push-ups</span>
+              <strong>{status}</strong>
+            </div>
+            <OverlayPositionControl value={overlayPosition} onChange={setOverlayPosition} />
+          </div>
 
-        <div className="rep-counter">
-          <span>Reps</span>
-          <strong>{detectorState.validReps}</strong>
-          <small>{detectorState.partialReps} partial</small>
-        </div>
+          <div className="rep-counter">
+            <span>Valid reps</span>
+            <strong>{detectorState.validReps}</strong>
+            <small>{detectorState.partialReps} partial reps</small>
+          </div>
 
-        <div className="metric-grid">
-          <Metric label="Phase" value={formatPhase(detectorState.phase)} />
-          <Metric label="Elbow" value={formatMetric(detectorState.metrics.elbowAngle, 'deg')} />
-          <Metric
-            label="Alignment"
-            value={formatMetric(detectorState.metrics.alignmentScore, '%')}
-          />
-          <Metric
-            label="Confidence"
-            value={detectorState.phase === 'tracking_lost' ? 'Lost' : 'Live'}
-          />
-        </div>
+          <div className="metric-grid">
+            <Metric label="Phase" value={formatPhase(detectorState.phase)} />
+            <Metric label="Elbow" value={formatMetric(detectorState.metrics.elbowAngle, 'deg')} />
+            <Metric
+              label="Alignment"
+              value={formatMetric(detectorState.metrics.alignmentScore, '%')}
+            />
+            <Metric
+              label="Confidence"
+              value={detectorState.phase === 'tracking_lost' ? 'Lost' : 'Live'}
+            />
+          </div>
 
-        <fieldset className="segmented-control">
-          <legend>Camera angle</legend>
-          <button
-            type="button"
-            className={cameraAngle === 'side' ? 'active' : undefined}
-            onClick={() => setCameraAngle('side')}
-            disabled={isStarting || isTracking}
-          >
-            Side
-          </button>
-          <button
-            type="button"
-            className={cameraAngle === 'front_diagonal' ? 'active' : undefined}
-            onClick={() => setCameraAngle('front_diagonal')}
-            disabled={isStarting || isTracking}
-          >
-            Diagonal
-          </button>
-        </fieldset>
-
-        <div className="form-feedback">
-          <span>Form</span>
-          {detectorState.warnings.length === 0 ? (
-            <p>
-              <CheckCircle2 size={18} aria-hidden="true" />
-              Tracking conditions look usable.
-            </p>
-          ) : (
-            detectorState.warnings.map((warning) => (
-              <p key={warning.code}>
-                <CircleAlert size={18} aria-hidden="true" />
-                {warning.message}
-              </p>
-            ))
-          )}
-        </div>
-
-        <div className="control-row">
-          {!isTracking && !isStarting ? (
-            <button className="primary-action" type="button" onClick={() => void startWorkout()}>
-              <Play size={18} aria-hidden="true" />
-              Start
+          <fieldset className="segmented-control">
+            <legend>Camera angle</legend>
+            <button
+              type="button"
+              className={cameraAngle === 'side' ? 'active' : undefined}
+              onClick={() => setCameraAngle('side')}
+              disabled={isStarting || isTracking}
+            >
+              Side
             </button>
-          ) : (
-            <>
-              <button className="secondary-action" type="button" disabled>
-                <Pause size={18} aria-hidden="true" />
-                {isStarting ? 'Starting' : 'Pause'}
+            <button
+              type="button"
+              className={cameraAngle === 'front_diagonal' ? 'active' : undefined}
+              onClick={() => setCameraAngle('front_diagonal')}
+              disabled={isStarting || isTracking}
+            >
+              Diagonal
+            </button>
+          </fieldset>
+
+          <div className="form-feedback">
+            <span>Form</span>
+            {detectorState.warnings.length === 0 ? (
+              <p>
+                <CheckCircle2 size={18} aria-hidden="true" />
+                Tracking conditions look usable.
+              </p>
+            ) : (
+              detectorState.warnings.map((warning) => (
+                <p key={warning.code}>
+                  <CircleAlert size={18} aria-hidden="true" />
+                  {warning.message}
+                </p>
+              ))
+            )}
+          </div>
+
+          <div className="control-row">
+            {!isTracking && !isStarting ? (
+              <button className="primary-action" type="button" onClick={() => void startWorkout()}>
+                <Play size={18} aria-hidden="true" />
+                Start
               </button>
-              <button className="danger-action" type="button" onClick={() => void stopWorkout()}>
-                <Square size={18} aria-hidden="true" />
-                Stop
-              </button>
-            </>
-          )}
+            ) : (
+              <>
+                <button className="secondary-action" type="button" disabled>
+                  <Pause size={18} aria-hidden="true" />
+                  {isStarting ? 'Starting' : 'Pause'}
+                </button>
+                <button className="danger-action" type="button" onClick={() => void stopWorkout()}>
+                  <Square size={18} aria-hidden="true" />
+                  Stop
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </section>
@@ -773,6 +789,54 @@ function SettingsView({
   );
 }
 
+function OverlayPositionControl({
+  value,
+  onChange,
+}: {
+  readonly value: OverlayPosition;
+  readonly onChange: (position: OverlayPosition) => void;
+}): ReactElement {
+  const positions: readonly {
+    readonly value: OverlayPosition;
+    readonly label: string;
+    readonly icon: ReactElement;
+  }[] = [
+    { value: 'top-left', label: 'Top left', icon: <ArrowUpLeft size={15} aria-hidden="true" /> },
+    {
+      value: 'top-right',
+      label: 'Top right',
+      icon: <ArrowUpRight size={15} aria-hidden="true" />,
+    },
+    {
+      value: 'bottom-left',
+      label: 'Bottom left',
+      icon: <ArrowDownLeft size={15} aria-hidden="true" />,
+    },
+    {
+      value: 'bottom-right',
+      label: 'Bottom right',
+      icon: <ArrowDownRight size={15} aria-hidden="true" />,
+    },
+  ];
+
+  return (
+    <div className="overlay-position-control" role="group" aria-label="Overlay position">
+      {positions.map((position) => (
+        <button
+          key={position.value}
+          type="button"
+          aria-label={`Move overlay to ${position.label.toLowerCase()}`}
+          aria-pressed={value === position.value}
+          title={position.label}
+          onClick={() => onChange(position.value)}
+        >
+          {position.icon}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function readThemePreference(): ThemePreference {
   try {
     const storedPreference = localStorage.getItem(themePreferenceStorageKey);
@@ -806,6 +870,33 @@ function applyThemePreference(preference: ThemePreference): void {
   }
 
   document.documentElement.dataset.theme = preference;
+}
+
+function readOverlayPosition(): OverlayPosition {
+  try {
+    const storedPosition = localStorage.getItem(overlayPositionStorageKey);
+
+    if (
+      storedPosition === 'top-left' ||
+      storedPosition === 'top-right' ||
+      storedPosition === 'bottom-left' ||
+      storedPosition === 'bottom-right'
+    ) {
+      return storedPosition;
+    }
+  } catch {
+    return 'top-right';
+  }
+
+  return 'top-right';
+}
+
+function writeOverlayPosition(position: OverlayPosition): void {
+  try {
+    localStorage.setItem(overlayPositionStorageKey, position);
+  } catch {
+    // A blocked storage write should not prevent live workout tracking.
+  }
 }
 
 function describeCameraStartupError(error: unknown): string {
