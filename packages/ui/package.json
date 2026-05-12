@@ -18,7 +18,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@home-workout/exercise-core": "0.1.0",
+    "@home-workout/movement-core": "0.1.0",
     "@home-workout/pose-core": "0.1.0",
     "@home-workout/workout-history": "0.1.0",
     "lucide-react": "^0.511.0",

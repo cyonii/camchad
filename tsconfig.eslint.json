@@ -11,7 +11,7 @@
     "baseUrl": ".",
     "paths": {
       "@home-workout/pose-core": ["packages/pose-core/src/index.ts"],
-      "@home-workout/exercise-core": ["packages/exercise-core/src/index.ts"],
+      "@home-workout/movement-core": ["packages/movement-core/src/index.ts"],
       "@home-workout/workout-history": ["packages/workout-history/src/index.ts"],
       "@home-workout/ui": ["packages/ui/src/index.ts"]
     },

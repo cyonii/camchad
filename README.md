@@ -29,7 +29,7 @@ apps/
 
 packages/
   pose-core/
-  exercise-core/
+  movement-core/
   workout-history/
   ui/
 ```

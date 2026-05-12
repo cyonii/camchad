@@ -11,7 +11,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@home-workout/pose-core': `${root}packages/pose-core/src/index.ts`,
-      '@home-workout/exercise-core': `${root}packages/exercise-core/src/index.ts`,
+      '@home-workout/movement-core': `${root}packages/movement-core/src/index.ts`,
       '@home-workout/workout-history': `${root}packages/workout-history/src/index.ts`,
       '@home-workout/ui': `${root}packages/ui/src/index.ts`,
     },

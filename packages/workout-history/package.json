@@ -17,6 +17,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@home-workout/exercise-core": "0.1.0"
+    "@home-workout/movement-core": "0.1.0"
   }
 }

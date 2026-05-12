@@ -14,7 +14,7 @@
     "baseUrl": "../..",
     "paths": {
       "@home-workout/pose-core": ["packages/pose-core/src/index.ts"],
-      "@home-workout/exercise-core": ["packages/exercise-core/src/index.ts"],
+      "@home-workout/movement-core": ["packages/movement-core/src/index.ts"],
       "@home-workout/workout-history": ["packages/workout-history/src/index.ts"]
     },
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
@@ -27,7 +27,7 @@
       "path": "../pose-core"
     },
     {
-      "path": "../exercise-core"
+      "path": "../movement-core"
     },
     {
       "path": "../workout-history"

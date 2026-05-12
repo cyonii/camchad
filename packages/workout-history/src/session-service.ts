@@ -3,7 +3,7 @@ import type {
   ExerciseDetectorState,
   ExerciseType,
   RepEvent,
-} from '@home-workout/exercise-core';
+} from '@home-workout/movement-core';
 
 import type { ExerciseSet, WorkoutSession } from './models.js';
 import type { WorkoutRepository } from './workout-repository.js';

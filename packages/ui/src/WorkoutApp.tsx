@@ -19,8 +19,8 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
 
-import type { CameraAngle, ExerciseDetectorState, RepEvent } from '@home-workout/exercise-core';
-import { defaultPushUpConfig, PushUpDetector } from '@home-workout/exercise-core';
+import type { CameraAngle, ExerciseDetectorState, RepEvent } from '@home-workout/movement-core';
+import { defaultPushUpConfig, PushUpDetector } from '@home-workout/movement-core';
 import {
   ExponentialPoseSmoother,
   MediaPipePoseEstimator,

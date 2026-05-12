@@ -11,8 +11,8 @@ export default {
       { find: '@home-workout/ui', replacement: `${root}/packages/ui/src/index.ts` },
       { find: '@home-workout/pose-core', replacement: `${root}/packages/pose-core/src/index.ts` },
       {
-        find: '@home-workout/exercise-core',
-        replacement: `${root}/packages/exercise-core/src/index.ts`,
+        find: '@home-workout/movement-core',
+        replacement: `${root}/packages/movement-core/src/index.ts`,
       },
       {
         find: '@home-workout/workout-history',

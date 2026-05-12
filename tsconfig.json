@@ -5,7 +5,7 @@
       "path": "./packages/pose-core"
     },
     {
-      "path": "./packages/exercise-core"
+      "path": "./packages/movement-core"
     },
     {
       "path": "./packages/workout-history"
