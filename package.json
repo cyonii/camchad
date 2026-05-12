@@ -10,9 +10,11 @@
   ],
   "scripts": {
     "dev": "npm run dev -w @home-workout/desktop",
+    "dev:web": "npm run dev -w @home-workout/web",
     "sync:mediapipe-assets": "node scripts/sync-mediapipe-assets.mjs",
-    "build": "npm run build --workspaces --if-present",
-    "clean": "rm -rf apps/*/dist apps/*/dist-electron packages/*/dist apps/*/*.tsbuildinfo packages/*/*.tsbuildinfo coverage",
+    "build": "npm run build:packages && npm run build -w @home-workout/web && npm run build -w @home-workout/desktop",
+    "build:packages": "tsc -b packages/pose-core packages/exercise-core packages/workout-history packages/ui",
+    "clean": "tsc -b --clean packages/pose-core packages/exercise-core packages/workout-history packages/ui apps/web apps/desktop || true && rm -rf apps/*/dist apps/*/dist-electron apps/*/dist-types packages/*/dist apps/*/*.tsbuildinfo packages/*/*.tsbuildinfo coverage",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
