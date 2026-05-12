@@ -8,6 +8,11 @@
     "noEmit": true,
     "strict": true,
     "target": "ES2022",
+    "baseUrl": ".",
+    "paths": {
+      "@home-workout/pose-core": ["packages/pose-core/src/index.ts"],
+      "@home-workout/exercise-core": ["packages/exercise-core/src/index.ts"]
+    },
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true
   },

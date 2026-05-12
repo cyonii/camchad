@@ -1,7 +1,17 @@
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
+
+const root = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   test: {
     environment: 'node',
+  },
+  resolve: {
+    alias: {
+      '@home-workout/pose-core': `${root}packages/pose-core/src/index.ts`,
+      '@home-workout/exercise-core': `${root}packages/exercise-core/src/index.ts`,
+    },
   },
 });
