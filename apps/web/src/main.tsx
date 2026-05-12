@@ -14,7 +14,7 @@ createRoot(document.getElementById('root') as HTMLElement).render(
     <ActivityApp
       assets={{
         logoAssetPath: '/logo.png',
-        modelAssetPath: '/vendor/mediapipe/models/pose_landmarker_lite.task',
+        modelAssetPath: '/vendor/mediapipe/models/pose_landmarker_full.task',
         wasmAssetPath: '/vendor/mediapipe/wasm',
       }}
       platform={{

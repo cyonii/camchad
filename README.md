@@ -43,7 +43,7 @@ npm run validate
 npm run build
 ```
 
-The asset sync command copies MediaPipe WASM files from `@mediapipe/tasks-vision` and downloads the Pose Landmarker Lite model into each app's local `public/vendor/mediapipe` directory. Runtime inference should not fetch model assets from the network.
+The asset sync command copies MediaPipe WASM files from `@mediapipe/tasks-vision` and downloads local Pose Landmarker model variants into each app's `public/vendor/mediapipe` directory. Runtime inference should not fetch model assets from the network.
 
 Run the desktop app:
 

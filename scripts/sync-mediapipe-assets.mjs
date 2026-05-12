@@ -11,12 +11,20 @@ const publicRoots = [
   join(repoRoot, 'apps', 'web', 'public', 'vendor', 'mediapipe'),
   join(repoRoot, 'apps', 'desktop', 'public', 'vendor', 'mediapipe'),
 ];
-const modelUrl =
-  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+const poseModels = [
+  {
+    filename: 'pose_landmarker_lite.task',
+    url: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+  },
+  {
+    filename: 'pose_landmarker_full.task',
+    url: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
+  },
+];
 
 for (const publicRoot of publicRoots) {
   await syncWasmFiles(publicRoot);
-  await syncModel(publicRoot);
+  await syncModels(publicRoot);
 }
 
 console.log('MediaPipe assets synced.');
@@ -33,11 +41,15 @@ async function syncWasmFiles(publicRoot) {
   );
 }
 
-async function syncModel(publicRoot) {
-  const target = join(publicRoot, 'models', 'pose_landmarker_lite.task');
+async function syncModels(publicRoot) {
+  await Promise.all(poseModels.map((model) => syncModel(publicRoot, model)));
+}
+
+async function syncModel(publicRoot, model) {
+  const target = join(publicRoot, 'models', model.filename);
   await mkdir(dirname(target), { recursive: true });
 
-  const response = await fetch(modelUrl);
+  const response = await fetch(model.url);
 
   if (!response.ok || !response.body) {
     throw new Error(
