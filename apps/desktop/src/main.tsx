@@ -38,6 +38,7 @@ createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <WorkoutApp
       assets={{
+        logoAssetPath: '/logo.png',
         modelAssetPath: '/vendor/mediapipe/models/pose_landmarker_lite.task',
         wasmAssetPath: '/vendor/mediapipe/wasm',
       }}

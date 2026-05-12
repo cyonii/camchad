@@ -4,7 +4,6 @@ import {
   Camera,
   CheckCircle2,
   CircleAlert,
-  Dumbbell,
   History,
   Pause,
   Play,
@@ -31,6 +30,7 @@ import { buildHistoryChartModel, type HistoryChartModel } from './history-chart.
 type View = 'workout' | 'history' | 'settings';
 
 export interface WorkoutAssets {
+  readonly logoAssetPath?: string;
   readonly modelAssetPath: string;
   readonly wasmAssetPath: string;
 }
@@ -88,7 +88,7 @@ export function WorkoutApp({ assets, platform }: WorkoutAppProps): ReactElement 
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">
-            <Dumbbell aria-hidden="true" size={22} />
+            <img className="brand-logo" src={assets.logoAssetPath ?? '/logo.png'} alt="" />
           </div>
           <div>
             <strong>Home Workout</strong>
