@@ -255,6 +255,8 @@ button,
 }
 
 .brand span,
+.sidebar-session-telemetry span,
+.sidebar-session-telemetry small,
 .sidebar-summary span,
 .sidebar-summary small {
   color: var(--sidebar-muted);
@@ -320,6 +322,23 @@ button,
   border-radius: 7px;
   background:
     linear-gradient(135deg, rgb(var(--primary-rgb) / 8%), transparent 55%), rgb(255 255 255 / 3%);
+}
+
+.sidebar-session-telemetry {
+  padding: 15px 16px;
+  border: 1px solid rgb(var(--primary-rgb) / 24%);
+  border-radius: 7px;
+  background:
+    linear-gradient(135deg, rgb(var(--primary-rgb) / 12%), transparent 58%), rgb(255 255 255 / 4%);
+}
+
+.sidebar-session-telemetry strong {
+  display: block;
+  margin: 6px 0 2px;
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 1.9rem;
+  font-weight: 500;
+  color: var(--sidebar-text);
 }
 
 .sidebar-summary strong {
@@ -452,6 +471,8 @@ button,
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transform: scaleX(-1);
+  transform-origin: center;
 }
 
 .video-stage video {
@@ -740,6 +761,7 @@ button,
 
 .telemetry-panel-header span,
 .page-heading span,
+.camera-advice > span,
 .form-feedback > span,
 .metric span,
 .rep-history-strip > span {
@@ -758,6 +780,18 @@ button,
   font-size: 1.14rem;
   font-weight: 600;
   text-transform: uppercase;
+}
+
+.telemetry-panel-header small {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .telemetry-mode-control button {
@@ -907,6 +941,29 @@ button,
   color: var(--primary);
 }
 
+.camera-advice {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgb(var(--primary-rgb) / 14%);
+  border-radius: 7px;
+  background: var(--surface-glass-strong);
+}
+
+.camera-advice[data-severity='warning'] {
+  border-color: rgb(var(--warning-rgb) / 28%);
+  background:
+    linear-gradient(135deg, rgb(var(--warning-rgb) / 8%), transparent 58%),
+    var(--surface-glass-strong);
+}
+
+.camera-advice p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .rep-history-strip {
   display: grid;
   gap: 12px;
@@ -943,7 +1000,7 @@ button,
 
 .bottom-command-deck {
   display: grid;
-  grid-template-columns: auto minmax(280px, 1fr);
+  grid-template-columns: minmax(260px, 1fr) minmax(280px, auto);
   gap: 10px;
   align-items: center;
   padding: 8px;
@@ -976,11 +1033,6 @@ button,
   background: rgb(0 0 0 / 4%);
 }
 
-.command-module-camera {
-  width: fit-content;
-  justify-self: start;
-}
-
 .command-module > span {
   color: var(--text-subtle);
   font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
@@ -993,6 +1045,30 @@ button,
 .command-module-session {
   justify-self: end;
   width: min(360px, 100%);
+}
+
+.command-module-guidance {
+  width: min(560px, 100%);
+}
+
+.camera-guidance {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.camera-guidance strong {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.camera-guidance small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .segmented-control {

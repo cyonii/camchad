@@ -19,8 +19,19 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
 
-import type { CameraAngle, MovementInterpreterState, RepEvent } from '@home-activity/movement-core';
-import { defaultPushUpConfig, PushUpMovementInterpreter } from '@home-activity/movement-core';
+import type {
+  ActivitySessionTelemetry,
+  CameraAngle,
+  MovementInterpreterState,
+  RepEvent,
+} from '@home-activity/movement-core';
+import {
+  ActivitySessionOrchestrator,
+  defaultPushUpConfig,
+  movementDefinitionFor,
+  PushUpMovementInterpreter,
+  type MovementDefinition,
+} from '@home-activity/movement-core';
 import {
   ExponentialPoseSmoother,
   MediaPipePoseEstimator,
@@ -70,6 +81,17 @@ const initialDetectorState: MovementInterpreterState = {
 const themePreferenceStorageKey = 'home-activity:theme-preference';
 const telemetryModeStorageKey = 'home-activity:telemetry-mode';
 const poseInferenceIntervalMs = 80;
+const defaultCameraAngle: CameraAngle = 'side';
+const initialSessionTelemetry: ActivitySessionTelemetry = {
+  mode: 'idle',
+  recognitionConfidence: 0,
+};
+
+interface ShellSessionTelemetry {
+  readonly isActive: boolean;
+  readonly elapsedSeconds: number;
+  readonly mode: ActivitySessionTelemetry['mode'];
+}
 
 export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElement {
   const [view, setView] = useState<View>('activity');
@@ -81,6 +103,11 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
     partialReps: 0,
   });
   const [startupEnabled, setStartupEnabled] = useState(false);
+  const [shellSessionTelemetry, setShellSessionTelemetry] = useState<ShellSessionTelemetry>({
+    isActive: false,
+    elapsedSeconds: 0,
+    mode: 'idle',
+  });
   const [themePreference, setThemePreference] = useState<ThemePreference>(() =>
     readThemePreference(),
   );
@@ -154,6 +181,7 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
         </nav>
 
         <div className="sidebar-footer">
+          <SidebarSessionTelemetry telemetry={shellSessionTelemetry} />
           <div className="sidebar-summary">
             <span>Total reps</span>
             <strong>{summary.totalReps}</strong>
@@ -172,7 +200,12 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
 
       <main className="main-content">
         {view === 'activity' ? (
-          <ActivityView assets={assets} platform={platform} onSessionSaved={saveSession} />
+          <ActivityView
+            assets={assets}
+            platform={platform}
+            onSessionSaved={saveSession}
+            onShellSessionTelemetryChange={setShellSessionTelemetry}
+          />
         ) : null}
         {view === 'history' ? <HistoryView sessions={sessions} summary={summary} /> : null}
         {view === 'settings' ? (
@@ -193,16 +226,21 @@ function ActivityView({
   assets,
   platform,
   onSessionSaved,
+  onShellSessionTelemetryChange,
 }: {
   readonly assets: ActivityAssets;
   readonly platform: ActivityPlatform;
   readonly onSessionSaved: (session: ActivitySession) => Promise<void>;
+  readonly onShellSessionTelemetryChange: (telemetry: ShellSessionTelemetry) => void;
 }): ReactElement {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const estimatorRef = useRef<PoseEstimator | null>(null);
   const smootherRef = useRef(new ExponentialPoseSmoother());
   const detectorRef = useRef(new PushUpMovementInterpreter());
+  const sessionOrchestratorRef = useRef(
+    new ActivitySessionOrchestrator({ cameraAngle: defaultCameraAngle }),
+  );
   const animationFrameRef = useRef<number | undefined>(undefined);
   const sessionRef = useRef<ActivitySession | undefined>(undefined);
   const repEventsRef = useRef<RepEvent[]>([]);
@@ -212,10 +250,12 @@ function ActivityView({
   const lastInferenceAtRef = useRef(0);
   const detectorStateRef = useRef<MovementInterpreterState>(initialDetectorState);
 
-  const [cameraAngle, setCameraAngle] = useState<CameraAngle>('side');
   const [isStarting, setIsStarting] = useState(false);
   const [isPreviewActive, setIsPreviewActive] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
+  const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState(0);
+  const [sessionTelemetry, setSessionTelemetry] =
+    useState<ActivitySessionTelemetry>(initialSessionTelemetry);
   const [status, setStatus] = useState('Ready');
   const [detectorState, setDetectorState] =
     useState<MovementInterpreterState>(initialDetectorState);
@@ -229,6 +269,54 @@ function ActivityView({
   useEffect(() => {
     writeTelemetryMode(telemetryMode);
   }, [telemetryMode]);
+
+  useEffect(() => {
+    if (!isTracking || !sessionRef.current) {
+      setSessionElapsedSeconds(0);
+      return undefined;
+    }
+
+    const updateElapsed = (): void => {
+      const startedAt = sessionRef.current?.startedAt;
+
+      if (!startedAt) {
+        setSessionElapsedSeconds(0);
+        return;
+      }
+
+      setSessionElapsedSeconds(
+        Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000)),
+      );
+    };
+
+    updateElapsed();
+    const intervalId = window.setInterval(updateElapsed, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [isTracking]);
+
+  useEffect(() => {
+    onShellSessionTelemetryChange({
+      isActive: isTracking || isStarting,
+      elapsedSeconds: sessionElapsedSeconds,
+      mode: sessionTelemetry.mode,
+    });
+  }, [
+    isStarting,
+    isTracking,
+    onShellSessionTelemetryChange,
+    sessionElapsedSeconds,
+    sessionTelemetry.mode,
+  ]);
+
+  useEffect(() => {
+    return () =>
+      onShellSessionTelemetryChange({
+        isActive: false,
+        elapsedSeconds: 0,
+        mode: 'idle',
+      });
+  }, [onShellSessionTelemetryChange]);
 
   const processFrame = useCallback((timestampMs: number): void => {
     const video = videoRef.current;
@@ -256,8 +344,10 @@ function ActivityView({
 
     const smoothed = poseFrame ? smootherRef.current.smooth(poseFrame) : undefined;
     const nextState = detectorRef.current.processPose(smoothed);
+    const nextSessionTelemetry = sessionOrchestratorRef.current.process(nextState, timestampMs);
     detectorStateRef.current = nextState;
     setDetectorState(nextState);
+    setSessionTelemetry(nextSessionTelemetry);
 
     if (nextState.lastRep && !seenRepNumbersRef.current.has(nextState.lastRep.repNumber)) {
       seenRepNumbersRef.current.add(nextState.lastRep.repNumber);
@@ -325,8 +415,10 @@ function ActivityView({
       setStatus('Starting pose engine');
       detectorRef.current = new PushUpMovementInterpreter({
         ...defaultPushUpConfig,
-        cameraAngle,
+        cameraAngle: defaultCameraAngle,
       });
+      sessionOrchestratorRef.current.reset();
+      sessionOrchestratorRef.current.updateOptions({ cameraAngle: defaultCameraAngle });
       lastInferenceAtRef.current = 0;
       smootherRef.current.reset();
       repEventsRef.current = [];
@@ -372,7 +464,6 @@ function ActivityView({
   }, [
     assets.modelAssetPath,
     assets.wasmAssetPath,
-    cameraAngle,
     isTracking,
     platform.cameraPermission,
     processFrame,
@@ -407,7 +498,7 @@ function ActivityView({
       const movementSet = createMovementSegment(
         activeSession.startedAt,
         endedAt.toISOString(),
-        cameraAngle,
+        defaultCameraAngle,
         detectorStateRef.current,
         [...repEventsRef.current],
       );
@@ -424,10 +515,13 @@ function ActivityView({
     }
 
     sessionRef.current = undefined;
+    sessionOrchestratorRef.current.reset();
+    setSessionElapsedSeconds(0);
+    setSessionTelemetry(initialSessionTelemetry);
     detectorStateRef.current = initialDetectorState;
     setDetectorState(initialDetectorState);
     setStatus('Ready');
-  }, [cameraAngle, onSessionSaved]);
+  }, [onSessionSaved]);
 
   return (
     <section className={`activity-layout telemetry-${telemetryMode}`}>
@@ -448,6 +542,7 @@ function ActivityView({
               <MirrorTelemetryOverlay
                 status={status}
                 detectorState={detectorState}
+                sessionTelemetry={sessionTelemetry}
                 telemetryMode={telemetryMode}
                 onTelemetryModeChange={setTelemetryMode}
               />
@@ -466,6 +561,7 @@ function ActivityView({
           <SidebarTelemetryPanel
             status={status}
             detectorState={detectorState}
+            sessionTelemetry={sessionTelemetry}
             telemetryMode={telemetryMode}
             onTelemetryModeChange={setTelemetryMode}
           />
@@ -473,25 +569,14 @@ function ActivityView({
       </div>
 
       <div className="bottom-command-deck">
-        <div className="command-module command-module-camera">
-          <span>Camera</span>
-          <div className="segmented-control compact-control" role="group" aria-label="Camera angle">
-            <button
-              type="button"
-              className={cameraAngle === 'side' ? 'active' : undefined}
-              onClick={() => setCameraAngle('side')}
-              disabled={isStarting || isTracking}
-            >
-              Side
-            </button>
-            <button
-              type="button"
-              className={cameraAngle === 'front_diagonal' ? 'active' : undefined}
-              onClick={() => setCameraAngle('front_diagonal')}
-              disabled={isStarting || isTracking}
-            >
-              Diagonal
-            </button>
+        <div className="command-module command-module-guidance">
+          <span>Camera guidance</span>
+          <div className="camera-guidance">
+            <strong>{sessionTelemetry.cameraAdvice?.title ?? 'Awaiting movement'}</strong>
+            <small>
+              {sessionTelemetry.cameraAdvice?.message ??
+                'Step into frame and begin moving for automatic movement guidance.'}
+            </small>
           </div>
         </div>
 
@@ -550,6 +635,7 @@ function StageTelemetryChrome({
 interface SidebarTelemetryProps {
   readonly status: string;
   readonly detectorState: MovementInterpreterState;
+  readonly sessionTelemetry: ActivitySessionTelemetry;
   readonly telemetryMode: TelemetryMode;
   readonly onTelemetryModeChange: (mode: TelemetryMode) => void;
 }
@@ -557,20 +643,26 @@ interface SidebarTelemetryProps {
 function SidebarTelemetryPanel({
   status,
   detectorState,
+  sessionTelemetry,
   telemetryMode,
   onTelemetryModeChange,
 }: SidebarTelemetryProps): ReactElement {
-  const confidence =
-    detectorState.phase === 'tracking_lost'
-      ? 'Lost'
-      : formatMetric(detectorState.metrics.poseConfidence, '%');
+  const movementDefinition = movementDefinitionFor(
+    sessionTelemetry.movementType ??
+      detectorState.recognition.movementType ??
+      detectorState.movementType,
+  );
+  const telemetryMetrics = telemetryMetricsFor(movementDefinition, detectorState);
 
   return (
-    <aside className="telemetry-panel telemetry-panel-fixed" aria-label="Push-up telemetry">
+    <aside className="telemetry-panel telemetry-panel-fixed" aria-label="Movement telemetry">
       <div className="telemetry-panel-header">
         <div>
-          <span>Push-ups</span>
-          <strong>{status}</strong>
+          <span>Movement</span>
+          <strong>{sessionTelemetry.movementType ? movementDefinition.label : 'Observing'}</strong>
+          <small>
+            {status} / {formatSessionMode(sessionTelemetry.mode)}
+          </small>
         </div>
         <TelemetryModeControl value={telemetryMode} onChange={onTelemetryModeChange} />
       </div>
@@ -585,11 +677,26 @@ function SidebarTelemetryPanel({
       </div>
 
       <div className="metric-grid telemetry-block">
+        <Metric label="Session" value={formatSessionMode(sessionTelemetry.mode)} />
+        <Metric
+          label="Recognition"
+          value={formatMetric(sessionTelemetry.recognitionConfidence, '%')}
+        />
         <Metric label="Phase" value={formatPhase(detectorState.phase)} />
-        <Metric label="Elbow angle" value={formatMetric(detectorState.metrics.elbowAngle, 'deg')} />
-        <Metric label="Alignment" value={formatMetric(detectorState.metrics.alignmentScore, '%')} />
-        <Metric label="Confidence" value={confidence} />
+        {telemetryMetrics.map((metric) => (
+          <Metric key={metric.label} label={metric.label} value={metric.value} />
+        ))}
       </div>
+
+      {sessionTelemetry.cameraAdvice ? (
+        <div
+          className="camera-advice telemetry-block"
+          data-severity={sessionTelemetry.cameraAdvice.severity}
+        >
+          <span>{sessionTelemetry.cameraAdvice.title}</span>
+          <p>{sessionTelemetry.cameraAdvice.message}</p>
+        </div>
+      ) : null}
 
       <div className="form-feedback telemetry-block">
         <span>Form feedback</span>
@@ -637,27 +744,33 @@ function SidebarTelemetryPanel({
 function MirrorTelemetryOverlay({
   status,
   detectorState,
+  sessionTelemetry,
   telemetryMode,
   onTelemetryModeChange,
 }: SidebarTelemetryProps): ReactElement {
-  const confidence =
-    detectorState.phase === 'tracking_lost'
-      ? 'Lost'
-      : formatMetric(detectorState.metrics.poseConfidence, '%');
+  const movementDefinition = movementDefinitionFor(
+    sessionTelemetry.movementType ??
+      detectorState.recognition.movementType ??
+      detectorState.movementType,
+  );
+  const telemetryMetrics = telemetryMetricsFor(movementDefinition, detectorState);
   const formMessage =
     detectorState.warnings.length === 0
       ? 'Tracking conditions look usable.'
       : detectorState.warnings[0]?.message;
 
   return (
-    <aside className="mirror-telemetry" aria-label="Push-up mirror telemetry">
+    <aside className="mirror-telemetry" aria-label="Movement mirror telemetry">
       <div className="mirror-telemetry-controls">
         <TelemetryModeControl value={telemetryMode} onChange={onTelemetryModeChange} />
       </div>
 
       <div className="mirror-telemetry-heading">
-        <span>Push-ups</span>
-        <strong>{status}</strong>
+        <span>Movement</span>
+        <strong>{sessionTelemetry.movementType ? movementDefinition.label : 'Observing'}</strong>
+        <small>
+          {status} / {formatSessionMode(sessionTelemetry.mode)}
+        </small>
       </div>
 
       <dl className="mirror-telemetry-readout">
@@ -673,21 +786,19 @@ function MirrorTelemetryOverlay({
           <dt>Phase</dt>
           <dd>{formatPhase(detectorState.phase)}</dd>
         </div>
+        {telemetryMetrics.slice(0, 3).map((metric) => (
+          <div key={metric.label}>
+            <dt>{metric.label}</dt>
+            <dd>{metric.value}</dd>
+          </div>
+        ))}
         <div>
-          <dt>Elbow</dt>
-          <dd>{formatMetric(detectorState.metrics.elbowAngle, 'deg')}</dd>
-        </div>
-        <div>
-          <dt>Alignment</dt>
-          <dd>{formatMetric(detectorState.metrics.alignmentScore, '%')}</dd>
-        </div>
-        <div>
-          <dt>Confidence</dt>
-          <dd>{confidence}</dd>
+          <dt>Recognition</dt>
+          <dd>{formatMetric(sessionTelemetry.recognitionConfidence, '%')}</dd>
         </div>
       </dl>
 
-      <p className="mirror-form-message">{formMessage}</p>
+      <p className="mirror-form-message">{sessionTelemetry.cameraAdvice?.message ?? formMessage}</p>
     </aside>
   );
 }
@@ -771,7 +882,9 @@ function HistoryView({
               <article className="history-item" key={session.id}>
                 <div>
                   <strong>{formatDate(session.startedAt)}</strong>
-                  <span>{movement ? `${movement.validReps} push-ups` : 'No movement segment'}</span>
+                  <span>
+                    {movement ? formatMovementRepSummary(movement) : 'No movement segment'}
+                  </span>
                 </div>
                 <div>
                   <span>{session.durationSeconds ?? 0}s</span>
@@ -1163,6 +1276,20 @@ function NavButton({
   );
 }
 
+function SidebarSessionTelemetry({
+  telemetry,
+}: {
+  readonly telemetry: ShellSessionTelemetry;
+}): ReactElement {
+  return (
+    <div className="sidebar-session-telemetry">
+      <span>Current session</span>
+      <strong>{formatDuration(telemetry.elapsedSeconds)}</strong>
+      <small>{telemetry.isActive ? formatSessionMode(telemetry.mode) : 'Standby'}</small>
+    </div>
+  );
+}
+
 function Metric({
   label,
   value,
@@ -1176,6 +1303,16 @@ function Metric({
       <strong>{value}</strong>
     </div>
   );
+}
+
+function telemetryMetricsFor(
+  movementDefinition: MovementDefinition,
+  state: MovementInterpreterState,
+): readonly { readonly label: string; readonly value: string }[] {
+  return movementDefinition.telemetryMetrics.map((metric) => ({
+    label: metric.label,
+    value: formatMetric(state.metrics[metric.key], metric.unit),
+  }));
 }
 
 function createSession(): ActivitySession {
@@ -1206,6 +1343,13 @@ function createMovementSegment(
     formWarnings: state.warnings,
     repEvents,
   };
+}
+
+function formatMovementRepSummary(movement: MovementSegment): string {
+  const definition = movementDefinitionFor(movement.movementType);
+  const noun = movement.validReps === 1 ? definition.repLabel : definition.repPluralLabel;
+
+  return `${movement.validReps} ${noun}`;
 }
 
 function drawOverlay(
@@ -1423,6 +1567,17 @@ function stopMediaStream(stream: MediaStream | null): void {
 
 function formatPhase(phase: string): string {
   return phase.replaceAll('_', ' ');
+}
+
+function formatSessionMode(mode: ActivitySessionTelemetry['mode']): string {
+  return mode.replaceAll('_', ' ');
+}
+
+function formatDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 function formatMetric(value: number | undefined, unit: 'deg' | '%'): string {
