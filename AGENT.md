@@ -5,6 +5,7 @@ Treat this repository as production-grade software. Optimise for correctness, re
 ## Engineering Discipline
 
 - Build in small, reviewable commits with meaningful messages.
+- Before committing follow-up work, decide whether the request extends or corrects a recent commit. If it does, amend or autosquash into that commit instead of creating a separate history entry.
 - Validate formatting, linting, type checking, and tests before every commit once tooling exists.
 - Keep architecture explicit: desktop shell, web shell, pose estimation, exercise detection, session history, and storage must remain separately understandable.
 - Do not couple exercise detectors to a specific pose model. Pose engines are adapters; detectors consume normalized pose frames.
