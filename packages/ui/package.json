@@ -18,11 +18,12 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@home-activity/activity-history": "0.1.0",
     "@home-activity/movement-core": "0.1.0",
     "@home-activity/pose-core": "0.1.0",
-    "@home-activity/activity-history": "0.1.0",
     "lucide-react": "^0.511.0",
-    "react": "^19.1.0"
+    "react": "^19.1.0",
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@types/react": "^19.1.4"

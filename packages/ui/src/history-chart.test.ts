@@ -39,6 +39,8 @@ describe('buildHistoryChartModel', () => {
       validReps: 8,
       partialReps: 3,
       totalReps: 11,
+      sessionCount: 2,
+      averageQuality: 88,
     });
     expect(model.points.some((point) => !point.hasActivity)).toBe(true);
     expect(model.maxReps).toBe(20);
@@ -79,7 +81,14 @@ function session(
         validReps,
         partialReps,
         formWarnings: [],
-        repEvents: [],
+        repEvents: Array.from({ length: validReps }, (_, index) => ({
+          repNumber: index + 1,
+          timestampMs: (index + 1) * 1000,
+          qualityScore: index % 2 === 0 ? 90 : 85,
+          depthScore: 1,
+          alignmentScore: 0.9,
+          warnings: [],
+        })),
       },
     ],
   };

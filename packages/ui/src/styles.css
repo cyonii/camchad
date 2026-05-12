@@ -1281,6 +1281,22 @@ button,
   background: var(--chart-partial);
 }
 
+.legend-quality {
+  background: var(--warning);
+}
+
+.activity-chart-frame {
+  min-height: 292px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border-radius: 7px;
+  background:
+    linear-gradient(90deg, rgb(var(--primary-rgb) / 4%) 1px, transparent 1px),
+    linear-gradient(rgb(var(--primary-rgb) / 3%) 1px, transparent 1px),
+    rgb(var(--surface-rgb) / 46%);
+  background-size: 44px 44px;
+}
+
 .chart-empty {
   display: grid;
   min-height: 180px;
@@ -1289,42 +1305,6 @@ button,
   border: 1px dashed var(--border);
   border-radius: 7px;
   background: var(--surface-raised);
-}
-
-.rep-chart {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.chart-axis {
-  stroke: var(--chart-axis);
-  stroke-width: 1;
-}
-
-.chart-scale,
-.chart-label,
-.bar-value {
-  fill: var(--text-muted);
-  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
-  font-size: 0.78rem;
-}
-
-.bar-value {
-  fill: var(--text);
-  font-weight: 700;
-}
-
-.bar-valid {
-  fill: var(--primary);
-}
-
-.bar-partial {
-  fill: var(--chart-partial);
-}
-
-.bar-empty {
-  fill: var(--border);
 }
 
 .history-item,

@@ -18,6 +18,17 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
+import {
+  Area,
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 import type {
   ActivitySessionTelemetry,
@@ -900,19 +911,10 @@ function HistoryView({
 }
 
 function ActivityLogChart({ model }: { readonly model: HistoryChartModel }): ReactElement {
-  const chartWidth = 720;
-  const chartHeight = 240;
-  const padding = { top: 24, right: 28, bottom: 44, left: 44 };
-  const plotWidth = chartWidth - padding.left - padding.right;
-  const plotHeight = chartHeight - padding.top - padding.bottom;
-  const gap = 12;
-  const barWidth =
-    model.points.length === 0
-      ? 0
-      : Math.max(
-          18,
-          (plotWidth - gap * Math.max(0, model.points.length - 1)) / model.points.length,
-        );
+  const data = model.points.map((point) => ({
+    ...point,
+    durationMinutes: Math.round((point.durationSeconds / 60) * 10) / 10,
+  }));
 
   return (
     <section className="chart-panel" aria-labelledby="activity-chart-title">
@@ -930,105 +932,88 @@ function ActivityLogChart({ model }: { readonly model: HistoryChartModel }): Rea
             <i className="legend-partial" />
             Partial
           </span>
+          <span>
+            <i className="legend-quality" />
+            Quality
+          </span>
         </div>
       </div>
 
       {!model.hasActivities ? (
         <div className="chart-empty">Complete an activity to see rep trends.</div>
       ) : (
-        <svg className="rep-chart" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img">
-          <title>Valid and partial push-up reps by activity</title>
-          <line
-            className="chart-axis"
-            x1={padding.left}
-            y1={padding.top + plotHeight}
-            x2={chartWidth - padding.right}
-            y2={padding.top + plotHeight}
-          />
-          <line
-            className="chart-axis"
-            x1={padding.left}
-            y1={padding.top}
-            x2={padding.left}
-            y2={padding.top + plotHeight}
-          />
-          <text className="chart-scale" x={padding.left - 10} y={padding.top + 5} textAnchor="end">
-            {model.maxReps}
-          </text>
-          <text
-            className="chart-scale"
-            x={padding.left - 10}
-            y={padding.top + plotHeight + 4}
-            textAnchor="end"
-          >
-            0
-          </text>
-
-          {model.points.map((point, index) => {
-            const x = padding.left + index * (barWidth + gap);
-            const validHeight = (point.validReps / model.maxReps) * plotHeight;
-            const partialHeight = (point.partialReps / model.maxReps) * plotHeight;
-            const validY = padding.top + plotHeight - validHeight;
-            const partialY = validY - partialHeight;
-
-            return (
-              <g key={point.sessionId}>
-                <title>
-                  {point.hasActivity
-                    ? `${point.label}: ${point.validReps} valid, ${point.partialReps} partial reps`
-                    : `${point.label}: no activity`}
-                </title>
-                {point.totalReps > 0 ? (
-                  <rect
-                    className="bar-valid"
-                    x={x}
-                    y={validY}
-                    width={barWidth}
-                    height={Math.max(0, validHeight)}
-                    rx="4"
-                  />
-                ) : (
-                  <rect
-                    className="bar-empty"
-                    x={x}
-                    y={padding.top + plotHeight - 2}
-                    width={barWidth}
-                    height="2"
-                    rx="1"
-                  />
-                )}
-                {point.partialReps > 0 ? (
-                  <rect
-                    className="bar-partial"
-                    x={x}
-                    y={partialY}
-                    width={barWidth}
-                    height={Math.max(0, partialHeight)}
-                    rx="4"
-                  />
-                ) : null}
-                {point.totalReps > 0 ? (
-                  <text
-                    className="bar-value"
-                    x={x + barWidth / 2}
-                    y={Math.max(14, partialY - 6)}
-                    textAnchor="middle"
-                  >
-                    {point.totalReps}
-                  </text>
-                ) : null}
-                <text
-                  className="chart-label"
-                  x={x + barWidth / 2}
-                  y={chartHeight - 16}
-                  textAnchor="middle"
-                >
-                  {point.label}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+        <div className="activity-chart-frame">
+          <ResponsiveContainer width="100%" height={292}>
+            <ComposedChart data={data} margin={{ top: 18, right: 12, bottom: 12, left: -18 }}>
+              <CartesianGrid stroke="rgb(var(--primary-rgb) / 10%)" vertical={false} />
+              <XAxis
+                dataKey="label"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'var(--text-subtle)', fontSize: 12 }}
+              />
+              <YAxis
+                yAxisId="reps"
+                axisLine={false}
+                tickLine={false}
+                domain={[0, model.maxReps]}
+                tick={{ fill: 'var(--text-subtle)', fontSize: 12 }}
+              />
+              <YAxis
+                yAxisId="quality"
+                orientation="right"
+                axisLine={false}
+                tickLine={false}
+                domain={[0, 100]}
+                tick={{ fill: 'var(--text-subtle)', fontSize: 12 }}
+              />
+              <Tooltip
+                cursor={{ fill: 'rgb(var(--primary-rgb) / 6%)' }}
+                contentStyle={{
+                  border: '1px solid rgb(var(--primary-rgb) / 22%)',
+                  borderRadius: 8,
+                  background: 'var(--surface-glass-strong)',
+                  color: 'var(--text)',
+                  boxShadow: '0 18px 44px var(--shadow)',
+                }}
+                labelStyle={{ color: 'var(--text)' }}
+              />
+              <Area
+                yAxisId="reps"
+                type="monotone"
+                dataKey="durationMinutes"
+                name="Duration (min)"
+                fill="rgb(var(--primary-rgb) / 10%)"
+                stroke="rgb(var(--primary-rgb) / 24%)"
+              />
+              <Bar
+                yAxisId="reps"
+                dataKey="validReps"
+                name="Valid reps"
+                stackId="reps"
+                radius={[5, 5, 0, 0]}
+                fill="var(--primary)"
+              />
+              <Bar
+                yAxisId="reps"
+                dataKey="partialReps"
+                name="Partial reps"
+                stackId="reps"
+                radius={[5, 5, 0, 0]}
+                fill="var(--chart-partial)"
+              />
+              <Line
+                yAxisId="quality"
+                type="monotone"
+                dataKey="averageQuality"
+                name="Avg quality"
+                stroke="var(--warning)"
+                strokeWidth={2}
+                dot={{ r: 3, strokeWidth: 0, fill: 'var(--warning)' }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </section>
   );

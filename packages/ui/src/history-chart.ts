@@ -9,6 +9,8 @@ export interface HistoryChartPoint {
   readonly partialReps: number;
   readonly totalReps: number;
   readonly durationSeconds: number;
+  readonly sessionCount: number;
+  readonly averageQuality: number;
 }
 
 export interface HistoryChartModel {
@@ -43,6 +45,13 @@ export function buildHistoryChartModel(
     const movements = daySessions.flatMap((session) => session.movements);
     const validReps = movements.reduce((sum, movement) => sum + movement.validReps, 0);
     const partialReps = movements.reduce((sum, movement) => sum + movement.partialReps, 0);
+    const repEvents = movements.flatMap((movement) => movement.repEvents);
+    const averageQuality =
+      repEvents.length === 0
+        ? 0
+        : Math.round(
+            repEvents.reduce((sum, event) => sum + event.qualityScore, 0) / repEvents.length,
+          );
 
     return {
       sessionId: `day-${key}`,
@@ -52,10 +61,12 @@ export function buildHistoryChartModel(
       validReps,
       partialReps,
       totalReps: validReps + partialReps,
+      sessionCount: daySessions.length,
       durationSeconds: daySessions.reduce(
         (sum, session) => sum + (session.durationSeconds ?? 0),
         0,
       ),
+      averageQuality,
     };
   });
 
