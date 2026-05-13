@@ -20,10 +20,13 @@ export interface PoseMovementFeatures {
   readonly bodyLineDeviation?: number;
   readonly torsoInclinationDegrees?: number;
   readonly shoulderCenterY?: number;
+  readonly wristCenterY?: number;
   readonly hipCenterY?: number;
   readonly kneeCenterY?: number;
+  readonly ankleCenterY?: number;
   readonly ankleSpanRatio?: number;
   readonly wristSpanRatio?: number;
+  readonly wristElevationRatio?: number;
   readonly kneeLiftRatio?: number;
 }
 
@@ -52,6 +55,8 @@ export function extractPoseMovementFeatures(
   const rightAnkle = visibleLandmark(frame, 'right_ankle', minVisibility);
   const leftWrist = visibleLandmark(frame, 'left_wrist', minVisibility);
   const rightWrist = visibleLandmark(frame, 'right_wrist', minVisibility);
+  const wristCenter = centerLandmark(frame, 'left_wrist', 'right_wrist', minVisibility);
+  const ankleCenter = centerLandmark(frame, 'left_ankle', 'right_ankle', minVisibility);
 
   return {
     timestampMs: frame.timestampMs,
@@ -65,12 +70,15 @@ export function extractPoseMovementFeatures(
     bodyLineDeviation: average(sideFeatures.map((feature) => feature.bodyLineDeviation)),
     torsoInclinationDegrees: angleFromVertical(shoulderCenter, hipCenter),
     shoulderCenterY: shoulderCenter.y,
+    wristCenterY: wristCenter?.y,
     hipCenterY: hipCenter.y,
     kneeCenterY: kneeCenter?.y,
+    ankleCenterY: ankleCenter?.y,
     ankleSpanRatio:
       leftAnkle && rightAnkle ? Math.abs(leftAnkle.x - rightAnkle.x) / bodyScale : undefined,
     wristSpanRatio:
       leftWrist && rightWrist ? Math.abs(leftWrist.x - rightWrist.x) / bodyScale : undefined,
+    wristElevationRatio: wristCenter ? (shoulderCenter.y - wristCenter.y) / bodyScale : undefined,
     kneeLiftRatio: kneeCenter ? (hipCenter.y - kneeCenter.y) / bodyScale : undefined,
   };
 }

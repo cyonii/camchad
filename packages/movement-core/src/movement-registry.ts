@@ -5,6 +5,10 @@ import type {
   MovementType,
 } from './movement-interpreter.js';
 import { defaultPushUpConfig, PushUpMovementInterpreter } from './push-up-interpreter.js';
+import {
+  createRecognitionMovementInterpreter,
+  type RecognitionMovementType,
+} from './recognition-movement-interpreters.js';
 import { defaultSquatConfig, SquatMovementInterpreter } from './squat-interpreter.js';
 
 export interface MovementDefinition {
@@ -133,45 +137,45 @@ export const movementRegistry: readonly MovementDefinition[] = [
         cameraAngle: options?.cameraAngle ?? defaultSquatConfig.cameraAngle,
       }),
   },
-  plannedExercise('sit_up', 'Sit-up', 'Sit-ups', 'floor', [
+  recognitionExercise('sit_up', 'Sit-up', 'Sit-ups', 'floor', [
     'torso curl trajectory',
     'hip anchor stability',
   ]),
-  plannedExercise('lunge', 'Lunge', 'Lunges', 'standing', [
+  recognitionExercise('lunge', 'Lunge', 'Lunges', 'standing', [
     'split stance',
     'front knee flexion',
     'hip drop',
   ]),
-  plannedExercise('jumping_jack', 'Jumping jack', 'Jumping jacks', 'standing', [
+  recognitionExercise('jumping_jack', 'Jumping jack', 'Jumping jacks', 'standing', [
     'arm-leg abduction rhythm',
     'wrist and ankle span oscillation',
   ]),
-  plannedExercise('plank', 'Plank', 'Planks', 'floor', [
+  recognitionExercise('plank', 'Plank', 'Planks', 'floor', [
     'horizontal body line',
     'static hold stability',
   ]),
-  plannedExercise('pull_up', 'Pull-up', 'Pull-ups', 'hanging', [
+  recognitionExercise('pull_up', 'Pull-up', 'Pull-ups', 'hanging', [
     'vertical hanging posture',
     'elbow flexion',
     'shoulder elevation change',
   ]),
-  plannedExercise('burpee', 'Burpee', 'Burpees', 'mixed', [
+  recognitionExercise('burpee', 'Burpee', 'Burpees', 'mixed', [
     'standing-floor-standing transition',
     'compound motion rhythm',
   ]),
-  plannedExercise('mountain_climber', 'Mountain climber', 'Mountain climbers', 'floor', [
+  recognitionExercise('mountain_climber', 'Mountain climber', 'Mountain climbers', 'floor', [
     'plank base',
     'alternating knee drive',
   ]),
-  plannedExercise('high_knees', 'High knees', 'High knees', 'standing', [
+  recognitionExercise('high_knees', 'High knees', 'High knees', 'standing', [
     'alternating knee lift',
     'vertical cadence',
   ]),
-  plannedExercise('lateral_raise', 'Lateral raise', 'Lateral raises', 'standing', [
+  recognitionExercise('lateral_raise', 'Lateral raise', 'Lateral raises', 'standing', [
     'shoulder abduction',
     'arm elevation symmetry',
   ]),
-  plannedExercise('yoga_hold', 'Yoga hold', 'Yoga holds', 'mixed', [
+  recognitionExercise('yoga_hold', 'Yoga hold', 'Yoga holds', 'mixed', [
     'static pose geometry',
     'hold stability',
   ]),
@@ -204,8 +208,8 @@ export function cameraAdviceFor(
   };
 }
 
-function plannedExercise(
-  type: ExerciseType,
+function recognitionExercise(
+  type: RecognitionMovementType,
   label: string,
   pluralLabel: string,
   bodyOrientation: MovementBodyOrientation,
@@ -218,7 +222,7 @@ function plannedExercise(
     repLabel: label.toLowerCase(),
     repPluralLabel: pluralLabel.toLowerCase(),
     category: type === 'plank' || type === 'yoga_hold' ? 'hold' : 'repetition',
-    supportLevel: 'planned',
+    supportLevel: 'recognition',
     bodyOrientation,
     analysisSignals,
     phaseLabels: [],
@@ -236,5 +240,6 @@ function plannedExercise(
       { key: 'movementConfidence', label: 'Signal', unit: '%' },
       { key: 'rangeOfMotionScore', label: 'Range', unit: '%' },
     ],
+    createInterpreter: () => createRecognitionMovementInterpreter(type),
   };
 }
