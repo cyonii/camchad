@@ -34,13 +34,11 @@ import type {
   ActivitySessionTelemetry,
   CameraAngle,
   MovementInterpreterState,
-  RepEvent,
+  MovementType,
 } from '@camchad/movement-core';
 import {
   ActivitySessionOrchestrator,
-  defaultPushUpConfig,
   movementDefinitionFor,
-  PushUpMovementInterpreter,
   type MovementDefinition,
 } from '@camchad/movement-core';
 import {
@@ -50,7 +48,13 @@ import {
   type PoseEstimator,
   type PoseFrame,
 } from '@camchad/pose-core';
-import type { MovementSegment, ActivitySession, ActivitySummary } from '@camchad/activity-history';
+import {
+  ActivitySessionService,
+  type ActivityRepository,
+  type MovementSegment,
+  type ActivitySession,
+  type ActivitySummary,
+} from '@camchad/activity-history';
 
 import type { ActivityPlatform } from './platform.js';
 import { buildHistoryChartModel, type HistoryChartModel } from './history-chart.js';
@@ -90,7 +94,8 @@ const legacyThemePreferenceStorageKey = 'home-activity:theme-preference';
 const telemetryModeStorageKey = 'camchad:telemetry-mode';
 const legacyTelemetryModeStorageKey = 'home-activity:telemetry-mode';
 const poseInferenceIntervalMs = 80;
-const defaultCameraAngle: CameraAngle = 'side';
+const primaryMovementDefinition = movementDefinitionFor('push_up');
+const defaultCameraAngle: CameraAngle = primaryMovementDefinition.defaultCameraAngle;
 const initialSessionTelemetry: ActivitySessionTelemetry = {
   mode: 'idle',
   recognitionConfidence: 0,
@@ -246,14 +251,15 @@ function ActivityView({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const estimatorRef = useRef<PoseEstimator | null>(null);
   const smootherRef = useRef(new ExponentialPoseSmoother());
-  const detectorRef = useRef(new PushUpMovementInterpreter());
+  const detectorRef = useRef(primaryMovementDefinition.createInterpreter());
   const sessionOrchestratorRef = useRef(
     new ActivitySessionOrchestrator({ cameraAngle: defaultCameraAngle }),
   );
   const animationFrameRef = useRef<number | undefined>(undefined);
   const sessionRef = useRef<ActivitySession | undefined>(undefined);
-  const repEventsRef = useRef<RepEvent[]>([]);
-  const seenRepNumbersRef = useRef(new Set<number>());
+  const sessionServiceRef = useRef<ActivitySessionService | undefined>(undefined);
+  const activeMovementTypeRef = useRef<MovementType | undefined>(undefined);
+  const hasRecordableActivityRef = useRef(false);
   const startTokenRef = useRef(0);
   const startInFlightRef = useRef(false);
   const lastInferenceAtRef = useRef(0);
@@ -327,45 +333,94 @@ function ActivityView({
       });
   }, [onShellSessionTelemetryChange]);
 
-  const processFrame = useCallback((timestampMs: number): void => {
-    const video = videoRef.current;
-    const estimator = estimatorRef.current;
+  const endActiveMovement = useCallback((): void => {
+    const service = sessionServiceRef.current;
 
-    if (timestampMs - lastInferenceAtRef.current < poseInferenceIntervalMs) {
-      animationFrameRef.current = requestAnimationFrame(processFrame);
+    if (!service || !activeMovementTypeRef.current) {
       return;
     }
 
-    if (!video || !estimator || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      animationFrameRef.current = requestAnimationFrame(processFrame);
-      return;
-    }
-
-    lastInferenceAtRef.current = timestampMs;
-    let poseFrame: PoseFrame | undefined;
-
-    try {
-      poseFrame = estimator.estimate(video, timestampMs);
-    } catch (error) {
-      setCameraError(error instanceof Error ? error.message : 'Pose estimation failed.');
-      poseFrame = undefined;
-    }
-
-    const smoothed = poseFrame ? smootherRef.current.smooth(poseFrame) : undefined;
-    const nextState = detectorRef.current.processPose(smoothed);
-    const nextSessionTelemetry = sessionOrchestratorRef.current.process(nextState, timestampMs);
-    detectorStateRef.current = nextState;
-    setDetectorState(nextState);
-    setSessionTelemetry(nextSessionTelemetry);
-
-    if (nextState.lastRep && !seenRepNumbersRef.current.has(nextState.lastRep.repNumber)) {
-      seenRepNumbersRef.current.add(nextState.lastRep.repNumber);
-      repEventsRef.current.push(nextState.lastRep);
-    }
-
-    drawOverlay(canvasRef.current, video, smoothed);
-    animationFrameRef.current = requestAnimationFrame(processFrame);
+    const completedMovement = service.endMovement();
+    hasRecordableActivityRef.current =
+      hasRecordableActivityRef.current || isRecordableMovement(completedMovement);
+    activeMovementTypeRef.current = undefined;
+    detectorRef.current.reset();
   }, []);
+
+  const syncMovementRecording = useCallback(
+    (state: MovementInterpreterState, telemetry: ActivitySessionTelemetry): void => {
+      const service = sessionServiceRef.current;
+
+      if (!service) {
+        return;
+      }
+
+      if (telemetry.mode === 'resting' || telemetry.mode === 'idle') {
+        endActiveMovement();
+        return;
+      }
+
+      if (telemetry.mode !== 'moving' || !telemetry.movementType) {
+        return;
+      }
+
+      if (
+        activeMovementTypeRef.current &&
+        activeMovementTypeRef.current !== telemetry.movementType
+      ) {
+        endActiveMovement();
+      }
+
+      if (!activeMovementTypeRef.current) {
+        service.startMovement(telemetry.movementType, defaultCameraAngle);
+        activeMovementTypeRef.current = telemetry.movementType;
+      }
+
+      const updatedMovement = service.updateMovement(state);
+      hasRecordableActivityRef.current =
+        hasRecordableActivityRef.current || isRecordableMovement(updatedMovement);
+    },
+    [endActiveMovement],
+  );
+
+  const processFrame = useCallback(
+    (timestampMs: number): void => {
+      const video = videoRef.current;
+      const estimator = estimatorRef.current;
+
+      if (timestampMs - lastInferenceAtRef.current < poseInferenceIntervalMs) {
+        animationFrameRef.current = requestAnimationFrame(processFrame);
+        return;
+      }
+
+      if (!video || !estimator || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        animationFrameRef.current = requestAnimationFrame(processFrame);
+        return;
+      }
+
+      lastInferenceAtRef.current = timestampMs;
+      let poseFrame: PoseFrame | undefined;
+
+      try {
+        poseFrame = estimator.estimate(video, timestampMs);
+      } catch (error) {
+        setCameraError(error instanceof Error ? error.message : 'Pose estimation failed.');
+        poseFrame = undefined;
+      }
+
+      const smoothed = poseFrame ? smootherRef.current.smooth(poseFrame) : undefined;
+      const nextState = detectorRef.current.processPose(smoothed);
+      const nextSessionTelemetry = sessionOrchestratorRef.current.process(nextState, timestampMs);
+      detectorStateRef.current = nextState;
+      setDetectorState(nextState);
+      setSessionTelemetry(nextSessionTelemetry);
+      syncMovementRecording(nextState, nextSessionTelemetry);
+
+      drawOverlay(canvasRef.current, video, smoothed);
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+    },
+    [syncMovementRecording],
+  );
 
   const startActivity = useCallback(async () => {
     if (startInFlightRef.current || isTracking) {
@@ -422,17 +477,19 @@ function ActivityView({
       }
 
       setStatus('Starting pose engine');
-      detectorRef.current = new PushUpMovementInterpreter({
-        ...defaultPushUpConfig,
+      detectorRef.current = primaryMovementDefinition.createInterpreter({
         cameraAngle: defaultCameraAngle,
       });
       sessionOrchestratorRef.current.reset();
       sessionOrchestratorRef.current.updateOptions({ cameraAngle: defaultCameraAngle });
       lastInferenceAtRef.current = 0;
       smootherRef.current.reset();
-      repEventsRef.current = [];
-      seenRepNumbersRef.current = new Set();
-      sessionRef.current = createSession();
+      activeMovementTypeRef.current = undefined;
+      hasRecordableActivityRef.current = false;
+      sessionServiceRef.current = new ActivitySessionService(
+        createSessionRepository(onSessionSaved),
+      );
+      sessionRef.current = sessionServiceRef.current.startSession();
 
       const estimator = new MediaPipePoseEstimator({
         modelAssetPath: assets.modelAssetPath,
@@ -474,6 +531,7 @@ function ActivityView({
     assets.modelAssetPath,
     assets.wasmAssetPath,
     isTracking,
+    onSessionSaved,
     platform.cameraPermission,
     processFrame,
   ]);
@@ -496,41 +554,27 @@ function ActivityView({
     stopCamera(videoRef.current);
     clearCanvas(canvasRef.current);
 
-    const activeSession = sessionRef.current;
+    const sessionService = sessionServiceRef.current;
 
-    if (activeSession) {
-      const endedAt = new Date();
-      const durationSeconds = Math.max(
-        0,
-        Math.round((endedAt.getTime() - new Date(activeSession.startedAt).getTime()) / 1000),
-      );
-      const movementSet = createMovementSegment(
-        activeSession.startedAt,
-        endedAt.toISOString(),
-        defaultCameraAngle,
-        detectorStateRef.current,
-        [...repEventsRef.current],
-      );
-      const completedSession: ActivitySession = {
-        ...activeSession,
-        endedAt: endedAt.toISOString(),
-        durationSeconds,
-        movements: [movementSet],
-      };
+    if (sessionService) {
+      endActiveMovement();
 
-      if (movementSet.reps > 0 || durationSeconds > 3) {
-        await onSessionSaved(completedSession);
+      if (hasRecordableActivityRef.current) {
+        await sessionService.endSession();
       }
     }
 
     sessionRef.current = undefined;
+    sessionServiceRef.current = undefined;
+    activeMovementTypeRef.current = undefined;
+    hasRecordableActivityRef.current = false;
     sessionOrchestratorRef.current.reset();
     setSessionElapsedSeconds(0);
     setSessionTelemetry(initialSessionTelemetry);
     detectorStateRef.current = initialDetectorState;
     setDetectorState(initialDetectorState);
     setStatus('Ready');
-  }, [onSessionSaved]);
+  }, [endActiveMovement]);
 
   return (
     <section className={`activity-layout telemetry-${telemetryMode}`}>
@@ -1320,34 +1364,25 @@ function telemetryMetricsFor(
   }));
 }
 
-function createSession(): ActivitySession {
+function createSessionRepository(
+  saveSession: (session: ActivitySession) => Promise<void>,
+): ActivityRepository {
   return {
-    id: `session_${crypto.randomUUID()}`,
-    startedAt: new Date().toISOString(),
-    movements: [],
-    notes: undefined,
+    listSessions: async () => [],
+    getSession: async () => undefined,
+    saveSession,
+    deleteSession: async () => undefined,
+    summary: async () => ({
+      totalSessions: 0,
+      totalReps: 0,
+      validReps: 0,
+      partialReps: 0,
+    }),
   };
 }
 
-function createMovementSegment(
-  startedAt: string,
-  endedAt: string,
-  cameraAngle: CameraAngle,
-  state: MovementInterpreterState,
-  repEvents: readonly RepEvent[],
-): MovementSegment {
-  return {
-    id: `set_${crypto.randomUUID()}`,
-    movementType: 'push_up',
-    cameraAngle,
-    startedAt,
-    endedAt,
-    reps: state.reps,
-    validReps: state.validReps,
-    partialReps: state.partialReps,
-    formWarnings: state.warnings,
-    repEvents,
-  };
+function isRecordableMovement(movement: MovementSegment): boolean {
+  return movement.reps > 0 || movement.validReps > 0 || movement.partialReps > 0;
 }
 
 function formatMovementRepSummary(movement: MovementSegment): string {
