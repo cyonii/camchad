@@ -6,10 +6,10 @@ CamChad Workout is a local-first camera-based movement analysis app. CamChad is 
 
 - Electron desktop app.
 - React and TypeScript UI.
-- Automatic movement-recognition foundation with push-up validation first.
+- Automatic exercise inference foundation with local movement validation.
 - Local-only pose inference.
 - Local activity history.
-- Passive camera-angle guidance with side view as the recommended push-up baseline.
+- Passive camera-angle guidance based on inferred exercise metadata.
 - Repository hygiene from the start: formatting, linting, type checking, tests, pre-commit validation, and CI.
 
 ## Privacy
