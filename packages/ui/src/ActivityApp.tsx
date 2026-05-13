@@ -1042,11 +1042,29 @@ function SettingsView({
   };
 
   return (
-    <section className="stack">
+    <section className="stack settings-stack">
       <div className="page-heading">
         <div>
           <span>Local controls</span>
           <h1>Settings</h1>
+        </div>
+      </div>
+
+      <div className="settings-summary-grid">
+        <div>
+          <Activity size={18} aria-hidden="true" />
+          <span>Mode</span>
+          <strong>Movement analysis</strong>
+        </div>
+        <div>
+          <Camera size={18} aria-hidden="true" />
+          <span>Pose engine</span>
+          <strong>MediaPipe Full</strong>
+        </div>
+        <div>
+          <Bell size={18} aria-hidden="true" />
+          <span>Network</span>
+          <strong>Offline local</strong>
         </div>
       </div>
 
@@ -1082,7 +1100,7 @@ function SettingsView({
             type="button"
             disabled={!canUseNotifications}
             onClick={() => {
-              void platform.notifications?.activityReminder('Time for a short push-up session.');
+              void platform.notifications?.activityReminder('Time for a short movement session.');
               setReminderStatus('Reminder sent.');
             }}
             aria-label="Send reminder"

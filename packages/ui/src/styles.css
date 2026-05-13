@@ -1196,10 +1196,59 @@ button,
 .settings-list,
 .history-list {
   display: grid;
+  width: 100%;
   border: 1px solid rgb(var(--primary-rgb) / 16%);
   border-radius: 8px;
   background: var(--surface-glass);
   box-shadow: 0 16px 42px var(--shadow);
+}
+
+.settings-stack {
+  align-content: start;
+}
+
+.settings-stack .page-heading,
+.settings-stack .settings-list,
+.settings-summary-grid {
+  width: min(820px, 100%);
+}
+
+.settings-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-summary-grid > div {
+  display: grid;
+  gap: 8px;
+  min-height: 118px;
+  padding: 16px;
+  border: 1px solid rgb(var(--primary-rgb) / 15%);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(var(--primary-rgb) / 8%), transparent 58%), var(--surface-glass);
+}
+
+.settings-summary-grid svg {
+  color: var(--primary);
+}
+
+.settings-summary-grid span {
+  color: var(--text-subtle);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.settings-summary-grid strong {
+  align-self: end;
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.98rem;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .page-heading {
