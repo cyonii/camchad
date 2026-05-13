@@ -1,9 +1,5 @@
 import type { CameraAngle, MovementInterpreter, MovementType } from './movement-interpreter.js';
-import {
-  defaultPushUpConfig,
-  PushUpMovementInterpreter,
-  type PushUpMovementInterpreterConfig,
-} from './push-up-interpreter.js';
+import { defaultPushUpConfig, PushUpMovementInterpreter } from './push-up-interpreter.js';
 
 export interface MovementDefinition {
   readonly type: MovementType;
@@ -12,10 +8,29 @@ export interface MovementDefinition {
   readonly repLabel: string;
   readonly repPluralLabel: string;
   readonly defaultCameraAngle: CameraAngle;
+  readonly cameraGuidance: MovementCameraGuidance;
   readonly telemetryMetrics: readonly MovementTelemetryMetricDefinition[];
-  readonly createInterpreter: (
-    config?: Partial<PushUpMovementInterpreterConfig>,
-  ) => MovementInterpreter;
+  readonly createInterpreter: (options?: MovementInterpreterFactoryOptions) => MovementInterpreter;
+}
+
+export interface MovementInterpreterFactoryOptions {
+  readonly cameraAngle?: CameraAngle;
+}
+
+export interface MovementCameraGuidance {
+  readonly recommendedAngle: CameraAngle;
+  readonly usableTitle: string;
+  readonly usableMessage: string;
+  readonly warningTitle: string;
+  readonly warningMessage: string;
+}
+
+export interface CameraAngleAdvice {
+  readonly movementType: MovementType;
+  readonly severity: 'info' | 'warning';
+  readonly title: string;
+  readonly message: string;
+  readonly recommendedAngle: CameraAngle;
 }
 
 export interface MovementTelemetryMetricDefinition {
@@ -32,14 +47,24 @@ export const movementRegistry: readonly MovementDefinition[] = [
     repLabel: 'push-up',
     repPluralLabel: 'push-ups',
     defaultCameraAngle: 'side',
+    cameraGuidance: {
+      recommendedAngle: 'side',
+      usableTitle: 'Camera angle usable',
+      usableMessage: 'Keep shoulders, hips, wrists, and ankles visible for stable analysis.',
+      warningTitle: 'Prefer side view',
+      warningMessage: 'Depth and body-line checks are more reliable from a clean side angle.',
+    },
     telemetryMetrics: [
       { key: 'primaryJointAngle', label: 'Primary joint', unit: 'deg' },
       { key: 'rangeOfMotionScore', label: 'Range', unit: '%' },
       { key: 'alignmentScore', label: 'Alignment', unit: '%' },
       { key: 'movementConfidence', label: 'Signal', unit: '%' },
     ],
-    createInterpreter: (config) =>
-      new PushUpMovementInterpreter({ ...defaultPushUpConfig, ...config }),
+    createInterpreter: (options) =>
+      new PushUpMovementInterpreter({
+        ...defaultPushUpConfig,
+        cameraAngle: options?.cameraAngle ?? defaultPushUpConfig.cameraAngle,
+      }),
   },
 ];
 
@@ -51,4 +76,21 @@ export function movementDefinitionFor(type: MovementType): MovementDefinition {
   }
 
   return definition;
+}
+
+export function cameraAdviceFor(
+  movementType: MovementType,
+  cameraAngle: CameraAngle,
+): CameraAngleAdvice {
+  const definition = movementDefinitionFor(movementType);
+  const guidance = definition.cameraGuidance;
+  const isRecommendedAngle = cameraAngle === guidance.recommendedAngle;
+
+  return {
+    movementType,
+    severity: isRecommendedAngle ? 'info' : 'warning',
+    title: isRecommendedAngle ? guidance.usableTitle : guidance.warningTitle,
+    message: isRecommendedAngle ? guidance.usableMessage : guidance.warningMessage,
+    recommendedAngle: guidance.recommendedAngle,
+  };
 }

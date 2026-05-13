@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import type { MovementInterpreterState } from './movement-interpreter.js';
-import { ActivitySessionOrchestrator, cameraAdviceFor } from './activity-session-orchestrator.js';
+import { ActivitySessionOrchestrator } from './activity-session-orchestrator.js';
+import { cameraAdviceFor, movementDefinitionFor } from './movement-registry.js';
 
 describe('ActivitySessionOrchestrator', () => {
   it('starts movement telemetry when recognition becomes confident', () => {
@@ -50,6 +51,13 @@ describe('ActivitySessionOrchestrator', () => {
     expect(cameraAdviceFor('push_up', 'front_diagonal')).toMatchObject({
       severity: 'warning',
       recommendedAngle: 'side',
+    });
+
+    expect(
+      cameraAdviceFor('push_up', movementDefinitionFor('push_up').defaultCameraAngle),
+    ).toMatchObject({
+      severity: 'info',
+      message: expect.not.stringContaining('Push-up'),
     });
   });
 });

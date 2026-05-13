@@ -3,16 +3,9 @@ import type {
   MovementInterpreterState,
   MovementType,
 } from './movement-interpreter.js';
+import { cameraAdviceFor, type CameraAngleAdvice } from './movement-registry.js';
 
 export type ActivitySessionMode = 'idle' | 'observing' | 'moving' | 'resting';
-
-export interface CameraAngleAdvice {
-  readonly movementType: MovementType;
-  readonly severity: 'info' | 'warning';
-  readonly title: string;
-  readonly message: string;
-  readonly recommendedAngle: CameraAngle;
-}
 
 export interface ActivitySessionTelemetry {
   readonly mode: ActivitySessionMode;
@@ -114,27 +107,4 @@ export class ActivitySessionOrchestrator {
     this.activeSetStartedAtMs = undefined;
     this.lastMovementAtMs = undefined;
   }
-}
-
-export function cameraAdviceFor(
-  movementType: MovementType,
-  cameraAngle: CameraAngle,
-): CameraAngleAdvice {
-  if (movementType === 'push_up' && cameraAngle !== 'side') {
-    return {
-      movementType,
-      severity: 'warning',
-      title: 'Prefer side view',
-      message: 'Push-up depth and body-line checks are more reliable from a clean side angle.',
-      recommendedAngle: 'side',
-    };
-  }
-
-  return {
-    movementType,
-    severity: 'info',
-    title: 'Camera angle usable',
-    message: 'Keep shoulders, hips, wrists, and ankles visible for stable push-up analysis.',
-    recommendedAngle: 'side',
-  };
 }
