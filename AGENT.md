@@ -25,12 +25,14 @@ Treat this repository like software you will still own after it ships. Optimize 
 ## Movement Product Direction
 
 - CamChad is a local-first biomechanical movement system, not a traditional exercise picker. The user should be able to open the app, step into frame, move, and let the system infer what is happening.
-- First validated movement is push-ups only. Build the foundations so squats, lunges, sit-ups, pull-ups, and future movements can be added as interpreters rather than as piles of custom UI logic.
+- Push-ups are the first proving ground for the movement engine, not the product model. Use them to harden orientation, range of motion, phase detection, form validation, rest handling, and telemetry contracts that future movements can reuse.
+- Build movement support as definitions, recognizers, validators, session events, and UI metadata. Avoid one-off UI branches or persistence shortcuts that only make sense for a single exercise.
 - Treat movement recognition and repetition validation as separate concerns. The system can recognize likely push-ups before any rep is valid, and it should say so explicitly in state.
-- Sessions are generic activity periods. Movement segments emerge from interpreter and orchestrator state; do not rebuild the product around manual exercise modes.
+- Sessions are generic activity periods. Movement segments emerge from interpreter and orchestrator state; do not rebuild the product around manual exercise modes or session-wide exercise labels.
 - Do not couple movement interpreters to a specific pose model. Pose engines are adapters; interpreters consume normalized pose frames.
 - Prefer deterministic state machines over threshold snippets hidden in UI code. When behavior depends on thresholds, name them, configure them, and test representative edge cases.
 - Surface camera-angle guidance passively from movement metadata. Do not make calibration advice feel like a required exercise-selection flow.
+- Logs and charts must preserve movement-level detail. A session can contain multiple movements, sets, rests, camera contexts, warnings, and quality signals; do not flatten that into a single undifferentiated rep count.
 
 ## Privacy And Platform
 
