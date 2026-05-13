@@ -9,6 +9,8 @@ Treat this repository as production-grade software. Optimise for correctness, re
 - Validate formatting, linting, type checking, and tests before every commit once tooling exists.
 - Keep architecture explicit: desktop shell, web shell, pose estimation, movement detection, session history, and storage must remain separately understandable.
 - Do not couple movement detectors to a specific pose model. Pose engines are adapters; detectors consume normalized pose frames.
+- Treat movement recognition and repetition validation as separate concerns. A system can recognize likely push-ups before any rep is valid.
+- Sessions are generic activity periods. Movement segments emerge from interpreter/orchestrator state; avoid rebuilding the product around manual exercise modes.
 - Treat camera access, local video, and activity history as private user data.
 - Avoid telemetry, cloud upload, backend services, or external inference unless the product direction explicitly changes.
 - Prefer deterministic state machines over threshold snippets hidden in UI code.
@@ -18,9 +20,9 @@ Treat this repository as production-grade software. Optimise for correctness, re
 
 - Start desktop-first with Electron, React, and TypeScript.
 - Include a web renderer path because camera behavior is easier to test in browsers and the user wants eventual web/mobile reach.
-- First movement is push-ups only. Keep detector registration extensible for squats and other indoor movements.
-- Support side-view push-up tracking as the reliable default, with diagonal/front modes treated as less reliable until validated.
-- Save a neat local movement log with sessions, sets, rep events, and form warnings.
+- First validated movement is push-ups only. Keep interpreter registration extensible for squats and other indoor movements.
+- Support side-view push-up tracking as the reliable default. Surface camera-angle advice as passive movement guidance, not as a primary exercise selection step.
+- Save a neat local movement log with activity sessions, movement segments, rep events, and form warnings.
 - Local video recording is a later opt-in feature, not a default.
 
 ## Lessons Already Learned

@@ -6,10 +6,10 @@ Local-first camera-based home activity tracker. The desktop app is the first-cla
 
 - Electron desktop app.
 - React and TypeScript UI.
-- Push-up tracking first.
+- Automatic movement-recognition foundation with push-up validation first.
 - Local-only pose inference.
 - Local activity history.
-- Camera-angle options with side view as the recommended default.
+- Passive camera-angle guidance with side view as the recommended push-up baseline.
 - Repository hygiene from the start: formatting, linting, type checking, tests, pre-commit validation, and CI.
 
 ## Privacy
