@@ -29,6 +29,7 @@ import {
   ActivitySessionOrchestrator,
   createMovementRecognitionEngine,
   movementDefinitionFor,
+  movementRegistry,
   type MovementDefinition,
 } from '@camchad/movement-core';
 import {
@@ -70,8 +71,15 @@ export interface ActivityAppProps {
   readonly platform: ActivityPlatform;
 }
 
+const themePreferenceStorageKey = 'camchad:theme-preference';
+const legacyThemePreferenceStorageKey = 'home-activity:theme-preference';
+const telemetryModeStorageKey = 'camchad:telemetry-mode';
+const legacyTelemetryModeStorageKey = 'home-activity:telemetry-mode';
+const poseInferenceIntervalMs = 80;
+const defaultMovementDefinition = defaultCatalogDefinition();
+const defaultCameraAngle: CameraAngle = defaultMovementDefinition.defaultCameraAngle;
 const initialDetectorState: MovementInterpreterState = {
-  movementType: 'push_up',
+  movementType: defaultMovementDefinition.type,
   recognition: {
     confidence: 0,
     status: 'tracking_lost',
@@ -84,14 +92,6 @@ const initialDetectorState: MovementInterpreterState = {
   warnings: [],
   metrics: {},
 };
-
-const themePreferenceStorageKey = 'camchad:theme-preference';
-const legacyThemePreferenceStorageKey = 'home-activity:theme-preference';
-const telemetryModeStorageKey = 'camchad:telemetry-mode';
-const legacyTelemetryModeStorageKey = 'home-activity:telemetry-mode';
-const poseInferenceIntervalMs = 80;
-const primaryMovementDefinition = movementDefinitionFor('push_up');
-const defaultCameraAngle: CameraAngle = primaryMovementDefinition.defaultCameraAngle;
 const initialSessionTelemetry: ActivitySessionTelemetry = {
   mode: 'idle',
   recognitionConfidence: 0,
@@ -193,7 +193,7 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
         <div className="sidebar-footer">
           <SidebarSessionTelemetry telemetry={shellSessionTelemetry} />
           <div className="sidebar-summary">
-            <span>Total reps</span>
+            <span>Total movement reps</span>
             <strong>{summary.totalReps}</strong>
             <small>{summary.totalSessions} saved sessions</small>
           </div>
@@ -722,7 +722,7 @@ function SidebarTelemetryPanel({
           <strong>{detectorState.validReps}</strong>
           <small>{detectorState.partialReps} partial reps</small>
         </div>
-        <QualityDial value={detectorState.metrics.poseConfidence} phase={detectorState.phase} />
+        <SignalDial value={detectorState.metrics.poseConfidence} phase={detectorState.phase} />
       </div>
 
       <div className="metric-grid telemetry-block">
@@ -877,7 +877,7 @@ function TelemetryModeControl({
   );
 }
 
-function QualityDial({
+function SignalDial({
   value,
   phase,
 }: {
@@ -890,7 +890,7 @@ function QualityDial({
   return (
     <div className="quality-dial" style={{ '--quality': `${clampedQuality}%` } as CSSProperties}>
       <strong>{phase === 'tracking_lost' ? '--' : clampedQuality}</strong>
-      <span>Quality</span>
+      <span>Signal</span>
     </div>
   );
 }
@@ -1031,8 +1031,8 @@ function SettingsView({
         </div>
         <div>
           <Bell size={18} aria-hidden="true" />
-          <span>Network</span>
-          <strong>Offline local</strong>
+          <span>Catalog</span>
+          <strong>{movementRegistry.length} definitions</strong>
         </div>
       </div>
 
@@ -1078,6 +1078,46 @@ function SettingsView({
           </button>
         </div>
         <p className="setting-note">{reminderStatus}</p>
+      </div>
+
+      <ExerciseCatalogPanel />
+    </section>
+  );
+}
+
+function ExerciseCatalogPanel(): ReactElement {
+  return (
+    <section className="exercise-catalog-panel" aria-labelledby="exercise-catalog-title">
+      <div className="chart-heading">
+        <div>
+          <span>Movement catalog</span>
+          <h2 id="exercise-catalog-title">Exercise definitions</h2>
+        </div>
+        <div className="chart-legend" aria-label="Exercise support legend">
+          <span>
+            <i className="legend-valid" />
+            Validation
+          </span>
+          <span>
+            <i className="legend-partial" />
+            Planned
+          </span>
+        </div>
+      </div>
+
+      <div className="exercise-catalog-grid">
+        {movementRegistry.map((definition) => (
+          <article key={definition.type} data-support={definition.supportLevel}>
+            <div>
+              <strong>{definition.label}</strong>
+              <span>{formatSupportLevel(definition.supportLevel)}</span>
+            </div>
+            <p>{definition.analysisSignals.slice(0, 2).join(' / ')}</p>
+            <small>
+              {definition.bodyOrientation} / {formatCameraAngle(definition.defaultCameraAngle)}
+            </small>
+          </article>
+        ))}
       </div>
     </section>
   );
@@ -1368,6 +1408,23 @@ function formatQualityScore(score: number | undefined): string {
 
 function formatCameraAngle(cameraAngle: CameraAngle): string {
   return cameraAngle.replaceAll('_', ' ');
+}
+
+function formatSupportLevel(level: MovementDefinition['supportLevel']): string {
+  return level === 'validation' ? 'Validation-ready' : level;
+}
+
+function defaultCatalogDefinition(): MovementDefinition {
+  const definition =
+    movementRegistry.find(
+      (movement) => movement.supportLevel === 'validation' && movement.createInterpreter,
+    ) ?? movementRegistry[0];
+
+  if (!definition) {
+    throw new Error('CamChad requires at least one exercise definition.');
+  }
+
+  return definition;
 }
 
 function drawOverlay(

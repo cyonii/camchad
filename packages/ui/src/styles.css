@@ -1187,6 +1187,7 @@ button,
 
 .settings-stack .page-heading,
 .settings-stack .settings-list,
+.exercise-catalog-panel,
 .settings-summary-grid {
   width: min(820px, 100%);
 }
@@ -1250,6 +1251,66 @@ button,
   border: 1px solid rgb(var(--primary-rgb) / 16%);
   border-radius: 8px;
   background: var(--surface-glass);
+}
+
+.exercise-catalog-panel {
+  padding: 18px;
+  border: 1px solid rgb(var(--primary-rgb) / 16%);
+  border-radius: 8px;
+  background: var(--surface-glass);
+}
+
+.exercise-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.exercise-catalog-grid article {
+  display: grid;
+  gap: 8px;
+  min-height: 132px;
+  padding: 13px;
+  border: 1px solid rgb(var(--primary-rgb) / 12%);
+  border-radius: 7px;
+  background: rgb(var(--surface-rgb) / 38%);
+}
+
+.exercise-catalog-grid article[data-support='validation'] {
+  border-color: rgb(var(--primary-rgb) / 28%);
+  background:
+    linear-gradient(135deg, rgb(var(--primary-rgb) / 8%), transparent 64%),
+    rgb(var(--surface-rgb) / 42%);
+}
+
+.exercise-catalog-grid strong,
+.exercise-catalog-grid span,
+.exercise-catalog-grid small {
+  display: block;
+}
+
+.exercise-catalog-grid strong {
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.96rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.exercise-catalog-grid span,
+.exercise-catalog-grid small {
+  color: var(--text-subtle);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.exercise-catalog-grid p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .chart-heading {

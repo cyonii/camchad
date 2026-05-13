@@ -34,6 +34,10 @@ packages/
   ui/
 ```
 
+## Movement Catalog
+
+CamChad models exercises as catalog definitions. Each definition can describe body orientation, camera guidance, analysis signals, phase labels, telemetry fields, and validation readiness. The current validation-ready definitions are push-ups and squats; the broader catalog records planned definitions for sit-ups, lunges, jumping jacks, planks, pull-ups, burpees, mountain climbers, high knees, lateral raises, and selected static holds.
+
 ## Development
 
 ```bash

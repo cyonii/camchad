@@ -43,7 +43,7 @@ export function ActivityLogChart({ model }: { readonly model: HistoryChartModel 
       </div>
 
       {!model.hasActivities ? (
-        <div className="chart-empty">Complete an activity to see rep trends.</div>
+        <div className="chart-empty">Complete an activity to see movement trends.</div>
       ) : (
         <div className="activity-chart-stack">
           <div className="activity-chart-frame">
