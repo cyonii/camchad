@@ -27,6 +27,7 @@ import type {
 } from '@camchad/movement-core';
 import {
   ActivitySessionOrchestrator,
+  createMovementRecognitionEngine,
   movementDefinitionFor,
   type MovementDefinition,
 } from '@camchad/movement-core';
@@ -246,7 +247,7 @@ function ActivityView({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const estimatorRef = useRef<PoseEstimator | null>(null);
   const smootherRef = useRef(new ExponentialPoseSmoother());
-  const detectorRef = useRef(primaryMovementDefinition.createInterpreter());
+  const recognitionEngineRef = useRef(createMovementRecognitionEngine());
   const sessionOrchestratorRef = useRef(
     new ActivitySessionOrchestrator({ cameraAngle: defaultCameraAngle }),
   );
@@ -339,7 +340,7 @@ function ActivityView({
     hasRecordableActivityRef.current =
       hasRecordableActivityRef.current || isRecordableMovement(completedMovement);
     activeMovementTypeRef.current = undefined;
-    detectorRef.current.reset();
+    recognitionEngineRef.current.reset();
   }, []);
 
   const syncMovementRecording = useCallback(
@@ -404,7 +405,7 @@ function ActivityView({
       }
 
       const smoothed = poseFrame ? smootherRef.current.smooth(poseFrame) : undefined;
-      const nextState = detectorRef.current.processPose(smoothed);
+      const nextState = recognitionEngineRef.current.processPose(smoothed).primary;
       const nextSessionTelemetry = sessionOrchestratorRef.current.process(nextState, timestampMs);
       detectorStateRef.current = nextState;
       setDetectorState(nextState);
@@ -472,7 +473,7 @@ function ActivityView({
       }
 
       setStatus('Starting pose engine');
-      detectorRef.current = primaryMovementDefinition.createInterpreter({
+      recognitionEngineRef.current = createMovementRecognitionEngine({
         cameraAngle: defaultCameraAngle,
       });
       sessionOrchestratorRef.current.reset();
