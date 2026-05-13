@@ -179,6 +179,66 @@ export const movementRegistry: readonly MovementDefinition[] = [
     'static pose geometry',
     'hold stability',
   ]),
+  plannedExercise('crunch', 'Crunch', 'Crunches', 'floor', [
+    'abdominal curl definition pending',
+    'shoulder elevation from floor',
+  ]),
+  plannedExercise('leg_raise', 'Leg raise', 'Leg raises', 'floor', [
+    'hip flexion definition pending',
+    'leg elevation range',
+  ]),
+  plannedExercise('glute_bridge', 'Glute bridge', 'Glute bridges', 'floor', [
+    'hip extension definition pending',
+    'shoulder-hip-knee line',
+  ]),
+  plannedExercise('wall_sit', 'Wall sit', 'Wall sits', 'seated', [
+    'static squat hold definition pending',
+    'knee angle stability',
+  ]),
+  plannedExercise('calf_raise', 'Calf raise', 'Calf raises', 'standing', [
+    'ankle extension definition pending',
+    'heel lift rhythm',
+  ]),
+  plannedExercise('step_up', 'Step-up', 'Step-ups', 'standing', [
+    'platform transition definition pending',
+    'single-leg drive',
+  ]),
+  plannedExercise('tricep_dip', 'Tricep dip', 'Tricep dips', 'floor', [
+    'back-supported elbow flexion definition pending',
+    'shoulder depth control',
+  ]),
+  plannedExercise('bicep_curl', 'Bicep curl', 'Bicep curls', 'standing', [
+    'elbow flexion definition pending',
+    'arm isolation signal',
+  ]),
+  plannedExercise('shoulder_press', 'Shoulder press', 'Shoulder presses', 'standing', [
+    'overhead press definition pending',
+    'wrist elevation path',
+  ]),
+  plannedExercise('deadlift', 'Deadlift', 'Deadlifts', 'standing', [
+    'hip hinge definition pending',
+    'torso inclination recovery',
+  ]),
+  plannedExercise('bear_crawl', 'Bear crawl', 'Bear crawls', 'floor', [
+    'quadruped travel definition pending',
+    'alternating limb rhythm',
+  ]),
+  plannedExercise('side_plank', 'Side plank', 'Side planks', 'floor', [
+    'lateral body line definition pending',
+    'static hold stability',
+  ]),
+  plannedExercise('bird_dog', 'Bird dog', 'Bird dogs', 'floor', [
+    'contralateral limb extension definition pending',
+    'spine stability',
+  ]),
+  plannedExercise('superman_hold', 'Superman hold', 'Superman holds', 'floor', [
+    'prone extension definition pending',
+    'static posterior-chain hold',
+  ]),
+  plannedExercise('russian_twist', 'Russian twist', 'Russian twists', 'seated', [
+    'torso rotation definition pending',
+    'seated trunk rhythm',
+  ]),
 ];
 
 export function movementDefinitionFor(type: MovementType): MovementDefinition {
@@ -241,5 +301,38 @@ function recognitionExercise(
       { key: 'rangeOfMotionScore', label: 'Range', unit: '%' },
     ],
     createInterpreter: () => createRecognitionMovementInterpreter(type),
+  };
+}
+
+function plannedExercise(
+  type: ExerciseType,
+  label: string,
+  pluralLabel: string,
+  bodyOrientation: MovementBodyOrientation,
+  analysisSignals: readonly string[],
+): MovementDefinition {
+  return {
+    type,
+    label,
+    pluralLabel,
+    repLabel: label.toLowerCase(),
+    repPluralLabel: pluralLabel.toLowerCase(),
+    category:
+      type.includes('hold') || type === 'wall_sit' || type === 'side_plank' ? 'hold' : 'repetition',
+    supportLevel: 'planned',
+    bodyOrientation,
+    analysisSignals,
+    phaseLabels: [],
+    defaultCameraAngle: bodyOrientation === 'standing' ? 'front' : 'side',
+    supportedCameraAngles:
+      bodyOrientation === 'standing' ? ['front', 'side'] : ['side', 'front_diagonal'],
+    cameraGuidance: {
+      recommendedAngle: bodyOrientation === 'standing' ? 'front' : 'side',
+      usableTitle: 'Definition pending',
+      usableMessage: `${label} is listed as a future exercise and is not recognized yet.`,
+      warningTitle: 'Not defined yet',
+      warningMessage: `${label} needs a movement definition before the engine can recognize it.`,
+    },
+    telemetryMetrics: [],
   };
 }

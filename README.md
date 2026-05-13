@@ -36,7 +36,7 @@ packages/
 
 ## Movement Catalog
 
-CamChad models exercises as catalog definitions. Each definition can describe body orientation, camera guidance, analysis signals, phase labels, telemetry fields, and support level. Push-ups and squats have validation-grade interpreters. Sit-ups, lunges, jumping jacks, planks, pull-ups, burpees, mountain climbers, high knees, lateral raises, and selected static holds have recognition interpreters that make them visible to the movement engine without claiming mature form validation yet.
+CamChad models exercises as catalog definitions. Each definition can describe body orientation, camera guidance, analysis signals, phase labels, telemetry fields, and support level. Push-ups and squats have validation-grade interpreters. Sit-ups, lunges, jumping jacks, planks, pull-ups, burpees, mountain climbers, high knees, lateral raises, and selected static holds have recognition interpreters that make them visible to the movement engine without claiming mature form validation yet. The broader catalog also includes planned exercises with no active interpreter so the product can show future coverage without pretending those movements are recognized.
 
 ## Development
 

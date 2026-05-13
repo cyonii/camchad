@@ -10,14 +10,26 @@ import { movementRegistry } from './movement-registry.js';
 import { createRecognitionMovementInterpreter } from './recognition-movement-interpreters.js';
 
 describe('recognition movement interpreters', () => {
-  it('creates an interpreter for every catalog movement', () => {
-    expect(movementRegistry.every((definition) => definition.createInterpreter)).toBe(true);
+  it('creates interpreters for every currently recognized catalog movement', () => {
+    expect(
+      movementRegistry
+        .filter((definition) => definition.supportLevel !== 'planned')
+        .every((definition) => definition.createInterpreter),
+    ).toBe(true);
+    expect(
+      movementRegistry
+        .filter((definition) => definition.supportLevel === 'planned')
+        .every((definition) => !definition.createInterpreter),
+    ).toBe(true);
     expect(
       movementRegistry.filter((definition) => definition.supportLevel === 'validation'),
     ).toHaveLength(2);
     expect(
       movementRegistry.filter((definition) => definition.supportLevel === 'recognition'),
     ).toHaveLength(10);
+    expect(
+      movementRegistry.filter((definition) => definition.supportLevel === 'planned').length,
+    ).toBeGreaterThan(0);
   });
 
   it('counts a high-knees cycle from knee lift rhythm', () => {

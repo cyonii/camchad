@@ -4,6 +4,7 @@ import {
   Camera,
   CheckCircle2,
   CircleAlert,
+  Dumbbell,
   History,
   Monitor,
   Moon,
@@ -56,7 +57,7 @@ const ActivityLogChart = lazy(async () => {
   return { default: module.ActivityLogChart };
 });
 
-type View = 'activity' | 'history' | 'settings';
+type View = 'activity' | 'history' | 'exercises' | 'settings';
 type ThemePreference = 'system' | 'light' | 'dark';
 type TelemetryMode = 'fixed' | 'engraved';
 
@@ -182,6 +183,13 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
             Log
           </NavButton>
           <NavButton
+            icon={<Dumbbell size={18} />}
+            active={view === 'exercises'}
+            onClick={() => setView('exercises')}
+          >
+            Exercises
+          </NavButton>
+          <NavButton
             icon={<Settings size={18} />}
             active={view === 'settings'}
             onClick={() => setView('settings')}
@@ -218,6 +226,7 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
           />
         ) : null}
         {view === 'history' ? <HistoryView sessions={sessions} summary={summary} /> : null}
+        {view === 'exercises' ? <SupportedExercisesView /> : null}
         {view === 'settings' ? (
           <SettingsView
             platform={platform}
@@ -1137,11 +1146,6 @@ function SettingsView({
           <span>Pose engine</span>
           <strong>MediaPipe Full</strong>
         </div>
-        <div>
-          <Bell size={18} aria-hidden="true" />
-          <span>Catalog</span>
-          <strong>{movementRegistry.length} definitions</strong>
-        </div>
       </div>
 
       <div className="settings-list">
@@ -1187,47 +1191,151 @@ function SettingsView({
         </div>
         <p className="setting-note">{reminderStatus}</p>
       </div>
-
-      <ExerciseCatalogPanel />
     </section>
   );
 }
 
-function ExerciseCatalogPanel(): ReactElement {
+function SupportedExercisesView(): ReactElement {
+  const validationDefinitions = movementRegistry.filter(
+    (definition) => definition.supportLevel === 'validation',
+  );
+  const recognitionDefinitions = movementRegistry.filter(
+    (definition) => definition.supportLevel === 'recognition',
+  );
+  const plannedDefinitions = movementRegistry.filter(
+    (definition) => definition.supportLevel === 'planned',
+  );
+  const recognizedCount = validationDefinitions.length + recognitionDefinitions.length;
+
   return (
-    <section className="exercise-catalog-panel" aria-labelledby="exercise-catalog-title">
-      <div className="chart-heading">
+    <section className="stack exercises-stack">
+      <div className="page-heading">
         <div>
-          <span>Movement catalog</span>
-          <h2 id="exercise-catalog-title">Exercise definitions</h2>
-        </div>
-        <div className="chart-legend" aria-label="Exercise support legend">
-          <span>
-            <i className="legend-valid" />
-            Validation
-          </span>
-          <span>
-            <i className="legend-partial" />
-            Planned
-          </span>
+          <span>Exercise catalog</span>
+          <h1>Supported exercises</h1>
+          <p>
+            See what the local engine understands now, what it can only recognize as a movement
+            pattern, and what is parked as a future exercise definition.
+          </p>
         </div>
       </div>
 
-      <div className="exercise-catalog-grid">
-        {movementRegistry.map((definition) => (
-          <article key={definition.type} data-support={definition.supportLevel}>
-            <div>
-              <strong>{definition.label}</strong>
-              <span>{formatSupportLevel(definition.supportLevel)}</span>
-            </div>
-            <p>{definition.analysisSignals.slice(0, 2).join(' / ')}</p>
-            <small>
-              {definition.bodyOrientation} / {formatCameraAngle(definition.defaultCameraAngle)}
-            </small>
-          </article>
+      <div className="exercise-support-summary">
+        <Metric label="Total listed" value={String(movementRegistry.length)} />
+        <Metric label="Recognized now" value={String(recognizedCount)} />
+        <Metric label="Future backlog" value={String(plannedDefinitions.length)} />
+      </div>
+
+      <section className="exercise-catalog-panel" aria-labelledby="exercise-catalog-title">
+        <div className="chart-heading">
+          <div>
+            <span>Engine coverage</span>
+            <h2 id="exercise-catalog-title">Exercise definitions</h2>
+          </div>
+          <div className="chart-legend" aria-label="Exercise support legend">
+            <span>
+              <i className="legend-valid" />
+              Validation
+            </span>
+            <span>
+              <i className="legend-recognition" />
+              Recognition
+            </span>
+            <span>
+              <i className="legend-partial" />
+              Planned
+            </span>
+          </div>
+        </div>
+
+        <div className="exercise-definition-list">
+          <ExerciseCatalogSection
+            definitions={validationDefinitions}
+            description="Full rep counting and quality validation are implemented."
+            title="Validation-ready"
+          />
+          <ExerciseCatalogSection
+            definitions={recognitionDefinitions}
+            description="The engine can infer these movement patterns, but form validation is still lightweight."
+            title="Recognized now"
+          />
+          <ExerciseCatalogSection
+            definitions={plannedDefinitions}
+            description="These are listed deliberately, but do not have active movement definitions yet."
+            title="Not defined yet"
+          />
+        </div>
+      </section>
+    </section>
+  );
+}
+
+function ExerciseCatalogSection({
+  title,
+  description,
+  definitions,
+}: {
+  readonly title: string;
+  readonly description: string;
+  readonly definitions: readonly MovementDefinition[];
+}): ReactElement {
+  return (
+    <section className="exercise-definition-section" aria-label={title}>
+      <header>
+        <div>
+          <span>{title}</span>
+          <p>{description}</p>
+        </div>
+        <strong>{definitions.length}</strong>
+      </header>
+
+      <div className="exercise-definition-rows">
+        {definitions.map((definition) => (
+          <ExerciseDefinitionRow definition={definition} key={definition.type} />
         ))}
       </div>
     </section>
+  );
+}
+
+function ExerciseDefinitionRow({
+  definition,
+}: {
+  readonly definition: MovementDefinition;
+}): ReactElement {
+  return (
+    <article className="exercise-definition-row" data-support={definition.supportLevel}>
+      <div className="exercise-definition-main">
+        <div>
+          <strong>{definition.label}</strong>
+          <span>{formatSupportLevel(definition.supportLevel)}</span>
+        </div>
+        <p>{definition.analysisSignals.join(' / ')}</p>
+      </div>
+
+      <dl className="exercise-definition-details">
+        <div>
+          <dt>Type</dt>
+          <dd>{definition.category}</dd>
+        </div>
+        <div>
+          <dt>Orientation</dt>
+          <dd>{definition.bodyOrientation}</dd>
+        </div>
+        <div>
+          <dt>Camera</dt>
+          <dd>{formatCameraAngle(definition.defaultCameraAngle)}</dd>
+        </div>
+        <div>
+          <dt>Telemetry</dt>
+          <dd>
+            {definition.telemetryMetrics.length === 0
+              ? 'not defined'
+              : definition.telemetryMetrics.map((metric) => metric.label).join(', ')}
+          </dd>
+        </div>
+      </dl>
+    </article>
   );
 }
 
@@ -1589,7 +1697,15 @@ function formatCameraAngle(cameraAngle: CameraAngle): string {
 }
 
 function formatSupportLevel(level: MovementDefinition['supportLevel']): string {
-  return level === 'validation' ? 'Validation-ready' : level;
+  if (level === 'validation') {
+    return 'Validation-ready';
+  }
+
+  if (level === 'recognition') {
+    return 'Recognition';
+  }
+
+  return 'Planned';
 }
 
 function defaultCatalogDefinition(): MovementDefinition {

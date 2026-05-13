@@ -4,7 +4,6 @@ import type {
   MovementInterpreterState,
   MovementPhase,
   MovementRecognition,
-  MovementType,
   RepEvent,
 } from './movement-interpreter.js';
 import {
@@ -13,7 +12,17 @@ import {
   type PoseMovementFeatures,
 } from './pose-movement-features.js';
 
-export type RecognitionMovementType = Exclude<MovementType, 'push_up' | 'squat'>;
+export type RecognitionMovementType =
+  | 'sit_up'
+  | 'lunge'
+  | 'jumping_jack'
+  | 'plank'
+  | 'pull_up'
+  | 'burpee'
+  | 'mountain_climber'
+  | 'high_knees'
+  | 'lateral_raise'
+  | 'yoga_hold';
 
 type MovementDirection = 'increase' | 'decrease';
 

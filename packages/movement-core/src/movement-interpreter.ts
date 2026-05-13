@@ -12,7 +12,22 @@ export type ExerciseType =
   | 'mountain_climber'
   | 'high_knees'
   | 'lateral_raise'
-  | 'yoga_hold';
+  | 'yoga_hold'
+  | 'crunch'
+  | 'leg_raise'
+  | 'glute_bridge'
+  | 'wall_sit'
+  | 'calf_raise'
+  | 'step_up'
+  | 'tricep_dip'
+  | 'bicep_curl'
+  | 'shoulder_press'
+  | 'deadlift'
+  | 'bear_crawl'
+  | 'side_plank'
+  | 'bird_dog'
+  | 'superman_hold'
+  | 'russian_twist';
 
 export type MovementType = ExerciseType;
 
