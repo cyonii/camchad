@@ -1,4 +1,4 @@
-import type { ActivitySession } from '@home-activity/activity-history';
+import type { ActivitySession } from '@camchad/activity-history';
 
 export interface HistoryChartPoint {
   readonly sessionId: string;

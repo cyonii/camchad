@@ -1,5 +1,5 @@
 {
-  "name": "@home-activity/movement-core",
+  "name": "@camchad/movement-core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,6 +17,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@home-activity/pose-core": "0.1.0"
+    "@camchad/pose-core": "0.1.0"
   }
 }

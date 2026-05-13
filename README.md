@@ -1,6 +1,6 @@
-# Home Activity Tracker
+# CamChad
 
-Local-first camera-based home activity tracker. The desktop app is the first-class target, with shared packages designed for web and future mobile reuse.
+CamChad Workout is a local-first camera-based movement analysis app. CamChad is the short display name used for the installed app and app listings. The desktop app is the first-class target, with shared packages designed for web and future mobile reuse.
 
 ## Initial Scope
 
@@ -74,14 +74,14 @@ npm run package:desktop
 The package command runs the full production build first, then creates an unpacked macOS app bundle under:
 
 ```text
-release/desktop/mac-*/Home Activity Tracker.app
+release/desktop/mac-*/CamChad.app
 ```
 
 Install it into the normal macOS Applications folder:
 
 ```bash
-rm -rf "/Applications/Home Activity Tracker.app"
-ditto "release/desktop/mac-arm64/Home Activity Tracker.app" "/Applications/Home Activity Tracker.app"
+rm -rf "/Applications/CamChad.app"
+ditto "release/desktop/mac-arm64/CamChad.app" "/Applications/CamChad.app"
 ```
 
 If your output directory differs, replace `mac-arm64` with the directory that exists under `release/desktop`.
@@ -91,8 +91,8 @@ This local package is ad-hoc signed for development. For a distributable release
 After rebuilding, reinstall the app bundle if you want the copy in `/Applications` to reflect the latest local build:
 
 ```bash
-rm -rf "/Applications/Home Activity Tracker.app"
-ditto "release/desktop/mac-arm64/Home Activity Tracker.app" "/Applications/Home Activity Tracker.app"
+rm -rf "/Applications/CamChad.app"
+ditto "release/desktop/mac-arm64/CamChad.app" "/Applications/CamChad.app"
 ```
 
 ## Camera Notes
@@ -106,7 +106,7 @@ During local development, macOS can still attribute camera access to the launche
 If the packaged app still does not appear under System Settings > Privacy & Security > Camera after pressing Start, reset only this app's camera privacy entry and open it again from `/Applications`:
 
 ```bash
-tccutil reset Camera app.homeactivity.tracker
+tccutil reset Camera app.homechad.workout
 ```
 
 A distributable macOS build should add camera usage metadata, signing, and notarization before it is treated as production-ready.

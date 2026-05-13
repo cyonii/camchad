@@ -1,4 +1,4 @@
-import type { PoseFrame } from '@home-activity/pose-core';
+import type { PoseFrame } from '@camchad/pose-core';
 
 export type MovementType = 'push_up';
 

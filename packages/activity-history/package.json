@@ -1,5 +1,5 @@
 {
-  "name": "@home-activity/activity-history",
+  "name": "@camchad/activity-history",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,6 +17,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@home-activity/movement-core": "0.1.0"
+    "@camchad/movement-core": "0.1.0"
   }
 }

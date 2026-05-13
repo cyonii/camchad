@@ -3,7 +3,7 @@ import type {
   MovementInterpreterState,
   MovementType,
   RepEvent,
-} from '@home-activity/movement-core';
+} from '@camchad/movement-core';
 
 import type { MovementSegment, ActivitySession } from './models.js';
 import type { ActivityRepository } from './activity-repository.js';

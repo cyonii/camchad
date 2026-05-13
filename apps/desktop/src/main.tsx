@@ -1,12 +1,12 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 
-import type { CameraPermissionResult, ActivityPlatform } from '@home-activity/ui';
-import { ActivityApp } from '@home-activity/ui';
-import '@home-activity/ui/styles.css';
-import type { ActivitySession, ActivitySummary } from '@home-activity/activity-history';
+import type { CameraPermissionResult, ActivityPlatform } from '@camchad/ui';
+import { ActivityApp } from '@camchad/ui';
+import '@camchad/ui/styles.css';
+import type { ActivitySession, ActivitySummary } from '@camchad/activity-history';
 
-const desktopApi = window.homeActivity;
+const desktopApi = window.camChad;
 
 const platform: ActivityPlatform = {
   history: {

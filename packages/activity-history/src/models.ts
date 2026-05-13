@@ -1,9 +1,4 @@
-import type {
-  CameraAngle,
-  MovementType,
-  FormWarning,
-  RepEvent,
-} from '@home-activity/movement-core';
+import type { CameraAngle, MovementType, FormWarning, RepEvent } from '@camchad/movement-core';
 
 export interface ActivitySession {
   readonly id: string;

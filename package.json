@@ -1,20 +1,20 @@
 {
-  "name": "home-activity-tracker",
+  "name": "camchad-workout",
   "version": "0.1.0",
   "private": true,
-  "description": "Local-first camera-based home activity tracker.",
+  "description": "CamChad Workout is a local-first camera-based movement analysis app.",
   "type": "module",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w @home-activity/desktop",
-    "dev:web": "npm run dev -w @home-activity/web",
+    "dev": "npm run dev -w @camchad/desktop",
+    "dev:web": "npm run dev -w @camchad/web",
     "sync:mediapipe-assets": "node scripts/sync-mediapipe-assets.mjs",
-    "build": "npm run build:packages && npm run build -w @home-activity/web && npm run build -w @home-activity/desktop",
+    "build": "npm run build:packages && npm run build -w @camchad/web && npm run build -w @camchad/desktop",
     "build:packages": "tsc -b packages/pose-core packages/movement-core packages/activity-history packages/ui",
-    "package:desktop": "npm run build && npm run package:mac -w @home-activity/desktop",
+    "package:desktop": "npm run build && npm run package:mac -w @camchad/desktop",
     "clean": "tsc -b --clean packages/pose-core packages/movement-core packages/activity-history packages/ui apps/web apps/desktop || true && rm -rf apps/*/dist apps/*/dist-electron apps/*/dist-types packages/*/dist apps/*/*.tsbuildinfo packages/*/*.tsbuildinfo coverage",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

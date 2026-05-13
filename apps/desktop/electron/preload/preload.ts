@@ -23,4 +23,4 @@ const api = {
   },
 };
 
-contextBridge.exposeInMainWorld('homeActivity', api);
+contextBridge.exposeInMainWorld('camChad', api);

@@ -2,7 +2,7 @@
 
 declare global {
   interface Window {
-    homeActivity: {
+    camChad: {
       history: {
         list(): Promise<unknown>;
         save(session: unknown): Promise<void>;

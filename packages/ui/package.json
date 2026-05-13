@@ -1,5 +1,5 @@
 {
-  "name": "@home-activity/ui",
+  "name": "@camchad/ui",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,9 +18,9 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@home-activity/activity-history": "0.1.0",
-    "@home-activity/movement-core": "0.1.0",
-    "@home-activity/pose-core": "0.1.0",
+    "@camchad/activity-history": "0.1.0",
+    "@camchad/movement-core": "0.1.0",
+    "@camchad/pose-core": "0.1.0",
     "lucide-react": "^0.511.0",
     "react": "^19.1.0",
     "recharts": "^3.8.1"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ActivitySession } from '@home-activity/activity-history';
+import type { ActivitySession } from '@camchad/activity-history';
 
 import { buildHistoryChartModel } from './history-chart.js';
 

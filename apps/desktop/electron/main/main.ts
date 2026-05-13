@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-app.setName('Home Activity Tracker');
+app.setName('CamChad');
 
 interface RepEvent {
   readonly repNumber: number;
@@ -90,7 +90,7 @@ async function createWindow(): Promise<void> {
     height: 820,
     minWidth: 980,
     minHeight: 680,
-    title: 'Home Activity Tracker',
+    title: 'CamChad',
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
@@ -119,6 +119,16 @@ function legacyHistoryPath(): string {
   return join(app.getPath('userData'), 'workout-history.json');
 }
 
+function previousBrandHistoryPaths(): readonly string[] {
+  const appDataPath = app.getPath('appData');
+
+  return [
+    join(appDataPath, 'Home Activity Tracker', 'activity-history.json'),
+    join(appDataPath, 'Home Activity Tracker', 'workout-history.json'),
+    join(appDataPath, 'Home Workout Tracker', 'workout-history.json'),
+  ];
+}
+
 async function readHistory(): Promise<PersistedHistory> {
   try {
     const raw = await readFile(historyPath(), 'utf8');
@@ -137,11 +147,24 @@ async function readLegacyHistory(): Promise<PersistedHistory> {
     const raw = await readFile(legacyHistoryPath(), 'utf8');
     return normalizeHistory(JSON.parse(raw));
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      return { sessions: [] };
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+      throw error;
     }
 
-    throw error;
+    for (const legacyPath of previousBrandHistoryPaths()) {
+      try {
+        const raw = await readFile(legacyPath, 'utf8');
+        return normalizeHistory(JSON.parse(raw));
+      } catch (legacyError) {
+        if (
+          !(legacyError instanceof Error && 'code' in legacyError && legacyError.code === 'ENOENT')
+        ) {
+          throw legacyError;
+        }
+      }
+    }
+
+    return { sessions: [] };
   }
 }
 
@@ -251,7 +274,7 @@ async function ensureCameraPermission(): Promise<CameraPermissionResult> {
     return {
       granted: false,
       reason:
-        'Camera access is blocked for Home Activity Tracker. Enable it in macOS System Settings > Privacy & Security > Camera, then restart the app.',
+        'Camera access is blocked for CamChad. Enable it in macOS System Settings > Privacy & Security > Camera, then restart the app.',
     };
   }
 
@@ -261,7 +284,7 @@ async function ensureCameraPermission(): Promise<CameraPermissionResult> {
     granted,
     reason: granted
       ? undefined
-      : 'Camera access was not granted. Reopen Home Activity Tracker from /Applications and press Start to request access again.',
+      : 'Camera access was not granted. Reopen CamChad from /Applications and press Start to request access again.',
   };
 }
 

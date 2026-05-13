@@ -1,9 +1,9 @@
 {
-  "name": "@home-activity/desktop",
+  "name": "@camchad/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Local-first camera-based home activity tracker desktop app.",
-  "author": "Home Activity Tracker",
+  "description": "CamChad Workout desktop app.",
+  "author": "CamChad",
   "type": "module",
   "main": "dist-electron/main/main.js",
   "scripts": {
@@ -14,7 +14,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@home-activity/ui": "0.1.0",
+    "@camchad/ui": "0.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

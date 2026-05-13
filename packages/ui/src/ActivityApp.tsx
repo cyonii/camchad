@@ -35,26 +35,22 @@ import type {
   CameraAngle,
   MovementInterpreterState,
   RepEvent,
-} from '@home-activity/movement-core';
+} from '@camchad/movement-core';
 import {
   ActivitySessionOrchestrator,
   defaultPushUpConfig,
   movementDefinitionFor,
   PushUpMovementInterpreter,
   type MovementDefinition,
-} from '@home-activity/movement-core';
+} from '@camchad/movement-core';
 import {
   ExponentialPoseSmoother,
   MediaPipePoseEstimator,
   type LandmarkName,
   type PoseEstimator,
   type PoseFrame,
-} from '@home-activity/pose-core';
-import type {
-  MovementSegment,
-  ActivitySession,
-  ActivitySummary,
-} from '@home-activity/activity-history';
+} from '@camchad/pose-core';
+import type { MovementSegment, ActivitySession, ActivitySummary } from '@camchad/activity-history';
 
 import type { ActivityPlatform } from './platform.js';
 import { buildHistoryChartModel, type HistoryChartModel } from './history-chart.js';
@@ -89,8 +85,10 @@ const initialDetectorState: MovementInterpreterState = {
   metrics: {},
 };
 
-const themePreferenceStorageKey = 'home-activity:theme-preference';
-const telemetryModeStorageKey = 'home-activity:telemetry-mode';
+const themePreferenceStorageKey = 'camchad:theme-preference';
+const legacyThemePreferenceStorageKey = 'home-activity:theme-preference';
+const telemetryModeStorageKey = 'camchad:telemetry-mode';
+const legacyTelemetryModeStorageKey = 'home-activity:telemetry-mode';
 const poseInferenceIntervalMs = 80;
 const defaultCameraAngle: CameraAngle = 'side';
 const initialSessionTelemetry: ActivitySessionTelemetry = {
@@ -162,7 +160,7 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
             <img className="brand-logo" src={assets.logoAssetPath ?? '/logo.png'} alt="" />
           </div>
           <div>
-            <strong>Home Activity</strong>
+            <strong>CamChad</strong>
             <span>Local tracker</span>
           </div>
         </div>
@@ -1187,7 +1185,9 @@ function nextThemePreference(value: ThemePreference): ThemePreference {
 
 function readThemePreference(): ThemePreference {
   try {
-    const storedPreference = localStorage.getItem(themePreferenceStorageKey);
+    const storedPreference =
+      localStorage.getItem(themePreferenceStorageKey) ??
+      localStorage.getItem(legacyThemePreferenceStorageKey);
 
     if (
       storedPreference === 'system' ||
@@ -1222,7 +1222,9 @@ function applyThemePreference(preference: ThemePreference): void {
 
 function readTelemetryMode(): TelemetryMode {
   try {
-    const storedMode = localStorage.getItem(telemetryModeStorageKey);
+    const storedMode =
+      localStorage.getItem(telemetryModeStorageKey) ??
+      localStorage.getItem(legacyTelemetryModeStorageKey);
 
     if (storedMode === 'fixed' || storedMode === 'engraved') {
       return storedMode;
@@ -1245,7 +1247,7 @@ function writeTelemetryMode(mode: TelemetryMode): void {
 function describeCameraStartupError(error: unknown): string {
   if (error instanceof DOMException) {
     if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
-      return 'Camera access was blocked by the operating system. If Home Activity Tracker is not listed in macOS Camera settings, quit the app, reopen it from /Applications, and press Start again to trigger the system prompt.';
+      return 'Camera access was blocked by the operating system. If CamChad is not listed in macOS Camera settings, quit the app, reopen it from /Applications, and press Start again to trigger the system prompt.';
     }
 
     if (error.name === 'NotFoundError') {

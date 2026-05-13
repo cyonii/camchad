@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { MovementInterpreterState } from '@home-activity/movement-core';
+import type { MovementInterpreterState } from '@camchad/movement-core';
 
 import type { Clock, IdGenerator } from './session-service.js';
 import { repEvent, ActivitySessionService } from './session-service.js';

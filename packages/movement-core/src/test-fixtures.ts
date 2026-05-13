@@ -3,7 +3,7 @@ import {
   type LandmarkName,
   type PoseFrame,
   type PoseLandmark,
-} from '@home-activity/pose-core';
+} from '@camchad/pose-core';
 
 interface PushUpFrameOptions {
   readonly timestampMs: number;

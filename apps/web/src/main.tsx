@@ -6,8 +6,8 @@ import {
   browserCameraPermissionClient,
   localBrowserHistoryClient,
   ActivityApp,
-} from '@home-activity/ui';
-import '@home-activity/ui/styles.css';
+} from '@camchad/ui';
+import '@camchad/ui/styles.css';
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

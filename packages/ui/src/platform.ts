@@ -1,4 +1,4 @@
-import type { ActivitySession, ActivitySummary } from '@home-activity/activity-history';
+import type { ActivitySession, ActivitySummary } from '@camchad/activity-history';
 
 export interface CameraPermissionResult {
   readonly granted: boolean;
@@ -44,7 +44,7 @@ export const localBrowserHistoryClient: HistoryClient = {
   async save(session: ActivitySession): Promise<void> {
     const sessions = readLocalSessions();
     const nextSessions = [session, ...sessions.filter((existing) => existing.id !== session.id)];
-    localStorage.setItem('home-activity:sessions', JSON.stringify(nextSessions));
+    localStorage.setItem('camchad:sessions', JSON.stringify(nextSessions));
   },
 
   async summary(): Promise<ActivitySummary> {
@@ -79,6 +79,7 @@ export const browserAppLifecycleClient: AppLifecycleClient = {
 
 function readLocalSessions(): readonly ActivitySession[] {
   const raw =
+    localStorage.getItem('camchad:sessions') ??
     localStorage.getItem('home-activity:sessions') ??
     localStorage.getItem('home-workout:sessions') ??
     '[]';

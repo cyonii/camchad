@@ -1,5 +1,5 @@
 {
-  "name": "@home-activity/web",
+  "name": "@camchad/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@home-activity/ui": "0.1.0",
+    "@camchad/ui": "0.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

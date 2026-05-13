@@ -7,15 +7,15 @@ export default {
   plugins: [react()],
   resolve: {
     alias: [
-      { find: '@home-activity/ui/styles.css', replacement: `${root}/packages/ui/src/styles.css` },
-      { find: '@home-activity/ui', replacement: `${root}/packages/ui/src/index.ts` },
-      { find: '@home-activity/pose-core', replacement: `${root}/packages/pose-core/src/index.ts` },
+      { find: '@camchad/ui/styles.css', replacement: `${root}/packages/ui/src/styles.css` },
+      { find: '@camchad/ui', replacement: `${root}/packages/ui/src/index.ts` },
+      { find: '@camchad/pose-core', replacement: `${root}/packages/pose-core/src/index.ts` },
       {
-        find: '@home-activity/movement-core',
+        find: '@camchad/movement-core',
         replacement: `${root}/packages/movement-core/src/index.ts`,
       },
       {
-        find: '@home-activity/activity-history',
+        find: '@camchad/activity-history',
         replacement: `${root}/packages/activity-history/src/index.ts`,
       },
     ],
