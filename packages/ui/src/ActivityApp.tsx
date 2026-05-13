@@ -903,86 +903,194 @@ function HistoryView({
   readonly summary: ActivitySummary;
 }): ReactElement {
   const chartModel = buildHistoryChartModel(sessions);
+  const latestSession = sessions[0];
+  const overview = historyOverviewFor(sessions);
 
   return (
-    <section className="stack">
-      <div className="page-heading">
-        <div>
-          <span>Movement log</span>
-          <h1>Activity history</h1>
+    <section className="history-command-center">
+      <div className="history-primary-column">
+        <div className="history-heading-row">
+          <div className="page-heading history-page-heading">
+            <div>
+              <span>Session logs</span>
+              <h1>Movement history</h1>
+              <p>Review local activity sessions, movement segments, and rep quality.</p>
+            </div>
+          </div>
+
+          <div className="history-window-badge">
+            <History size={16} aria-hidden="true" />
+            <span>{formatHistoryWindow(sessions)}</span>
+          </div>
         </div>
-        <div className="summary-strip">
-          <Metric label="Sessions" value={String(summary.totalSessions)} />
-          <Metric label="Valid reps" value={String(summary.validReps)} />
-          <Metric label="Partial" value={String(summary.partialReps)} />
-          <Metric label="Sets" value={String(chartModel.totalSets)} />
-          <Metric label="Warnings" value={String(chartModel.totalWarnings)} />
+
+        <div className="history-stat-grid">
+          <HistoryStatCard
+            label="Total sessions"
+            value={String(summary.totalSessions)}
+            detail={`${chartModel.totalSets} movement sets`}
+            points={chartModel.points.map((point) => point.sessionCount)}
+          />
+          <HistoryStatCard
+            label="Total time"
+            value={formatLongDuration(overview.totalDurationSeconds)}
+            detail={`${overview.movementTypeCount} movement types`}
+            points={chartModel.points.map((point) => point.durationSeconds)}
+          />
+          <HistoryStatCard
+            label="Total reps"
+            value={String(summary.totalReps)}
+            detail={`${summary.validReps} valid / ${summary.partialReps} partial`}
+            points={chartModel.points.map((point) => point.totalReps)}
+          />
+          <HistoryStatCard
+            label="Avg quality"
+            value={formatQualityScore(overview.averageQuality)}
+            detail={`${chartModel.totalWarnings} form warnings`}
+            points={chartModel.points.map((point) => point.averageQuality)}
+          />
         </div>
+
+        <Suspense fallback={<div className="chart-empty">Loading activity chart...</div>}>
+          <ActivityLogChart model={chartModel} />
+        </Suspense>
+
+        <section className="history-table-panel" aria-labelledby="sessions-table-title">
+          <div className="history-section-heading">
+            <div>
+              <span>Sessions</span>
+              <h2 id="sessions-table-title">Recorded activity</h2>
+            </div>
+            <small>
+              {sessions.length === 0 ? 'No sessions' : `${sessions.length} local sessions`}
+            </small>
+          </div>
+
+          <div className="history-table">
+            <div className="history-table-row history-table-head">
+              <span>Date</span>
+              <span>Duration</span>
+              <span>Movements</span>
+              <span>Reps</span>
+              <span>Quality</span>
+              <span>Warnings</span>
+            </div>
+
+            {sessions.length === 0 ? (
+              <div className="empty-state">No saved activities yet.</div>
+            ) : (
+              sessions.map((session) => (
+                <article className="history-table-row" key={session.id}>
+                  <div>
+                    <strong>{formatCompactDate(session.startedAt)}</strong>
+                    <small>{formatCompactTime(session.startedAt)}</small>
+                  </div>
+                  <span>{formatDuration(session.durationSeconds ?? 0)}</span>
+                  <span>{formatSessionMovementNames(session)}</span>
+                  <span>{sessionTotalReps(session)}</span>
+                  <span>{formatQualityScore(sessionAverageQuality(session))}</span>
+                  <span>{sessionWarningCount(session)}</span>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
       </div>
 
-      <Suspense fallback={<div className="chart-empty">Loading activity chart...</div>}>
-        <ActivityLogChart model={chartModel} />
-      </Suspense>
+      <aside className="history-detail-panel" aria-label="Session details">
+        {latestSession ? (
+          <>
+            <section className="history-detail-card session-detail-hero">
+              <span>Session details</span>
+              <strong>{formatDate(latestSession.startedAt)}</strong>
+              <div>
+                <small>{formatSessionMovementSummary(latestSession)}</small>
+                <b>{formatDuration(latestSession.durationSeconds ?? 0)}</b>
+              </div>
+            </section>
 
-      <div className="history-list">
-        {sessions.length === 0 ? (
-          <div className="empty-state">No saved activities yet.</div>
-        ) : (
-          sessions.map((session) => (
-            <article className="history-item history-item-detailed" key={session.id}>
-              <div className="history-item-header">
+            <section className="history-detail-card">
+              <div className="history-section-heading">
                 <div>
-                  <strong>{formatDate(session.startedAt)}</strong>
-                  <span>{formatSessionMovementSummary(session)}</span>
-                </div>
-                <div>
-                  <span>{formatDuration(session.durationSeconds ?? 0)}</span>
-                  <small>
-                    {session.movements.length} sets / {sessionWarningCount(session)} warnings
-                  </small>
+                  <span>Movement breakdown</span>
+                  <h2>Movement segments</h2>
                 </div>
               </div>
 
-              {session.movements.length > 0 ? (
-                <div className="history-segment-grid">
-                  {session.movements.map((movement) => (
-                    <div className="history-segment" key={movement.id}>
-                      <div>
-                        <strong>{movementDefinitionFor(movement.movementType).label}</strong>
-                        <span>{formatMovementRepSummary(movement)}</span>
+              {latestSession.movements.length === 0 ? (
+                <div className="history-empty-line">No movement segments recorded.</div>
+              ) : (
+                <div className="movement-breakdown-list">
+                  {latestSession.movements.map((movement) => {
+                    const definition = movementDefinitionFor(movement.movementType);
+
+                    return (
+                      <div key={movement.id}>
+                        <div>
+                          <strong>{definition.label}</strong>
+                          <small>{formatCameraAngle(movement.cameraAngle)}</small>
+                        </div>
+                        <span>{movement.validReps}</span>
+                        <span>{movement.partialReps}</span>
+                        <span>{formatQualityScore(averageMovementQuality(movement))}</span>
                       </div>
-                      <dl>
-                        <div>
-                          <dt>Quality</dt>
-                          <dd>{formatQualityScore(averageMovementQuality(movement))}</dd>
-                        </div>
-                        <div>
-                          <dt>Partial</dt>
-                          <dd>{movement.partialReps}</dd>
-                        </div>
-                        <div>
-                          <dt>Camera</dt>
-                          <dd>{formatCameraAngle(movement.cameraAngle)}</dd>
-                        </div>
-                        <div>
-                          <dt>Duration</dt>
-                          <dd>{formatDuration(movementDurationSeconds(movement))}</dd>
-                        </div>
-                        <div>
-                          <dt>Warnings</dt>
-                          <dd>{movement.formWarnings.length}</dd>
-                        </div>
-                      </dl>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            <section className="history-detail-card">
+              <div className="history-section-heading">
+                <div>
+                  <span>Performance overview</span>
+                  <h2>Telemetry</h2>
+                </div>
+              </div>
+
+              <div className="detail-metric-grid">
+                <Metric label="Valid reps" value={String(sessionValidReps(latestSession))} />
+                <Metric label="Partial reps" value={String(sessionPartialReps(latestSession))} />
+                <Metric
+                  label="Avg quality"
+                  value={formatQualityScore(sessionAverageQuality(latestSession))}
+                />
+                <Metric label="Warnings" value={String(sessionWarningCount(latestSession))} />
+              </div>
+            </section>
+
+            <section className="history-detail-card">
+              <div className="history-section-heading">
+                <div>
+                  <span>Movement mix</span>
+                  <h2>All-time breakdown</h2>
+                </div>
+              </div>
+
+              {chartModel.movementBreakdown.length === 0 ? (
+                <div className="history-empty-line">No movement mix yet.</div>
+              ) : (
+                <div className="chart-breakdown-grid compact-breakdown">
+                  {chartModel.movementBreakdown.map((movement) => (
+                    <div key={movement.movementType}>
+                      <span>{movement.label}</span>
+                      <strong>{movement.validReps}</strong>
+                      <small>
+                        {movement.sets} sets / {movement.warningCount} warnings
+                      </small>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <span className="history-no-segments">No movement segment recorded.</span>
               )}
-            </article>
-          ))
+            </section>
+          </>
+        ) : (
+          <section className="history-detail-card">
+            <span>Session details</span>
+            <p>No local activity has been recorded yet.</p>
+          </section>
         )}
-      </div>
+      </aside>
     </section>
   );
 }
@@ -1320,6 +1428,37 @@ function Metric({
   );
 }
 
+function HistoryStatCard({
+  label,
+  value,
+  detail,
+  points,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly detail: string;
+  readonly points: readonly number[];
+}): ReactElement {
+  const maxPoint = Math.max(1, ...points);
+  const sparkPoints = points.slice(-9);
+
+  return (
+    <div className="history-stat-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+      <div className="history-sparkline" aria-hidden="true">
+        {sparkPoints.map((point, index) => (
+          <i
+            key={`${point}-${index}`}
+            style={{ '--spark': `${Math.max(8, (point / maxPoint) * 100)}%` } as CSSProperties}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function telemetryMetricsFor(
   movementDefinition: MovementDefinition,
   state: MovementInterpreterState,
@@ -1351,11 +1490,27 @@ function isRecordableMovement(movement: MovementSegment): boolean {
   return movement.reps > 0 || movement.validReps > 0 || movement.partialReps > 0;
 }
 
-function formatMovementRepSummary(movement: MovementSegment): string {
-  const definition = movementDefinitionFor(movement.movementType);
-  const noun = movement.validReps === 1 ? definition.repLabel : definition.repPluralLabel;
+function historyOverviewFor(sessions: readonly ActivitySession[]): {
+  readonly totalDurationSeconds: number;
+  readonly averageQuality: number | undefined;
+  readonly movementTypeCount: number;
+} {
+  const movements = sessions.flatMap((session) => session.movements);
+  const repEvents = movements.flatMap((movement) => movement.repEvents);
 
-  return `${movement.validReps} ${noun}`;
+  return {
+    totalDurationSeconds: sessions.reduce(
+      (sum, session) => sum + (session.durationSeconds ?? 0),
+      0,
+    ),
+    averageQuality:
+      repEvents.length === 0
+        ? undefined
+        : Math.round(
+            repEvents.reduce((sum, event) => sum + event.qualityScore, 0) / repEvents.length,
+          ),
+    movementTypeCount: new Set(movements.map((movement) => movement.movementType)).size,
+  };
 }
 
 function formatSessionMovementSummary(session: ActivitySession): string {
@@ -1374,21 +1529,44 @@ function formatSessionMovementSummary(session: ActivitySession): string {
   return `${movementLabels.join(' + ')} / ${validReps} valid / ${partialReps} partial`;
 }
 
-function sessionWarningCount(session: ActivitySession): number {
-  return session.movements.reduce((sum, movement) => sum + movement.formWarnings.length, 0);
-}
-
-function movementDurationSeconds(movement: MovementSegment): number {
-  if (!movement.endedAt) {
-    return 0;
+function formatSessionMovementNames(session: ActivitySession): string {
+  if (session.movements.length === 0) {
+    return 'None';
   }
 
-  return Math.max(
-    0,
-    Math.round(
-      (new Date(movement.endedAt).getTime() - new Date(movement.startedAt).getTime()) / 1000,
+  return [
+    ...new Set(
+      session.movements.map((movement) => movementDefinitionFor(movement.movementType).label),
     ),
+  ].join(', ');
+}
+
+function sessionTotalReps(session: ActivitySession): number {
+  return session.movements.reduce((sum, movement) => sum + movement.reps, 0);
+}
+
+function sessionValidReps(session: ActivitySession): number {
+  return session.movements.reduce((sum, movement) => sum + movement.validReps, 0);
+}
+
+function sessionPartialReps(session: ActivitySession): number {
+  return session.movements.reduce((sum, movement) => sum + movement.partialReps, 0);
+}
+
+function sessionAverageQuality(session: ActivitySession): number | undefined {
+  const repEvents = session.movements.flatMap((movement) => movement.repEvents);
+
+  if (repEvents.length === 0) {
+    return undefined;
+  }
+
+  return Math.round(
+    repEvents.reduce((sum, event) => sum + event.qualityScore, 0) / repEvents.length,
   );
+}
+
+function sessionWarningCount(session: ActivitySession): number {
+  return session.movements.reduce((sum, movement) => sum + movement.formWarnings.length, 0);
 }
 
 function averageMovementQuality(movement: MovementSegment): number | undefined {
@@ -1655,6 +1833,14 @@ function formatDuration(totalSeconds: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+function formatLongDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 function formatMetric(value: number | undefined, unit: 'deg' | '%'): string {
   if (value === undefined || Number.isNaN(value)) {
     return 'n/a';
@@ -1668,4 +1854,35 @@ function formatDate(value: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
+}
+
+function formatCompactDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(value));
+}
+
+function formatCompactTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function formatHistoryWindow(sessions: readonly ActivitySession[]): string {
+  if (sessions.length === 0) {
+    return 'No sessions recorded';
+  }
+
+  const sorted = [...sessions].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+
+  if (!first || !last) {
+    return 'No sessions recorded';
+  }
+
+  return `${formatCompactDate(first.startedAt)} - ${formatCompactDate(last.startedAt)}`;
 }
