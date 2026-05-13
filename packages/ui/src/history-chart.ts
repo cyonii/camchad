@@ -1,4 +1,18 @@
 import type { ActivitySession } from '@camchad/activity-history';
+import { movementDefinitionFor, type MovementType } from '@camchad/movement-core';
+
+export interface HistoryMovementBreakdown {
+  readonly movementType: MovementType;
+  readonly label: string;
+  readonly sets: number;
+  readonly validReps: number;
+  readonly partialReps: number;
+  readonly totalReps: number;
+  readonly durationSeconds: number;
+  readonly averageQuality: number;
+  readonly warningCount: number;
+  readonly cameraAngles: readonly string[];
+}
 
 export interface HistoryChartPoint {
   readonly sessionId: string;
@@ -10,7 +24,10 @@ export interface HistoryChartPoint {
   readonly totalReps: number;
   readonly durationSeconds: number;
   readonly sessionCount: number;
+  readonly setCount: number;
+  readonly warningCount: number;
   readonly averageQuality: number;
+  readonly movements: readonly HistoryMovementBreakdown[];
 }
 
 export interface HistoryChartModel {
@@ -19,6 +36,9 @@ export interface HistoryChartModel {
   readonly hasActivities: boolean;
   readonly totalValidReps: number;
   readonly totalPartialReps: number;
+  readonly totalSets: number;
+  readonly totalWarnings: number;
+  readonly movementBreakdown: readonly HistoryMovementBreakdown[];
 }
 
 export function buildHistoryChartModel(
@@ -46,6 +66,7 @@ export function buildHistoryChartModel(
     const validReps = movements.reduce((sum, movement) => sum + movement.validReps, 0);
     const partialReps = movements.reduce((sum, movement) => sum + movement.partialReps, 0);
     const repEvents = movements.flatMap((movement) => movement.repEvents);
+    const movementBreakdown = buildMovementBreakdown(movements);
     const averageQuality =
       repEvents.length === 0
         ? 0
@@ -62,15 +83,21 @@ export function buildHistoryChartModel(
       partialReps,
       totalReps: validReps + partialReps,
       sessionCount: daySessions.length,
+      setCount: movements.length,
+      warningCount: movements.reduce((sum, movement) => sum + movement.formWarnings.length, 0),
       durationSeconds: daySessions.reduce(
         (sum, session) => sum + (session.durationSeconds ?? 0),
         0,
       ),
       averageQuality,
+      movements: movementBreakdown,
     };
   });
 
   const maxObservedReps = Math.max(0, ...points.map((point) => point.totalReps));
+  const movementBreakdown = buildMovementBreakdown(
+    sessions.flatMap((session) => session.movements),
+  );
 
   return {
     points,
@@ -78,7 +105,67 @@ export function buildHistoryChartModel(
     hasActivities: points.some((point) => point.hasActivity),
     totalValidReps: points.reduce((sum, point) => sum + point.validReps, 0),
     totalPartialReps: points.reduce((sum, point) => sum + point.partialReps, 0),
+    totalSets: points.reduce((sum, point) => sum + point.setCount, 0),
+    totalWarnings: points.reduce((sum, point) => sum + point.warningCount, 0),
+    movementBreakdown,
   };
+}
+
+function buildMovementBreakdown(
+  movements: readonly ActivitySession['movements'][number][],
+): readonly HistoryMovementBreakdown[] {
+  const byMovement = new Map<MovementType, ActivitySession['movements'][number][]>();
+
+  for (const movement of movements) {
+    byMovement.set(movement.movementType, [
+      ...(byMovement.get(movement.movementType) ?? []),
+      movement,
+    ]);
+  }
+
+  return [...byMovement.entries()]
+    .map(([movementType, movementGroup]) => {
+      const repEvents = movementGroup.flatMap((movement) => movement.repEvents);
+      const definition = movementDefinitionFor(movementType);
+
+      return {
+        movementType,
+        label: definition.label,
+        sets: movementGroup.length,
+        validReps: movementGroup.reduce((sum, movement) => sum + movement.validReps, 0),
+        partialReps: movementGroup.reduce((sum, movement) => sum + movement.partialReps, 0),
+        totalReps: movementGroup.reduce((sum, movement) => sum + movement.reps, 0),
+        durationSeconds: movementGroup.reduce(
+          (sum, movement) => sum + movementDurationSeconds(movement),
+          0,
+        ),
+        averageQuality:
+          repEvents.length === 0
+            ? 0
+            : Math.round(
+                repEvents.reduce((sum, event) => sum + event.qualityScore, 0) / repEvents.length,
+              ),
+        warningCount: movementGroup.reduce(
+          (sum, movement) => sum + movement.formWarnings.length,
+          0,
+        ),
+        cameraAngles: [...new Set(movementGroup.map((movement) => movement.cameraAngle))],
+      };
+    })
+    .sort((a, b) => b.totalReps - a.totalReps || a.label.localeCompare(b.label));
+}
+
+function movementDurationSeconds(movement: ActivitySession['movements'][number]): number {
+  if (!movement.endedAt) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.round(
+      (new Date(movement.endedAt).getTime() - new Date(movement.startedAt).getTime()) / 1000,
+    ),
+  );
 }
 
 function startOfDay(value: Date): Date {

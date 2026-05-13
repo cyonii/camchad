@@ -1346,6 +1346,45 @@ button,
   background-size: 44px 44px;
 }
 
+.activity-chart-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.chart-breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.chart-breakdown-grid > div {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid rgb(var(--primary-rgb) / 13%);
+  border-radius: 7px;
+  background: rgb(var(--surface-rgb) / 42%);
+}
+
+.chart-breakdown-grid span,
+.chart-breakdown-grid small {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.chart-breakdown-grid span {
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.chart-breakdown-grid strong {
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
 .chart-empty {
   display: grid;
   min-height: 180px;
@@ -1365,6 +1404,60 @@ button,
   min-height: 76px;
   padding: 16px 18px;
   border-bottom: 1px solid var(--border-soft);
+}
+
+.history-item-detailed {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.history-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.history-segment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.history-segment {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgb(var(--primary-rgb) / 12%);
+  border-radius: 7px;
+  background: rgb(var(--surface-rgb) / 34%);
+}
+
+.history-segment dl {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.history-segment dt {
+  margin-bottom: 4px;
+  color: var(--text-subtle);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.history-segment dd {
+  margin: 0;
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.82rem;
+}
+
+.history-no-segments {
+  color: var(--text-muted);
 }
 
 .history-item:last-child,
@@ -1439,5 +1532,13 @@ button,
 
   .bottom-command-deck {
     grid-template-columns: 1fr;
+  }
+
+  .history-item-header {
+    flex-direction: column;
+  }
+
+  .history-segment dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

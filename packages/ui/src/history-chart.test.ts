@@ -19,6 +19,9 @@ describe('buildHistoryChartModel', () => {
       hasActivities: false,
       totalValidReps: 0,
       totalPartialReps: 0,
+      totalSets: 0,
+      totalWarnings: 0,
+      movementBreakdown: [],
     });
     expect(model.points).toHaveLength(12);
   });
@@ -40,13 +43,32 @@ describe('buildHistoryChartModel', () => {
       partialReps: 3,
       totalReps: 11,
       sessionCount: 2,
+      setCount: 2,
       averageQuality: 88,
+      movements: [
+        expect.objectContaining({
+          label: 'Push-up',
+          sets: 2,
+          validReps: 8,
+          partialReps: 3,
+          totalReps: 11,
+          cameraAngles: ['side'],
+        }),
+      ],
     });
     expect(model.points.some((point) => !point.hasActivity)).toBe(true);
     expect(model.maxReps).toBe(20);
     expect(model.hasActivities).toBe(true);
     expect(model.totalValidReps).toBe(8);
     expect(model.totalPartialReps).toBe(3);
+    expect(model.totalSets).toBe(2);
+    expect(model.movementBreakdown).toEqual([
+      expect.objectContaining({
+        movementType: 'push_up',
+        sets: 2,
+        totalReps: 11,
+      }),
+    ]);
   });
 
   it('uses a minimum visual scale so tiny activities do not fill the graph', () => {
