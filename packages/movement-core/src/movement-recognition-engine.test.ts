@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import type { MovementInterpreter, MovementInterpreterState } from './movement-interpreter.js';
-import { MovementRecognitionEngine } from './movement-recognition-engine.js';
+import {
+  createMovementRecognitionEngine,
+  MovementRecognitionEngine,
+} from './movement-recognition-engine.js';
+import { makePushUpFrame, makeSquatFrame } from './test-fixtures.js';
 
 describe('MovementRecognitionEngine', () => {
   it('selects the strongest recognized movement as the primary state', () => {
@@ -44,6 +48,26 @@ describe('MovementRecognitionEngine', () => {
     engine.reset();
 
     expect(interpreters.every((interpreter) => interpreter.resetCount === 1)).toBe(true);
+  });
+
+  it('distinguishes standing squat motion from floor push-up motion', () => {
+    const engine = createMovementRecognitionEngine();
+
+    engine.processPose(makeSquatFrame({ timestampMs: 0, kneeAngle: 168 }));
+    engine.processPose(makeSquatFrame({ timestampMs: 120, kneeAngle: 138 }));
+    engine.processPose(makeSquatFrame({ timestampMs: 260, kneeAngle: 96 }));
+    const squatState = engine.processPose(
+      makeSquatFrame({ timestampMs: 420, kneeAngle: 166 }),
+    ).primary;
+
+    engine.reset();
+    engine.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
+    const pushUpState = engine.processPose(
+      makePushUpFrame({ timestampMs: 140, elbowAngle: 132 }),
+    ).primary;
+
+    expect(squatState.movementType).toBe('squat');
+    expect(pushUpState.movementType).toBe('push_up');
   });
 });
 

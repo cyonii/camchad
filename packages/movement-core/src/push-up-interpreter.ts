@@ -15,6 +15,7 @@ import type {
   FormWarning,
   RepEvent,
 } from './movement-interpreter.js';
+import { extractPoseMovementFeatures } from './pose-movement-features.js';
 
 export interface PushUpMovementInterpreterConfig {
   readonly cameraAngle: CameraAngle;
@@ -62,6 +63,8 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
+    const features = extractPoseMovementFeatures(frame, this.config.minVisibility);
+
     const trackingSide = selectTrackingSide(frame, this.config.minVisibility);
 
     if (!trackingSide) {
@@ -98,6 +101,17 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
     if (hasInvalidAlignment) {
       this.phase = 'invalid_form';
       this.recognition = this.buildRecognition('active');
+      return this.getState();
+    }
+
+    if (features?.bodyOrientation === 'vertical') {
+      this.phase = 'setup_needed';
+      this.warnings = [];
+      this.recognition = {
+        confidence: 0.12,
+        status: 'candidate',
+        evidence: ['body_orientation_mismatch'],
+      };
       return this.getState();
     }
 

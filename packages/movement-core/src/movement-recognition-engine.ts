@@ -65,7 +65,9 @@ export function createMovementRecognitionEngine(
   definitions: readonly MovementDefinition[] = movementRegistry,
 ): MovementRecognitionEngine {
   return new MovementRecognitionEngine(
-    definitions.map((definition) => definition.createInterpreter(options)),
+    definitions.flatMap((definition) =>
+      definition.createInterpreter ? [definition.createInterpreter(options)] : [],
+    ),
   );
 }
 

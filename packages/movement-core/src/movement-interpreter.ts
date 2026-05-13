@@ -1,8 +1,22 @@
 import type { PoseFrame } from '@camchad/pose-core';
 
-export type MovementType = 'push_up';
+export type ExerciseType =
+  | 'push_up'
+  | 'squat'
+  | 'sit_up'
+  | 'lunge'
+  | 'jumping_jack'
+  | 'plank'
+  | 'pull_up'
+  | 'burpee'
+  | 'mountain_climber'
+  | 'high_knees'
+  | 'lateral_raise'
+  | 'yoga_hold';
 
-export type CameraAngle = 'side' | 'front_diagonal';
+export type MovementType = ExerciseType;
+
+export type CameraAngle = 'side' | 'front' | 'front_diagonal';
 
 export type MovementPhase =
   | 'tracking_lost'
@@ -18,7 +32,9 @@ export interface FormWarning {
     | 'tracking_lost'
     | 'low_confidence'
     | 'body_alignment'
+    | 'posture_alignment'
     | 'partial_depth'
+    | 'range_of_motion'
     | 'camera_angle_experimental';
   readonly message: string;
 }

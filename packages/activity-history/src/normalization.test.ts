@@ -54,7 +54,7 @@ describe('activity history normalization', () => {
           movements: [
             {
               id: 'unknown',
-              movementType: 'jumping_jack',
+              movementType: 'dance',
               cameraAngle: 'side',
               startedAt: '2026-05-12T07:00:05.000Z',
             },

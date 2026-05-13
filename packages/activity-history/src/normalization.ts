@@ -114,11 +114,24 @@ function normalizeRepEvent(value: unknown): readonly RepEvent[] {
 }
 
 function isMovementType(value: unknown): value is MovementType {
-  return value === 'push_up';
+  return (
+    value === 'push_up' ||
+    value === 'squat' ||
+    value === 'sit_up' ||
+    value === 'lunge' ||
+    value === 'jumping_jack' ||
+    value === 'plank' ||
+    value === 'pull_up' ||
+    value === 'burpee' ||
+    value === 'mountain_climber' ||
+    value === 'high_knees' ||
+    value === 'lateral_raise' ||
+    value === 'yoga_hold'
+  );
 }
 
 function isCameraAngle(value: unknown): value is CameraAngle {
-  return value === 'side' || value === 'front_diagonal';
+  return value === 'side' || value === 'front' || value === 'front_diagonal';
 }
 
 function isFormWarningCode(value: unknown): value is FormWarning['code'] {
