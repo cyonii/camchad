@@ -1,4 +1,8 @@
-import type { ActivitySession, ActivitySummary } from '@camchad/activity-history';
+import {
+  normalizeActivitySessions,
+  type ActivitySession,
+  type ActivitySummary,
+} from '@camchad/activity-history';
 
 export interface CameraPermissionResult {
   readonly granted: boolean;
@@ -83,14 +87,10 @@ function readLocalSessions(): readonly ActivitySession[] {
     localStorage.getItem('home-activity:sessions') ??
     localStorage.getItem('home-workout:sessions') ??
     '[]';
-  const sessions = JSON.parse(raw) as readonly LegacyActivitySession[];
 
-  return sessions.map((session) => ({
-    ...session,
-    movements: session.movements ?? session.exercises ?? [],
-  }));
+  try {
+    return normalizeActivitySessions(JSON.parse(raw));
+  } catch {
+    return [];
+  }
 }
-
-type LegacyActivitySession = ActivitySession & {
-  readonly exercises?: ActivitySession['movements'];
-};

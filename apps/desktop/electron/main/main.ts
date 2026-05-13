@@ -11,62 +11,20 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  normalizeActivityHistory,
+  type ActivitySession,
+  type ActivitySummary,
+  type PersistedActivityHistory,
+} from '@camchad/activity-history';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 app.setName('CamChad');
 
-interface RepEvent {
-  readonly repNumber: number;
-  readonly timestampMs: number;
-  readonly qualityScore: number;
-  readonly depthScore: number;
-  readonly alignmentScore: number;
-  readonly warnings: readonly FormWarning[];
-}
-
-interface FormWarning {
-  readonly code: string;
-  readonly message: string;
-}
-
-interface MovementSegment {
-  readonly id: string;
-  readonly movementType: string;
-  readonly cameraAngle: string;
-  readonly startedAt: string;
-  readonly endedAt?: string;
-  readonly reps: number;
-  readonly validReps: number;
-  readonly partialReps: number;
-  readonly formWarnings: readonly FormWarning[];
-  readonly repEvents: readonly RepEvent[];
-}
-
-interface ActivitySession {
-  readonly id: string;
-  readonly startedAt: string;
-  readonly endedAt?: string;
-  readonly durationSeconds?: number;
-  readonly movements: readonly MovementSegment[];
-  readonly exercises?: readonly MovementSegment[];
-  readonly notes?: string;
-}
-
-interface ActivitySummary {
-  readonly totalSessions: number;
-  readonly totalReps: number;
-  readonly validReps: number;
-  readonly partialReps: number;
-  readonly lastActivityAt?: string;
-}
-
 interface CameraPermissionResult {
   readonly granted: boolean;
   readonly reason?: string;
-}
-
-interface PersistedHistory {
-  readonly sessions: readonly ActivitySession[];
 }
 
 let mainWindow: BrowserWindow | undefined;
@@ -129,10 +87,10 @@ function previousBrandHistoryPaths(): readonly string[] {
   ];
 }
 
-async function readHistory(): Promise<PersistedHistory> {
+async function readHistory(): Promise<PersistedActivityHistory> {
   try {
     const raw = await readFile(historyPath(), 'utf8');
-    return normalizeHistory(JSON.parse(raw));
+    return normalizeActivityHistory(JSON.parse(raw));
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
       return readLegacyHistory();
@@ -142,10 +100,10 @@ async function readHistory(): Promise<PersistedHistory> {
   }
 }
 
-async function readLegacyHistory(): Promise<PersistedHistory> {
+async function readLegacyHistory(): Promise<PersistedActivityHistory> {
   try {
     const raw = await readFile(legacyHistoryPath(), 'utf8');
-    return normalizeHistory(JSON.parse(raw));
+    return normalizeActivityHistory(JSON.parse(raw));
   } catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
       throw error;
@@ -154,7 +112,7 @@ async function readLegacyHistory(): Promise<PersistedHistory> {
     for (const legacyPath of previousBrandHistoryPaths()) {
       try {
         const raw = await readFile(legacyPath, 'utf8');
-        return normalizeHistory(JSON.parse(raw));
+        return normalizeActivityHistory(JSON.parse(raw));
       } catch (legacyError) {
         if (
           !(legacyError instanceof Error && 'code' in legacyError && legacyError.code === 'ENOENT')
@@ -168,90 +126,7 @@ async function readLegacyHistory(): Promise<PersistedHistory> {
   }
 }
 
-function normalizeHistory(value: unknown): PersistedHistory {
-  if (!isRecord(value) || !Array.isArray(value.sessions)) {
-    return { sessions: [] };
-  }
-
-  return {
-    sessions: value.sessions.flatMap((session) => normalizeSession(session)),
-  };
-}
-
-function normalizeSession(value: unknown): readonly ActivitySession[] {
-  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.startedAt !== 'string') {
-    return [];
-  }
-
-  const movements = Array.isArray(value.movements)
-    ? value.movements
-    : Array.isArray(value.exercises)
-      ? value.exercises
-      : [];
-
-  return [
-    {
-      id: value.id,
-      startedAt: value.startedAt,
-      endedAt: typeof value.endedAt === 'string' ? value.endedAt : undefined,
-      durationSeconds:
-        typeof value.durationSeconds === 'number' ? value.durationSeconds : undefined,
-      movements: movements.flatMap((movement) => normalizeMovementSegment(movement)),
-      notes: typeof value.notes === 'string' ? value.notes : undefined,
-    },
-  ];
-}
-
-function normalizeMovementSegment(value: unknown): readonly MovementSegment[] {
-  if (
-    !isRecord(value) ||
-    typeof value.id !== 'string' ||
-    typeof value.movementType !== 'string' ||
-    typeof value.cameraAngle !== 'string' ||
-    typeof value.startedAt !== 'string'
-  ) {
-    return [];
-  }
-
-  return [
-    {
-      id: value.id,
-      movementType: value.movementType,
-      cameraAngle: value.cameraAngle,
-      startedAt: value.startedAt,
-      endedAt: typeof value.endedAt === 'string' ? value.endedAt : undefined,
-      reps: typeof value.reps === 'number' ? value.reps : 0,
-      validReps: typeof value.validReps === 'number' ? value.validReps : 0,
-      partialReps: typeof value.partialReps === 'number' ? value.partialReps : 0,
-      formWarnings: Array.isArray(value.formWarnings)
-        ? value.formWarnings.filter(isFormWarning)
-        : [],
-      repEvents: Array.isArray(value.repEvents) ? value.repEvents.filter(isRepEvent) : [],
-    },
-  ];
-}
-
-function isFormWarning(value: unknown): value is FormWarning {
-  return isRecord(value) && typeof value.code === 'string' && typeof value.message === 'string';
-}
-
-function isRepEvent(value: unknown): value is RepEvent {
-  return (
-    isRecord(value) &&
-    typeof value.repNumber === 'number' &&
-    typeof value.timestampMs === 'number' &&
-    typeof value.qualityScore === 'number' &&
-    typeof value.depthScore === 'number' &&
-    typeof value.alignmentScore === 'number' &&
-    Array.isArray(value.warnings)
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-async function writeHistory(history: PersistedHistory): Promise<void> {
+async function writeHistory(history: PersistedActivityHistory): Promise<void> {
   const target = historyPath();
   await mkdir(dirname(target), { recursive: true });
   const temp = `${target}.tmp`;
