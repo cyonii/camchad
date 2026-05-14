@@ -5,6 +5,9 @@ import {
   type PoseLandmark,
 } from '@camchad/pose-core';
 
+import type { MovementInterpreter, MovementInterpreterState } from './movement-interpreter.js';
+import type { MovementRecognitionEngineState } from './movement-recognition-engine.js';
+
 interface PushUpFrameOptions {
   readonly timestampMs: number;
   readonly elbowAngle: number;
@@ -19,6 +22,85 @@ interface SquatFrameOptions {
   readonly kneeAngle: number;
   readonly torsoLeanX?: number;
   readonly visibility?: number;
+}
+
+export type PoseSequence = readonly (PoseFrame | undefined)[];
+
+export interface MovementReplayResult {
+  readonly states: readonly MovementInterpreterState[];
+  readonly finalState: MovementInterpreterState;
+  readonly phaseChanges: readonly MovementInterpreterState[];
+  readonly repEvents: readonly NonNullable<MovementInterpreterState['lastRep']>[];
+  readonly activeFrameCount: number;
+  readonly trackingLostFrameCount: number;
+}
+
+export interface RecognitionReplayResult {
+  readonly states: readonly MovementRecognitionEngineState[];
+  readonly finalState: MovementRecognitionEngineState;
+  readonly primaryTimeline: readonly MovementInterpreterState[];
+  readonly primaryMovementTypes: readonly MovementInterpreterState['movementType'][];
+}
+
+export function replayMovementSequence(
+  interpreter: MovementInterpreter,
+  sequence: PoseSequence,
+): MovementReplayResult {
+  const states = sequence.map((frame) => interpreter.processPose(frame));
+
+  if (states.length === 0) {
+    throw new Error('Cannot replay an empty movement sequence.');
+  }
+
+  return summarizeMovementStates(states);
+}
+
+export function replayRecognitionSequence(
+  engine: { processPose(frame: PoseFrame | undefined): MovementRecognitionEngineState },
+  sequence: PoseSequence,
+): RecognitionReplayResult {
+  const states = sequence.map((frame) => engine.processPose(frame));
+
+  if (states.length === 0) {
+    throw new Error('Cannot replay an empty recognition sequence.');
+  }
+
+  const primaryTimeline = states.map((state) => state.primary);
+
+  return {
+    states,
+    finalState: states.at(-1) as MovementRecognitionEngineState,
+    primaryTimeline,
+    primaryMovementTypes: primaryTimeline.map((state) => state.movementType),
+  };
+}
+
+export function makePushUpRepSequence(startTimestampMs = 0): PoseSequence {
+  return [
+    makePushUpFrame({ timestampMs: startTimestampMs, elbowAngle: 166 }),
+    makePushUpFrame({ timestampMs: startTimestampMs + 120, elbowAngle: 140 }),
+    makePushUpFrame({ timestampMs: startTimestampMs + 260, elbowAngle: 98 }),
+    makePushUpFrame({ timestampMs: startTimestampMs + 410, elbowAngle: 132 }),
+    makePushUpFrame({ timestampMs: startTimestampMs + 560, elbowAngle: 164 }),
+  ];
+}
+
+export function makePartialPushUpSequence(startTimestampMs = 0): PoseSequence {
+  return [
+    makePushUpFrame({ timestampMs: startTimestampMs, elbowAngle: 166 }),
+    makePushUpFrame({ timestampMs: startTimestampMs + 130, elbowAngle: 136 }),
+    makePushUpFrame({ timestampMs: startTimestampMs + 280, elbowAngle: 164 }),
+  ];
+}
+
+export function makeSquatRepSequence(startTimestampMs = 0): PoseSequence {
+  return [
+    makeSquatFrame({ timestampMs: startTimestampMs, kneeAngle: 168 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 120, kneeAngle: 138 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 260, kneeAngle: 96 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 410, kneeAngle: 132 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 560, kneeAngle: 166 }),
+  ];
 }
 
 export function makePushUpFrame(options: PushUpFrameOptions): PoseFrame {
@@ -81,6 +163,32 @@ export function makeSquatFrame(options: SquatFrameOptions): PoseFrame {
     timestampMs: options.timestampMs,
     landmarks: toLandmarkMap([...left, ...right]),
     confidence: visibility,
+  };
+}
+
+function summarizeMovementStates(
+  states: readonly MovementInterpreterState[],
+): MovementReplayResult {
+  const phaseChanges = states.filter(
+    (state, index) => index === 0 || state.phase !== states[index - 1]?.phase,
+  );
+  const repEvents = states.flatMap((state, index) => {
+    if (!state.lastRep) {
+      return [];
+    }
+
+    const previous = states[index - 1]?.lastRep;
+
+    return previous?.repNumber === state.lastRep.repNumber ? [] : [state.lastRep];
+  });
+
+  return {
+    states,
+    finalState: states.at(-1) as MovementInterpreterState,
+    phaseChanges,
+    repEvents,
+    activeFrameCount: states.filter((state) => state.recognition.status === 'active').length,
+    trackingLostFrameCount: states.filter((state) => state.phase === 'tracking_lost').length,
   };
 }
 
