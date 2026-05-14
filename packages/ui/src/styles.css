@@ -443,6 +443,15 @@ button,
   background: linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 22%);
 }
 
+.view-panel {
+  min-width: 0;
+  min-height: 0;
+}
+
+.view-panel-active {
+  display: block;
+}
+
 .activity-layout {
   display: grid;
   height: calc(100vh - 60px);

@@ -299,7 +299,10 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
       </aside>
 
       <main className="main-content">
-        {view === 'activity' ? (
+        <div
+          className={view === 'activity' ? 'view-panel view-panel-active' : 'view-panel'}
+          hidden={view !== 'activity'}
+        >
           <ActivityView
             assets={assets}
             platform={platform}
@@ -309,7 +312,7 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
             onTelemetryModeChange={setTelemetryMode}
             settingsPreferences={settingsPreferences}
           />
-        ) : null}
+        </div>
         {view === 'history' ? <HistoryView sessions={sessions} summary={summary} /> : null}
         {view === 'exercises' ? (
           <SupportedExercisesView exerciseGuideAssetBasePath={assets.exerciseGuideAssetBasePath} />
