@@ -4,11 +4,17 @@ import {
   Camera,
   CheckCircle2,
   CircleAlert,
+  Cpu,
   Database,
   Download,
   Dumbbell,
+  Filter,
   Gauge,
+  Grid2X2,
   History,
+  Layers3,
+  List,
+  Lock,
   Monitor,
   Moon,
   Move,
@@ -18,6 +24,7 @@ import {
   Power,
   RadioTower,
   ScanLine,
+  Search,
   ShieldCheck,
   Settings,
   Square,
@@ -76,6 +83,10 @@ type SettingsPositionGuide = 'auto' | 'side' | 'front';
 type SettingsSkeletonStyle = 'tactical' | 'minimal' | 'diagnostic';
 type SettingsTelemetryDensity = 'compact' | 'standard' | 'expanded';
 type SettingsFeedbackVerbosity = 'minimal' | 'balanced' | 'detailed';
+type ExerciseCatalogFilter =
+  | 'all'
+  | MovementDefinition['supportLevel']
+  | MovementDefinition['category'];
 
 interface AppSettingsPreferences {
   readonly cameraSource: SettingsCameraSource;
@@ -2013,6 +2024,9 @@ function SupportedExercisesView({
 }: {
   readonly exerciseGuideAssetBasePath: string;
 }): ReactElement {
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<ExerciseCatalogFilter>('all');
+  const [selectedType, setSelectedType] = useState<MovementType>(movementRegistry[0].type);
   const validationDefinitions = movementRegistry.filter(
     (definition) => definition.supportLevel === 'validation',
   );
@@ -2023,108 +2037,348 @@ function SupportedExercisesView({
     (definition) => definition.supportLevel === 'planned',
   );
   const recognizedCount = validationDefinitions.length + recognitionDefinitions.length;
+  const selectedDefinition =
+    movementRegistry.find((definition) => definition.type === selectedType) ?? movementRegistry[0];
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredDefinitions = movementRegistry.filter((definition) => {
+    const matchesFilter =
+      filter === 'all' || definition.supportLevel === filter || definition.category === filter;
+    const matchesQuery =
+      normalizedQuery.length === 0 ||
+      definition.label.toLowerCase().includes(normalizedQuery) ||
+      definition.bodyOrientation.toLowerCase().includes(normalizedQuery) ||
+      definition.analysisSignals.some((signal) => signal.toLowerCase().includes(normalizedQuery));
+
+    return matchesFilter && matchesQuery;
+  });
+  const familyBreakdown = movementFamilyBreakdown(movementRegistry);
 
   return (
-    <section className="stack exercises-stack">
-      <div className="page-heading">
-        <div>
-          <span>Exercise catalog</span>
-          <h1>Supported exercises</h1>
-          <p>
-            See what the local engine understands now, what it can only recognize as a movement
-            pattern, and what is parked as a future exercise definition.
-          </p>
-        </div>
-      </div>
-
-      <div className="exercise-support-summary">
-        <Metric label="Total listed" value={String(movementRegistry.length)} />
-        <Metric label="Recognized now" value={String(recognizedCount)} />
-        <Metric label="Future backlog" value={String(plannedDefinitions.length)} />
-      </div>
-
-      <section className="exercise-catalog-panel" aria-labelledby="exercise-catalog-title">
-        <div className="chart-heading">
+    <section className="exercise-observatory">
+      <div className="exercise-library-column">
+        <div className="exercise-hero-panel">
           <div>
-            <span>Engine coverage</span>
-            <h2 id="exercise-catalog-title">Exercise definitions</h2>
+            <span>Movement engine library</span>
+            <h1>Capability Registry</h1>
+            <p>
+              A local map of movement definitions the engine can validate, recognize, or has queued
+              as dormant profiles for future analysis.
+            </p>
           </div>
-          <div className="chart-legend" aria-label="Exercise support legend">
-            <span>
-              <i className="legend-valid" />
-              Validation
-            </span>
-            <span>
-              <i className="legend-recognition" />
-              Recognition
-            </span>
-            <span>
-              <i className="legend-partial" />
-              Planned
-            </span>
+          <div className="exercise-search-cluster">
+            <label className="exercise-search">
+              <Search size={17} aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                placeholder="Search definitions..."
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            <button
+              className="exercise-filter-button"
+              type="button"
+              disabled={filter === 'all' && query.length === 0}
+              onClick={() => {
+                setFilter('all');
+                setQuery('');
+              }}
+            >
+              <Filter size={16} aria-hidden="true" />
+              Reset
+            </button>
           </div>
         </div>
 
-        <div className="exercise-definition-list">
-          <ExerciseCatalogSection
-            definitions={validationDefinitions}
-            description="Full rep counting and quality validation are implemented."
-            exerciseGuideAssetBasePath={exerciseGuideAssetBasePath}
-            title="Validation-ready"
+        <div className="exercise-engine-summary">
+          <EngineStatCard
+            label="Known definitions"
+            value={String(movementRegistry.length)}
+            detail="Movement profiles"
+            tone="neutral"
+            points={movementRegistry.map((definition) => definition.analysisSignals.length)}
           />
-          <ExerciseCatalogSection
-            definitions={recognitionDefinitions}
-            description="The engine can infer these movement patterns, but form validation is still lightweight."
-            exerciseGuideAssetBasePath={exerciseGuideAssetBasePath}
-            title="Recognized now"
+          <EngineStatCard
+            label="Validation-ready"
+            value={String(validationDefinitions.length)}
+            detail="Rep and quality logic"
+            tone="valid"
+            points={validationDefinitions.map(movementMaturityScore)}
           />
-          <ExerciseCatalogSection
-            definitions={plannedDefinitions}
-            description="These are listed deliberately, but do not have active movement definitions yet."
-            exerciseGuideAssetBasePath={exerciseGuideAssetBasePath}
-            title="Not defined yet"
+          <EngineStatCard
+            label="Recognition-only"
+            value={String(recognitionDefinitions.length)}
+            detail="Pattern inference"
+            tone="recognition"
+            points={recognitionDefinitions.map(movementMaturityScore)}
           />
+          <EngineStatCard
+            label="Planned profiles"
+            value={String(plannedDefinitions.length)}
+            detail="Definition backlog"
+            tone="planned"
+            points={plannedDefinitions.map((definition) => definition.analysisSignals.length)}
+          />
+          <div className="engine-confidence-card">
+            <SignalDial
+              value={recognizedCount / Math.max(1, movementRegistry.length)}
+              phase="engine coverage"
+            />
+            <div>
+              <span>Engine coverage</span>
+              <strong>{Math.round((recognizedCount / movementRegistry.length) * 100)}%</strong>
+              <small>Active recognition surface</small>
+            </div>
+          </div>
         </div>
-      </section>
+
+        <section className="movement-family-panel" aria-label="Movement family coverage">
+          <div className="exercise-panel-heading">
+            <div>
+              <span>Coverage map</span>
+              <h2>Movement families</h2>
+            </div>
+            <small>{familyBreakdown.length} orientation groups</small>
+          </div>
+          <div className="movement-family-grid">
+            {familyBreakdown.map((family) => (
+              <div key={family.orientation}>
+                <span>{formatBodyOrientation(family.orientation)}</span>
+                <strong>{family.total}</strong>
+                <small>
+                  {family.active} active / {family.planned} planned
+                </small>
+                <i style={{ inlineSize: `${Math.max(8, family.coverage * 100)}%` }} />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="exercise-catalog-toolbar">
+          <div>
+            <span>Browse by capability</span>
+            <div className="exercise-filter-pills">
+              <ExerciseFilterPill value="all" activeFilter={filter} onChange={setFilter}>
+                All
+              </ExerciseFilterPill>
+              <ExerciseFilterPill value="validation" activeFilter={filter} onChange={setFilter}>
+                Validation-ready
+              </ExerciseFilterPill>
+              <ExerciseFilterPill value="recognition" activeFilter={filter} onChange={setFilter}>
+                Recognition-only
+              </ExerciseFilterPill>
+              <ExerciseFilterPill value="planned" activeFilter={filter} onChange={setFilter}>
+                Planned
+              </ExerciseFilterPill>
+              <ExerciseFilterPill value="repetition" activeFilter={filter} onChange={setFilter}>
+                Repetition
+              </ExerciseFilterPill>
+              <ExerciseFilterPill value="hold" activeFilter={filter} onChange={setFilter}>
+                Static holds
+              </ExerciseFilterPill>
+              <ExerciseFilterPill value="compound" activeFilter={filter} onChange={setFilter}>
+                Compound
+              </ExerciseFilterPill>
+            </div>
+          </div>
+          <div className="exercise-view-toggle" aria-label="Catalog view">
+            <button type="button" aria-pressed="true">
+              <List size={15} aria-hidden="true" />
+            </button>
+            <button type="button" aria-pressed="false">
+              <Grid2X2 size={15} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <section className="exercise-definition-panel" aria-labelledby="exercise-catalog-title">
+          <div className="exercise-panel-heading">
+            <div>
+              <span>Movement definitions</span>
+              <h2 id="exercise-catalog-title">Engine profiles</h2>
+            </div>
+            <small>
+              Showing {filteredDefinitions.length} of {movementRegistry.length}
+            </small>
+          </div>
+
+          <div className="engine-definition-list">
+            {filteredDefinitions.length === 0 ? (
+              <div className="engine-definition-empty">
+                No movement definitions match the current search and filter state.
+              </div>
+            ) : (
+              filteredDefinitions.map((definition) => (
+                <EngineDefinitionRow
+                  definition={definition}
+                  exerciseGuideAssetBasePath={exerciseGuideAssetBasePath}
+                  isSelected={definition.type === selectedDefinition.type}
+                  key={definition.type}
+                  onSelect={() => setSelectedType(definition.type)}
+                />
+              ))
+            )}
+          </div>
+        </section>
+      </div>
+
+      <MovementDefinitionInspector
+        definition={selectedDefinition}
+        exerciseGuideAssetBasePath={exerciseGuideAssetBasePath}
+      />
     </section>
   );
 }
 
-function ExerciseCatalogSection({
-  title,
-  description,
-  definitions,
-  exerciseGuideAssetBasePath,
+function EngineStatCard({
+  label,
+  value,
+  detail,
+  tone,
+  points,
 }: {
-  readonly title: string;
-  readonly description: string;
-  readonly definitions: readonly MovementDefinition[];
-  readonly exerciseGuideAssetBasePath: string;
+  readonly label: string;
+  readonly value: string;
+  readonly detail: string;
+  readonly tone: 'neutral' | 'valid' | 'recognition' | 'planned';
+  readonly points: readonly number[];
 }): ReactElement {
-  return (
-    <section className="exercise-definition-section" aria-label={title}>
-      <header>
-        <div>
-          <span>{title}</span>
-          <p>{description}</p>
-        </div>
-        <strong>{definitions.length}</strong>
-      </header>
+  const maxPoint = Math.max(1, ...points);
 
-      <div className="exercise-definition-rows">
-        {definitions.map((definition) => (
-          <ExerciseDefinitionRow
-            definition={definition}
-            exerciseGuideAssetBasePath={exerciseGuideAssetBasePath}
-            key={definition.type}
+  return (
+    <div className="engine-stat-card" data-tone={tone}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+      <div className="engine-sparkline" aria-hidden="true">
+        {points.slice(0, 14).map((point, index) => (
+          <i
+            key={`${point}-${index}`}
+            style={{ blockSize: `${Math.max(12, (point / maxPoint) * 100)}%` }}
           />
         ))}
       </div>
-    </section>
+    </div>
   );
 }
 
-function ExerciseDefinitionRow({
+function ExerciseFilterPill({
+  value,
+  activeFilter,
+  onChange,
+  children,
+}: {
+  readonly value: ExerciseCatalogFilter;
+  readonly activeFilter: ExerciseCatalogFilter;
+  readonly onChange: (value: ExerciseCatalogFilter) => void;
+  readonly children: string;
+}): ReactElement {
+  return (
+    <button type="button" aria-pressed={activeFilter === value} onClick={() => onChange(value)}>
+      {children}
+    </button>
+  );
+}
+
+function EngineDefinitionRow({
+  definition,
+  exerciseGuideAssetBasePath,
+  isSelected,
+  onSelect,
+}: {
+  readonly definition: MovementDefinition;
+  readonly exerciseGuideAssetBasePath: string;
+  readonly isSelected: boolean;
+  readonly onSelect: () => void;
+}): ReactElement {
+  const guide = exerciseGuideFor(definition.type, exerciseGuideAssetBasePath);
+  const maturityScore = movementMaturityScore(definition);
+  const telemetryRichness = movementTelemetryRichness(definition);
+
+  return (
+    <button
+      className="engine-definition-row"
+      data-support={definition.supportLevel}
+      type="button"
+      aria-pressed={isSelected}
+      onClick={onSelect}
+    >
+      <MovementPreviewFrame definition={definition} guide={guide} />
+      <div className="engine-definition-copy">
+        <div>
+          <strong>{definition.label}</strong>
+          <span>{formatSupportLevel(definition.supportLevel)}</span>
+        </div>
+        <p>{movementDefinitionSummary(definition)}</p>
+        <div className="engine-definition-tags">
+          <span>{formatMovementCategory(definition.category)}</span>
+          <span>{formatBodyOrientation(definition.bodyOrientation)}</span>
+          <span>{formatCameraAngle(definition.defaultCameraAngle)}</span>
+          <span>{definition.analysisSignals.length} signals</span>
+        </div>
+      </div>
+      <div className="engine-definition-score">
+        <div className="mini-signal-ring" style={{ '--score': maturityScore } as CSSProperties}>
+          <span>{maturityScore}%</span>
+        </div>
+        <small>Definition maturity</small>
+      </div>
+      <div className="engine-definition-metadata">
+        <span>{telemetryRichness}% telemetry</span>
+        <span>{definition.supportedCameraAngles.length} camera angles</span>
+        <span>{movementComplexityLabel(definition)}</span>
+      </div>
+    </button>
+  );
+}
+
+function MovementPreviewFrame({
+  definition,
+  guide,
+}: {
+  readonly definition: MovementDefinition;
+  readonly guide: ExerciseGuide | undefined;
+}): ReactElement {
+  return (
+    <div className="movement-preview-frame" data-support={definition.supportLevel}>
+      {guide ? (
+        <img src={guide.src} alt="" loading="lazy" />
+      ) : (
+        <SkeletonBlueprint definition={definition} />
+      )}
+      <div className="movement-preview-hud">
+        <span>{definition.supportLevel === 'planned' ? 'Blueprint' : 'Motion preview'}</span>
+        {definition.supportLevel === 'planned' ? (
+          <Lock size={14} aria-hidden="true" />
+        ) : (
+          <Play size={13} aria-hidden="true" />
+        )}
+      </div>
+      <i className="preview-scanline" />
+    </div>
+  );
+}
+
+function SkeletonBlueprint({
+  definition,
+}: {
+  readonly definition: MovementDefinition;
+}): ReactElement {
+  return (
+    <div className={`movement-blueprint blueprint-${definition.bodyOrientation}`}>
+      <i className="bp-joint bp-head" />
+      <i className="bp-joint bp-chest" />
+      <i className="bp-joint bp-hip" />
+      <i className="bp-line bp-spine" />
+      <i className="bp-line bp-left-arm" />
+      <i className="bp-line bp-right-arm" />
+      <i className="bp-line bp-left-leg" />
+      <i className="bp-line bp-right-leg" />
+    </div>
+  );
+}
+
+function MovementDefinitionInspector({
   definition,
   exerciseGuideAssetBasePath,
 }: {
@@ -2132,48 +2386,108 @@ function ExerciseDefinitionRow({
   readonly exerciseGuideAssetBasePath: string;
 }): ReactElement {
   const guide = exerciseGuideFor(definition.type, exerciseGuideAssetBasePath);
+  const maturitySteps = movementMaturitySteps(definition);
 
   return (
-    <article
-      className={guide ? 'exercise-definition-row has-guide' : 'exercise-definition-row'}
-      data-support={definition.supportLevel}
-    >
-      {guide ? (
-        <div className="exercise-definition-guide">
-          <img src={guide.src} alt={`${guide.label} form guide`} loading="lazy" />
-        </div>
-      ) : null}
-      <div className="exercise-definition-main">
-        <div>
-          <strong>{definition.label}</strong>
-          <span>{formatSupportLevel(definition.supportLevel)}</span>
-        </div>
-        <p>{definition.analysisSignals.join(' / ')}</p>
+    <aside className="movement-inspector" aria-label="Movement definition details">
+      <div className="movement-inspector-heading">
+        <span>Definition inspector</span>
+        <h2>{definition.label}</h2>
+        <p>
+          {formatMovementCategory(definition.category)} /{' '}
+          {formatBodyOrientation(definition.bodyOrientation)} /{' '}
+          {formatSupportLevel(definition.supportLevel)}
+        </p>
       </div>
 
-      <dl className="exercise-definition-details">
+      <section className="movement-inspector-card">
+        <div className="exercise-panel-heading">
+          <div>
+            <span>Movement preview</span>
+            <h3>Diagnostic reference</h3>
+          </div>
+          <small>{formatCameraAngle(definition.defaultCameraAngle)}</small>
+        </div>
+        <MovementPreviewFrame definition={definition} guide={guide} />
+      </section>
+
+      <section className="movement-inspector-card">
+        <div className="exercise-panel-heading">
+          <div>
+            <span>Recognition maturity</span>
+            <h3>Capability stages</h3>
+          </div>
+          <strong>{movementMaturityScore(definition)}%</strong>
+        </div>
+        <div className="maturity-rail">
+          {maturitySteps.map((step) => (
+            <div key={step.label} data-active={step.active}>
+              <i />
+              <span>{step.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="movement-inspector-grid">
         <div>
-          <dt>Type</dt>
-          <dd>{definition.category}</dd>
+          <span>Best camera</span>
+          <strong>{formatCameraAngle(definition.defaultCameraAngle)}</strong>
         </div>
         <div>
-          <dt>Orientation</dt>
-          <dd>{definition.bodyOrientation}</dd>
+          <span>Alt angles</span>
+          <strong>{definition.supportedCameraAngles.map(formatCameraAngle).join(', ')}</strong>
         </div>
         <div>
-          <dt>Camera</dt>
-          <dd>{formatCameraAngle(definition.defaultCameraAngle)}</dd>
+          <span>Telemetry</span>
+          <strong>{movementTelemetryRichness(definition)}%</strong>
         </div>
         <div>
-          <dt>Telemetry</dt>
-          <dd>
-            {definition.telemetryMetrics.length === 0
-              ? 'not defined'
-              : definition.telemetryMetrics.map((metric) => metric.label).join(', ')}
-          </dd>
+          <span>Complexity</span>
+          <strong>{movementComplexityLabel(definition)}</strong>
         </div>
-      </dl>
-    </article>
+      </section>
+
+      <section className="movement-inspector-card">
+        <div className="exercise-panel-heading">
+          <div>
+            <span>Analysis signals</span>
+            <h3>Tracked movement relationships</h3>
+          </div>
+        </div>
+        <ul className="analysis-signal-list">
+          {definition.analysisSignals.map((signal) => (
+            <li key={signal}>
+              <Cpu size={14} aria-hidden="true" />
+              {signal}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="movement-inspector-card">
+        <div className="exercise-panel-heading">
+          <div>
+            <span>Telemetry channels</span>
+            <h3>Current output surface</h3>
+          </div>
+        </div>
+        {definition.telemetryMetrics.length === 0 ? (
+          <p className="movement-placeholder-note">
+            Telemetry channels are not implemented for this dormant movement profile.
+          </p>
+        ) : (
+          <div className="telemetry-channel-grid">
+            {definition.telemetryMetrics.map((metric) => (
+              <span key={metric.key}>
+                <Layers3 size={14} aria-hidden="true" />
+                {metric.label}
+              </span>
+            ))}
+          </div>
+        )}
+      </section>
+    </aside>
   );
 }
 
@@ -2616,8 +2930,124 @@ function formatQualityScore(score: number | undefined): string {
   return score === undefined || score === 0 ? 'n/a' : `${score}%`;
 }
 
+function movementMaturityScore(definition: MovementDefinition): number {
+  if (definition.supportLevel === 'planned') {
+    return 18 + definition.analysisSignals.length * 3;
+  }
+
+  const supportBase = definition.supportLevel === 'validation' ? 72 : 46;
+  const telemetryWeight = Math.min(18, definition.telemetryMetrics.length * 4);
+  const phaseWeight = Math.min(8, definition.phaseLabels.length * 2);
+  const cameraWeight = Math.min(6, definition.supportedCameraAngles.length * 2);
+
+  return Math.min(96, supportBase + telemetryWeight + phaseWeight + cameraWeight);
+}
+
+function movementTelemetryRichness(definition: MovementDefinition): number {
+  if (definition.telemetryMetrics.length === 0) {
+    return 0;
+  }
+
+  return Math.min(100, 24 + definition.telemetryMetrics.length * 18);
+}
+
+function movementDefinitionSummary(definition: MovementDefinition): string {
+  if (definition.supportLevel === 'planned') {
+    return `${definition.analysisSignals.join(' / ')}. Movement profile not implemented yet.`;
+  }
+
+  return `${definition.analysisSignals.join(' / ')}. ${definition.cameraGuidance.usableMessage}`;
+}
+
+function movementComplexityLabel(definition: MovementDefinition): string {
+  if (definition.bodyOrientation === 'mixed' || definition.category === 'compound') {
+    return 'High complexity';
+  }
+
+  if (definition.category === 'hold') {
+    return 'Stability sensitive';
+  }
+
+  if (definition.supportedCameraAngles.length > 2) {
+    return 'Calibration flexible';
+  }
+
+  return 'Calibration sensitive';
+}
+
+function movementMaturitySteps(
+  definition: MovementDefinition,
+): readonly { readonly label: string; readonly active: boolean }[] {
+  return [
+    { label: 'Profiled', active: true },
+    { label: 'Recognized', active: definition.supportLevel !== 'planned' },
+    { label: 'Rep phases', active: definition.phaseLabels.length > 0 },
+    { label: 'Quality', active: definition.supportLevel === 'validation' },
+  ];
+}
+
+function movementFamilyBreakdown(definitions: readonly MovementDefinition[]): readonly {
+  readonly orientation: MovementDefinition['bodyOrientation'];
+  readonly total: number;
+  readonly active: number;
+  readonly planned: number;
+  readonly coverage: number;
+}[] {
+  const orientations: readonly MovementDefinition['bodyOrientation'][] = [
+    'standing',
+    'floor',
+    'seated',
+    'hanging',
+    'mixed',
+  ];
+
+  return orientations
+    .map((orientation) => {
+      const familyDefinitions = definitions.filter(
+        (definition) => definition.bodyOrientation === orientation,
+      );
+      const active = familyDefinitions.filter(
+        (definition) => definition.supportLevel !== 'planned',
+      ).length;
+      const planned = familyDefinitions.length - active;
+
+      return {
+        orientation,
+        total: familyDefinitions.length,
+        active,
+        planned,
+        coverage: active / Math.max(1, familyDefinitions.length),
+      };
+    })
+    .filter((family) => family.total > 0);
+}
+
 function formatCameraAngle(cameraAngle: CameraAngle): string {
   return cameraAngle.replaceAll('_', ' ');
+}
+
+function formatMovementCategory(category: MovementDefinition['category']): string {
+  if (category === 'hold') {
+    return 'Static hold';
+  }
+
+  if (category === 'compound') {
+    return 'Compound';
+  }
+
+  return 'Repetition';
+}
+
+function formatBodyOrientation(orientation: MovementDefinition['bodyOrientation']): string {
+  if (orientation === 'floor') {
+    return 'Floor movement';
+  }
+
+  if (orientation === 'mixed') {
+    return 'Mixed orientation';
+  }
+
+  return `${orientation[0].toUpperCase()}${orientation.slice(1)}`;
 }
 
 function formatSupportLevel(level: MovementDefinition['supportLevel']): string {

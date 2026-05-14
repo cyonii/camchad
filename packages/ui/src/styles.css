@@ -1897,6 +1897,776 @@ button,
   background: rgb(var(--surface-rgb) / 26%);
 }
 
+.exercise-observatory {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 14px;
+  height: calc(100vh - 60px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.exercise-library-column,
+.movement-inspector {
+  min-height: 0;
+  overflow: auto;
+}
+
+.exercise-library-column {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding-right: 2px;
+}
+
+.exercise-library-column::-webkit-scrollbar,
+.movement-inspector::-webkit-scrollbar {
+  width: 8px;
+}
+
+.exercise-library-column::-webkit-scrollbar-thumb,
+.movement-inspector::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgb(var(--primary-rgb) / 22%);
+}
+
+.exercise-hero-panel,
+.movement-family-panel,
+.exercise-definition-panel,
+.movement-inspector,
+.movement-inspector-card {
+  border: 1px solid rgb(var(--primary-rgb) / 12%);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgb(var(--primary-rgb) / 3%) 1px, transparent 1px),
+    linear-gradient(rgb(var(--primary-rgb) / 3%) 1px, transparent 1px),
+    rgb(var(--surface-rgb) / 58%);
+  background-size: 42px 42px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 2%);
+}
+
+.exercise-hero-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  gap: 24px;
+  align-items: start;
+  padding: 26px;
+  background:
+    radial-gradient(circle at 78% 18%, rgb(var(--primary-rgb) / 12%), transparent 32%),
+    linear-gradient(135deg, rgb(var(--surface-rgb) / 76%), rgb(var(--surface-rgb) / 36%));
+}
+
+.exercise-hero-panel span,
+.exercise-catalog-toolbar > div > span,
+.exercise-panel-heading span,
+.engine-stat-card span,
+.engine-definition-copy strong,
+.engine-definition-tags span,
+.engine-definition-metadata span,
+.movement-inspector-heading span,
+.movement-inspector-grid span,
+.analysis-signal-list li,
+.telemetry-channel-grid span {
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.exercise-hero-panel span,
+.exercise-panel-heading span {
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.exercise-hero-panel h1 {
+  margin: 8px 0 8px;
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: clamp(2rem, 4vw, 3.15rem);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.exercise-hero-panel p {
+  max-width: 78ch;
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.exercise-search-cluster {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.exercise-search,
+.exercise-filter-button {
+  min-height: 44px;
+  border: 1px solid rgb(var(--primary-rgb) / 14%);
+  border-radius: 7px;
+  background: rgb(0 0 0 / 18%);
+}
+
+.exercise-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 13px;
+  color: var(--text-muted);
+}
+
+.exercise-search input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: transparent;
+}
+
+.exercise-filter-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  color: var(--text);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.exercise-filter-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.exercise-engine-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.engine-stat-card,
+.engine-confidence-card {
+  min-height: 126px;
+  padding: 16px;
+  border: 1px solid rgb(var(--primary-rgb) / 12%);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(var(--primary-rgb) / 6%), transparent 48%),
+    rgb(var(--surface-rgb) / 52%);
+}
+
+.engine-stat-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.engine-stat-card span,
+.engine-stat-card small,
+.movement-inspector-heading p,
+.movement-placeholder-note {
+  color: var(--text-muted);
+}
+
+.engine-stat-card span {
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.engine-stat-card strong {
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 2rem;
+  font-weight: 500;
+}
+
+.engine-stat-card[data-tone='valid'] strong {
+  color: var(--primary);
+}
+
+.engine-stat-card[data-tone='recognition'] strong {
+  color: var(--warning);
+}
+
+.engine-stat-card[data-tone='planned'] strong {
+  color: #a27bff;
+}
+
+.engine-sparkline {
+  display: flex;
+  align-items: end;
+  gap: 3px;
+  height: 28px;
+  margin-top: auto;
+}
+
+.engine-sparkline i {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 999px 999px 0 0;
+  background: rgb(var(--primary-rgb) / 45%);
+}
+
+.engine-confidence-card {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.engine-confidence-card span,
+.engine-confidence-card small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.engine-confidence-card strong {
+  display: block;
+  margin: 4px 0;
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 1.65rem;
+  font-weight: 500;
+}
+
+.movement-family-panel,
+.exercise-definition-panel {
+  padding: 16px;
+}
+
+.exercise-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.exercise-panel-heading h2,
+.exercise-panel-heading h3 {
+  margin: 4px 0 0;
+  font-size: 1.05rem;
+}
+
+.exercise-panel-heading small,
+.exercise-panel-heading strong {
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.movement-family-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.movement-family-grid > div {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  min-height: 92px;
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid rgb(var(--primary-rgb) / 11%);
+  border-radius: 7px;
+  background: rgb(0 0 0 / 14%);
+}
+
+.movement-family-grid span {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.movement-family-grid strong {
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 1.55rem;
+  font-weight: 500;
+}
+
+.movement-family-grid small {
+  color: var(--text-subtle);
+}
+
+.movement-family-grid i {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--primary);
+}
+
+.exercise-catalog-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.exercise-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.exercise-filter-pills button,
+.exercise-view-toggle button {
+  min-height: 36px;
+  border: 1px solid rgb(var(--primary-rgb) / 14%);
+  border-radius: 7px;
+  color: var(--text-muted);
+  background: rgb(var(--surface-rgb) / 46%);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.exercise-filter-pills button {
+  padding: 0 12px;
+}
+
+.exercise-filter-pills button[aria-pressed='true'],
+.exercise-view-toggle button[aria-pressed='true'] {
+  color: var(--primary);
+  border-color: rgb(var(--primary-rgb) / 38%);
+  background: rgb(var(--primary-rgb) / 12%);
+}
+
+.exercise-view-toggle {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border-radius: 8px;
+  background: rgb(0 0 0 / 14%);
+}
+
+.exercise-view-toggle button {
+  display: grid;
+  width: 34px;
+  place-items: center;
+  padding: 0;
+}
+
+.engine-definition-list {
+  display: grid;
+}
+
+.engine-definition-empty {
+  padding: 28px;
+  color: var(--text-muted);
+  border: 1px dashed rgb(var(--primary-rgb) / 14%);
+  border-radius: 7px;
+  background: rgb(0 0 0 / 12%);
+  text-align: center;
+}
+
+.engine-definition-row {
+  display: grid;
+  grid-template-columns: 170px minmax(260px, 1fr) 118px 150px;
+  gap: 16px;
+  align-items: center;
+  width: 100%;
+  padding: 14px 8px;
+  border: 0;
+  border-bottom: 1px solid rgb(var(--primary-rgb) / 9%);
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+}
+
+.engine-definition-row:last-child {
+  border-bottom: 0;
+}
+
+.engine-definition-row[aria-pressed='true'] {
+  margin: 0 -8px;
+  padding-right: 16px;
+  padding-left: 16px;
+  border: 1px solid rgb(var(--primary-rgb) / 34%);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgb(var(--primary-rgb) / 10%), transparent 64%),
+    rgb(var(--primary-rgb) / 5%);
+}
+
+.engine-definition-row[data-support='planned'] {
+  opacity: 0.72;
+}
+
+.movement-preview-frame {
+  position: relative;
+  min-height: 98px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--primary-rgb) / 12%);
+  border-radius: 7px;
+  background:
+    linear-gradient(90deg, rgb(var(--primary-rgb) / 5%) 1px, transparent 1px),
+    linear-gradient(rgb(var(--primary-rgb) / 5%) 1px, transparent 1px), rgb(2 10 12 / 72%);
+  background-size: 28px 28px;
+}
+
+.movement-preview-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 98px;
+  object-fit: cover;
+  opacity: 0.82;
+  filter: saturate(0.86) contrast(1.08) brightness(0.78);
+}
+
+.movement-preview-frame[data-support='planned'] {
+  border-style: dashed;
+}
+
+.movement-preview-hud {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgb(235 245 239 / 84%);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.preview-scanline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgb(var(--primary-rgb) / 9%), transparent);
+  opacity: 0.65;
+}
+
+.movement-blueprint {
+  position: absolute;
+  inset: 12px;
+}
+
+.bp-joint,
+.bp-line {
+  position: absolute;
+  display: block;
+}
+
+.bp-joint {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #a27bff;
+  box-shadow: 0 0 12px rgb(162 123 255 / 40%);
+}
+
+.bp-line {
+  height: 2px;
+  transform-origin: left center;
+  background: rgb(162 123 255 / 70%);
+}
+
+.bp-head {
+  top: 10px;
+  left: 74px;
+}
+
+.bp-chest {
+  top: 40px;
+  left: 72px;
+}
+
+.bp-hip {
+  top: 62px;
+  left: 72px;
+}
+
+.bp-spine {
+  top: 53px;
+  left: 75px;
+  width: 24px;
+  transform: rotate(90deg);
+}
+
+.bp-left-arm {
+  top: 48px;
+  left: 44px;
+  width: 34px;
+  transform: rotate(-20deg);
+}
+
+.bp-right-arm {
+  top: 48px;
+  left: 78px;
+  width: 34px;
+  transform: rotate(20deg);
+}
+
+.bp-left-leg {
+  top: 70px;
+  left: 51px;
+  width: 38px;
+  transform: rotate(108deg);
+}
+
+.bp-right-leg {
+  top: 70px;
+  left: 75px;
+  width: 38px;
+  transform: rotate(72deg);
+}
+
+.blueprint-floor {
+  transform: rotate(82deg) scale(0.92);
+}
+
+.blueprint-seated {
+  transform: rotate(22deg) scale(0.9);
+}
+
+.blueprint-hanging {
+  transform: translateY(-10px) scaleY(1.08);
+}
+
+.blueprint-mixed {
+  transform: rotate(-18deg);
+}
+
+.engine-definition-copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.engine-definition-copy > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+}
+
+.engine-definition-copy strong {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.engine-definition-copy > div:first-child span {
+  padding: 4px 7px;
+  border: 1px solid rgb(var(--primary-rgb) / 12%);
+  border-radius: 5px;
+  color: var(--primary);
+  background: rgb(var(--primary-rgb) / 8%);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.engine-definition-row[data-support='recognition'] .engine-definition-copy > div:first-child span {
+  color: var(--warning);
+  background: rgb(var(--warning-rgb) / 10%);
+}
+
+.engine-definition-row[data-support='planned'] .engine-definition-copy > div:first-child span {
+  color: #b99aff;
+  background: rgb(162 123 255 / 10%);
+}
+
+.engine-definition-copy p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.engine-definition-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.engine-definition-tags span {
+  padding: 5px 8px;
+  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border-radius: 5px;
+  color: var(--text-muted);
+  background: rgb(0 0 0 / 12%);
+  font-size: 0.62rem;
+}
+
+.engine-definition-score {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.mini-signal-ring {
+  display: grid;
+  width: 58px;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at center, rgb(var(--surface-rgb) / 92%) 58%, transparent 60%),
+    conic-gradient(var(--primary) calc(var(--score) * 1%), rgb(var(--primary-rgb) / 12%) 0);
+}
+
+.mini-signal-ring span {
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.78rem;
+}
+
+.engine-definition-score small {
+  color: var(--text-subtle);
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.engine-definition-metadata {
+  display: grid;
+  gap: 6px;
+}
+
+.engine-definition-metadata span {
+  color: var(--text-muted);
+  font-size: 0.67rem;
+}
+
+.movement-inspector {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px;
+}
+
+.movement-inspector-heading h2 {
+  margin: 8px 0 6px;
+  font-size: 1.8rem;
+}
+
+.movement-inspector-card {
+  padding: 14px;
+}
+
+.movement-inspector-card .movement-preview-frame {
+  min-height: 184px;
+}
+
+.movement-inspector-card .movement-preview-frame img {
+  min-height: 184px;
+}
+
+.maturity-rail {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.maturity-rail div {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  color: var(--text-subtle);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.maturity-rail i {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgb(var(--primary-rgb) / 18%);
+  border-radius: 999px;
+  background: rgb(var(--surface-rgb) / 70%);
+}
+
+.maturity-rail div[data-active='true'] {
+  color: var(--text);
+}
+
+.maturity-rail div[data-active='true'] i {
+  border-color: rgb(var(--primary-rgb) / 46%);
+  background: var(--primary);
+  box-shadow: 0 0 14px rgb(var(--primary-rgb) / 36%);
+}
+
+.movement-inspector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.movement-inspector-grid div {
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border-radius: 7px;
+  background: rgb(0 0 0 / 14%);
+}
+
+.movement-inspector-grid span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-muted);
+  font-size: 0.64rem;
+}
+
+.movement-inspector-grid strong {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.analysis-signal-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-signal-list li,
+.telemetry-channel-grid span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.analysis-signal-list svg,
+.telemetry-channel-grid svg {
+  color: var(--primary);
+}
+
+.telemetry-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.telemetry-channel-grid span {
+  padding: 10px;
+  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border-radius: 6px;
+  background: rgb(var(--primary-rgb) / 5%);
+}
+
+.movement-placeholder-note {
+  margin: 0;
+  line-height: 1.5;
+}
+
 .settings-command-center {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 370px;
@@ -2514,6 +3284,23 @@ button,
     grid-template-columns: minmax(0, 1fr) 340px;
   }
 
+  .exercise-observatory {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+
+  .exercise-engine-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .engine-definition-row {
+    grid-template-columns: 150px minmax(220px, 1fr) 104px;
+  }
+
+  .engine-definition-metadata {
+    grid-column: 2 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .history-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2555,17 +3342,46 @@ button,
     overflow: auto;
   }
 
+  .exercise-observatory {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
   .history-primary-column,
   .history-detail-panel,
+  .exercise-library-column,
+  .movement-inspector,
   .settings-primary-column,
   .settings-preview-column {
     overflow: visible;
   }
 
   .history-detail-panel,
+  .movement-inspector,
   .settings-preview-column {
     padding-left: 0;
     border-left: 0;
+  }
+
+  .exercise-hero-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .exercise-engine-summary,
+  .movement-family-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .engine-definition-row {
+    grid-template-columns: 1fr;
+  }
+
+  .engine-definition-score {
+    justify-items: start;
+  }
+
+  .engine-definition-metadata {
+    grid-column: auto;
   }
 
   .settings-control-row {
