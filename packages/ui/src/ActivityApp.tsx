@@ -4,7 +4,10 @@ import {
   Camera,
   CheckCircle2,
   CircleAlert,
+  Database,
+  Download,
   Dumbbell,
+  Gauge,
   History,
   Monitor,
   Moon,
@@ -13,12 +16,17 @@ import {
   PanelRight,
   Play,
   Power,
+  RadioTower,
+  ScanLine,
+  ShieldCheck,
   Settings,
   Square,
   Sun,
+  Trash2,
+  Upload,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import type { CSSProperties, ReactElement } from 'react';
+import type { CSSProperties, ReactElement, ReactNode } from 'react';
 
 import type {
   ActivitySessionTelemetry,
@@ -42,13 +50,14 @@ import {
 } from '@camchad/pose-core';
 import {
   ActivitySessionService,
+  normalizeActivitySessions,
   type ActivityRepository,
   type MovementSegment,
   type ActivitySession,
   type ActivitySummary,
 } from '@camchad/activity-history';
 
-import type { ActivityPlatform } from './platform.js';
+import type { ActivityPlatform, HistoryStorageInfo } from './platform.js';
 import { buildHistoryChartModel } from './history-chart.js';
 
 const ActivityLogChart = lazy(async () => {
@@ -60,6 +69,34 @@ const ActivityLogChart = lazy(async () => {
 type View = 'activity' | 'history' | 'exercises' | 'settings';
 type ThemePreference = 'system' | 'light' | 'dark';
 type TelemetryMode = 'fixed' | 'engraved';
+type SettingsCameraSource = 'system' | 'integrated' | 'external';
+type SettingsResolution = 'auto' | '720p' | '1080p';
+type SettingsFrameRate = '30' | '60';
+type SettingsPositionGuide = 'auto' | 'side' | 'front';
+type SettingsSkeletonStyle = 'tactical' | 'minimal' | 'diagnostic';
+type SettingsTelemetryDensity = 'compact' | 'standard' | 'expanded';
+type SettingsFeedbackVerbosity = 'minimal' | 'balanced' | 'detailed';
+
+interface AppSettingsPreferences {
+  readonly cameraSource: SettingsCameraSource;
+  readonly cameraResolution: SettingsResolution;
+  readonly cameraFrameRate: SettingsFrameRate;
+  readonly cameraMirror: boolean;
+  readonly cameraLowLightAssist: boolean;
+  readonly cameraPositionGuide: SettingsPositionGuide;
+  readonly skeletonVisible: boolean;
+  readonly skeletonStyle: SettingsSkeletonStyle;
+  readonly skeletonJointsVisible: boolean;
+  readonly skeletonConfidenceColoring: boolean;
+  readonly skeletonLineWidth: number;
+  readonly skeletonDebugOverlay: boolean;
+  readonly telemetryDensity: SettingsTelemetryDensity;
+  readonly telemetryOpacity: number;
+  readonly telemetryBlur: number;
+  readonly telemetryLiveGraphs: boolean;
+  readonly telemetryFeedbackVerbosity: SettingsFeedbackVerbosity;
+  readonly autoSaveSessions: boolean;
+}
 
 export interface ActivityAssets {
   readonly logoAssetPath?: string;
@@ -77,7 +114,28 @@ const themePreferenceStorageKey = 'camchad:theme-preference';
 const legacyThemePreferenceStorageKey = 'home-activity:theme-preference';
 const telemetryModeStorageKey = 'camchad:telemetry-mode';
 const legacyTelemetryModeStorageKey = 'home-activity:telemetry-mode';
+const settingsPreferencesStorageKey = 'camchad:settings-preferences';
 const poseInferenceIntervalMs = 80;
+const defaultSettingsPreferences: AppSettingsPreferences = {
+  cameraSource: 'system',
+  cameraResolution: '720p',
+  cameraFrameRate: '30',
+  cameraMirror: false,
+  cameraLowLightAssist: true,
+  cameraPositionGuide: 'auto',
+  skeletonVisible: true,
+  skeletonStyle: 'tactical',
+  skeletonJointsVisible: true,
+  skeletonConfidenceColoring: true,
+  skeletonLineWidth: 2,
+  skeletonDebugOverlay: false,
+  telemetryDensity: 'standard',
+  telemetryOpacity: 86,
+  telemetryBlur: 14,
+  telemetryLiveGraphs: true,
+  telemetryFeedbackVerbosity: 'balanced',
+  autoSaveSessions: true,
+};
 const defaultMovementDefinition = defaultCatalogDefinition();
 const defaultCameraAngle: CameraAngle = defaultMovementDefinition.defaultCameraAngle;
 const initialDetectorState: MovementInterpreterState = {
@@ -123,6 +181,10 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
   const [themePreference, setThemePreference] = useState<ThemePreference>(() =>
     readThemePreference(),
   );
+  const [telemetryMode, setTelemetryMode] = useState<TelemetryMode>(() => readTelemetryMode());
+  const [settingsPreferences, setSettingsPreferences] = useState<AppSettingsPreferences>(() =>
+    readSettingsPreferences(),
+  );
 
   const loadHistory = useCallback(async () => {
     const [nextSessions, nextSummary] = await Promise.all([
@@ -142,6 +204,14 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
     applyThemePreference(themePreference);
     writeThemePreference(themePreference);
   }, [themePreference]);
+
+  useEffect(() => {
+    writeTelemetryMode(telemetryMode);
+  }, [telemetryMode]);
+
+  useEffect(() => {
+    writeSettingsPreferences(settingsPreferences);
+  }, [settingsPreferences]);
 
   const saveSession = useCallback(
     async (session: ActivitySession) => {
@@ -224,6 +294,9 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
             platform={platform}
             onSessionSaved={saveSession}
             onShellSessionTelemetryChange={setShellSessionTelemetry}
+            telemetryMode={telemetryMode}
+            onTelemetryModeChange={setTelemetryMode}
+            settingsPreferences={settingsPreferences}
           />
         ) : null}
         {view === 'history' ? <HistoryView sessions={sessions} summary={summary} /> : null}
@@ -237,6 +310,13 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
             onStartupEnabledChange={setStartupEnabled}
             themePreference={themePreference}
             onThemePreferenceChange={setThemePreference}
+            telemetryMode={telemetryMode}
+            onTelemetryModeChange={setTelemetryMode}
+            sessions={sessions}
+            summary={summary}
+            onHistoryChanged={loadHistory}
+            preferences={settingsPreferences}
+            onPreferencesChange={setSettingsPreferences}
           />
         ) : null}
       </main>
@@ -249,11 +329,17 @@ function ActivityView({
   platform,
   onSessionSaved,
   onShellSessionTelemetryChange,
+  telemetryMode,
+  onTelemetryModeChange,
+  settingsPreferences,
 }: {
   readonly assets: ActivityAssets;
   readonly platform: ActivityPlatform;
   readonly onSessionSaved: (session: ActivitySession) => Promise<void>;
   readonly onShellSessionTelemetryChange: (telemetry: ShellSessionTelemetry) => void;
+  readonly telemetryMode: TelemetryMode;
+  readonly onTelemetryModeChange: (mode: TelemetryMode) => void;
+  readonly settingsPreferences: AppSettingsPreferences;
 }): ReactElement {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -283,7 +369,6 @@ function ActivityView({
   const [detectorState, setDetectorState] =
     useState<MovementInterpreterState>(initialDetectorState);
   const [cameraError, setCameraError] = useState<string | undefined>();
-  const [telemetryMode, setTelemetryMode] = useState<TelemetryMode>(() => readTelemetryMode());
   const activeGuide = exerciseGuideFor(
     sessionTelemetry.movementType ??
       detectorState.recognition.movementType ??
@@ -294,10 +379,6 @@ function ActivityView({
   useEffect(() => {
     detectorStateRef.current = detectorState;
   }, [detectorState]);
-
-  useEffect(() => {
-    writeTelemetryMode(telemetryMode);
-  }, [telemetryMode]);
 
   useEffect(() => {
     if (!isTracking || !sessionRef.current) {
@@ -430,10 +511,14 @@ function ActivityView({
       setSessionTelemetry(nextSessionTelemetry);
       syncMovementRecording(nextState, nextSessionTelemetry);
 
-      drawOverlay(canvasRef.current, video, smoothed);
+      if (settingsPreferences.skeletonVisible) {
+        drawOverlay(canvasRef.current, video, smoothed);
+      } else {
+        clearCanvas(canvasRef.current);
+      }
       animationFrameRef.current = requestAnimationFrame(processFrame);
     },
-    [syncMovementRecording],
+    [settingsPreferences.skeletonVisible, syncMovementRecording],
   );
 
   const startActivity = useCallback(async () => {
@@ -459,8 +544,8 @@ function ActivityView({
       setStatus('Requesting camera');
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          ...cameraResolutionConstraints(settingsPreferences.cameraResolution),
+          frameRate: { ideal: Number(settingsPreferences.cameraFrameRate) },
           facingMode: 'user',
         },
         audio: false,
@@ -548,6 +633,8 @@ function ActivityView({
     onSessionSaved,
     platform.cameraPermission,
     processFrame,
+    settingsPreferences.cameraFrameRate,
+    settingsPreferences.cameraResolution,
   ]);
 
   const stopActivity = useCallback(async () => {
@@ -573,7 +660,7 @@ function ActivityView({
     if (sessionService) {
       endActiveMovement();
 
-      if (hasRecordableActivityRef.current) {
+      if (hasRecordableActivityRef.current && settingsPreferences.autoSaveSessions) {
         await sessionService.endSession();
       }
     }
@@ -588,10 +675,20 @@ function ActivityView({
     detectorStateRef.current = initialDetectorState;
     setDetectorState(initialDetectorState);
     setStatus('Ready');
-  }, [endActiveMovement]);
+  }, [endActiveMovement, settingsPreferences.autoSaveSessions]);
 
   return (
-    <section className={`activity-layout telemetry-${telemetryMode}`}>
+    <section
+      className={`activity-layout telemetry-${telemetryMode}${
+        settingsPreferences.cameraMirror ? ' camera-mirrored' : ''
+      }`}
+      style={
+        {
+          '--activity-hud-opacity': `${settingsPreferences.telemetryOpacity / 100}`,
+          '--activity-hud-blur': `${settingsPreferences.telemetryBlur}px`,
+        } as CSSProperties
+      }
+    >
       <div className="activity-command-grid">
         <div className="activity-stage-panel">
           <div className="video-stage">
@@ -614,7 +711,7 @@ function ActivityView({
                 detectorState={detectorState}
                 sessionTelemetry={sessionTelemetry}
                 telemetryMode={telemetryMode}
-                onTelemetryModeChange={setTelemetryMode}
+                onTelemetryModeChange={onTelemetryModeChange}
               />
             ) : null}
           </div>
@@ -633,7 +730,7 @@ function ActivityView({
             detectorState={detectorState}
             sessionTelemetry={sessionTelemetry}
             telemetryMode={telemetryMode}
-            onTelemetryModeChange={setTelemetryMode}
+            onTelemetryModeChange={onTelemetryModeChange}
           />
         ) : null}
       </div>
@@ -1134,88 +1231,780 @@ function SettingsView({
   onStartupEnabledChange,
   themePreference,
   onThemePreferenceChange,
+  telemetryMode,
+  onTelemetryModeChange,
+  sessions,
+  summary,
+  onHistoryChanged,
+  preferences,
+  onPreferencesChange,
 }: {
   readonly platform: ActivityPlatform;
   readonly startupEnabled: boolean;
   readonly onStartupEnabledChange: (enabled: boolean) => void;
   readonly themePreference: ThemePreference;
   readonly onThemePreferenceChange: (preference: ThemePreference) => void;
+  readonly telemetryMode: TelemetryMode;
+  readonly onTelemetryModeChange: (mode: TelemetryMode) => void;
+  readonly sessions: readonly ActivitySession[];
+  readonly summary: ActivitySummary;
+  readonly onHistoryChanged: () => Promise<void>;
+  readonly preferences: AppSettingsPreferences;
+  readonly onPreferencesChange: (preferences: AppSettingsPreferences) => void;
 }): ReactElement {
   const [reminderStatus, setReminderStatus] = useState('No reminder sent this session.');
+  const [cameraStatus, setCameraStatus] = useState('Camera access has not been checked here.');
+  const [dataStatus, setDataStatus] = useState('Local data controls are ready.');
+  const [confirmClearSessions, setConfirmClearSessions] = useState(false);
+  const [storageInfo, setStorageInfo] = useState<HistoryStorageInfo>({
+    bytes: 0,
+    sessionCount: sessions.length,
+    locationLabel: 'Local device',
+    lastActivityAt: summary.lastActivityAt,
+  });
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const canUseStartup = Boolean(platform.settings);
   const canUseNotifications = Boolean(platform.notifications);
+  const canCheckCamera = Boolean(platform.cameraPermission);
+
+  const refreshStorageInfo = useCallback(async () => {
+    setStorageInfo(await platform.history.storageInfo());
+  }, [platform.history]);
+
+  useEffect(() => {
+    void refreshStorageInfo();
+  }, [refreshStorageInfo, sessions]);
+
+  const updatePreference = <Key extends keyof AppSettingsPreferences>(
+    key: Key,
+    value: AppSettingsPreferences[Key],
+  ): void => {
+    onPreferencesChange({
+      ...preferences,
+      [key]: value,
+    });
+  };
 
   const toggleStartup = async (enabled: boolean) => {
     await platform.settings?.setStartupEnabled(enabled);
     onStartupEnabledChange(enabled);
   };
 
+  const checkCameraAccess = async (): Promise<void> => {
+    setCameraStatus('Checking camera permission...');
+    const permission = await platform.cameraPermission?.ensureCameraPermission();
+    setCameraStatus(
+      permission?.granted
+        ? 'Camera access is available for this app.'
+        : (permission?.reason ?? 'Camera permission could not be verified.'),
+    );
+  };
+
+  const exportSessionData = async (): Promise<void> => {
+    const exportedSessions = await platform.history.list();
+    const payload = JSON.stringify(
+      {
+        app: 'CamChad',
+        exportedAt: new Date().toISOString(),
+        sessions: exportedSessions,
+      },
+      null,
+      2,
+    );
+    const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `camchad-session-export-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setDataStatus(`Exported ${exportedSessions.length} local sessions.`);
+  };
+
+  const importSessionData = async (file: File): Promise<void> => {
+    const parsed = JSON.parse(await file.text()) as unknown;
+    const sourceSessions = Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === 'object' && 'sessions' in parsed
+        ? (parsed as { sessions: unknown }).sessions
+        : [];
+    const importedSessions = normalizeActivitySessions(sourceSessions);
+
+    if (importedSessions.length === 0) {
+      setDataStatus('No valid sessions were found in that backup.');
+      return;
+    }
+
+    await platform.history.replace(importedSessions);
+    await onHistoryChanged();
+    await refreshStorageInfo();
+    setDataStatus(`Imported ${importedSessions.length} local sessions.`);
+  };
+
+  const clearAllSessions = async (): Promise<void> => {
+    await platform.history.clear();
+    setConfirmClearSessions(false);
+    await onHistoryChanged();
+    await refreshStorageInfo();
+    setDataStatus('All local session history has been cleared.');
+  };
+
+  const clearInterfaceCache = (): void => {
+    try {
+      localStorage.removeItem(settingsPreferencesStorageKey);
+      localStorage.removeItem(telemetryModeStorageKey);
+      localStorage.removeItem(legacyTelemetryModeStorageKey);
+      onPreferencesChange(defaultSettingsPreferences);
+      onTelemetryModeChange('fixed');
+      setDataStatus('Interface preferences and cached UI state have been reset.');
+    } catch {
+      setDataStatus('Interface cache could not be reset in this environment.');
+    }
+  };
+
   return (
-    <section className="stack settings-stack">
-      <div className="page-heading">
-        <div>
-          <span>Local controls</span>
+    <section className="settings-command-center">
+      <div className="settings-primary-column">
+        <div className="settings-page-heading">
+          <span>Instrument control</span>
           <h1>Settings</h1>
+          <p>Configure the local movement engine, camera guidance, telemetry, and data controls.</p>
         </div>
-      </div>
 
-      <div className="settings-summary-grid">
-        <div>
-          <Activity size={18} aria-hidden="true" />
-          <span>Mode</span>
-          <strong>Movement analysis</strong>
-        </div>
-        <div>
-          <Camera size={18} aria-hidden="true" />
-          <span>Pose engine</span>
-          <strong>MediaPipe Full</strong>
-        </div>
-      </div>
-
-      <div className="settings-list">
-        <label className="setting-row">
-          <div>
-            <strong>Open on login</strong>
-            <span>Start the desktop app when your computer boots.</span>
-          </div>
-          <input
-            type="checkbox"
-            checked={startupEnabled}
-            disabled={!canUseStartup}
-            onChange={(event) => void toggleStartup(event.target.checked)}
+        <SettingsSection
+          icon={<Camera size={20} aria-hidden="true" />}
+          title="Camera Settings"
+          description="Tune capture assumptions and check whether this app can access the camera."
+        >
+          <SettingsRow
+            label="Camera source"
+            description="Use the system default for now; explicit device routing can attach here later."
+          >
+            <SettingsSelect
+              value={preferences.cameraSource}
+              onChange={(value) => updatePreference('cameraSource', value as SettingsCameraSource)}
+              options={[
+                ['system', 'System default'],
+                ['integrated', 'Integrated camera'],
+                ['external', 'External camera'],
+              ]}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Resolution"
+            description="Higher capture targets can improve analysis detail."
+          >
+            <SettingsSelect
+              value={preferences.cameraResolution}
+              onChange={(value) =>
+                updatePreference('cameraResolution', value as SettingsResolution)
+              }
+              options={[
+                ['auto', 'Auto'],
+                ['720p', '1280 x 720'],
+                ['1080p', '1920 x 1080'],
+              ]}
+            />
+          </SettingsRow>
+          <SettingsRow label="Frame rate" description="30 FPS is stable for most local analysis.">
+            <SettingsSelect
+              value={preferences.cameraFrameRate}
+              onChange={(value) => updatePreference('cameraFrameRate', value as SettingsFrameRate)}
+              options={[
+                ['30', '30 FPS'],
+                ['60', '60 FPS'],
+              ]}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Mirror preview"
+            description="Flip the live preview to match mirror behavior."
+          >
+            <SettingsToggle
+              checked={preferences.cameraMirror}
+              onChange={(checked) => updatePreference('cameraMirror', checked)}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Low-light assist"
+            description="Surface guidance when tracking confidence drops."
+          >
+            <SettingsToggle
+              checked={preferences.cameraLowLightAssist}
+              onChange={(checked) => updatePreference('cameraLowLightAssist', checked)}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Positioning guidance"
+            description="Preferred camera angle hints for reliable movement interpretation."
+          >
+            <SettingsSelect
+              value={preferences.cameraPositionGuide}
+              onChange={(value) =>
+                updatePreference('cameraPositionGuide', value as SettingsPositionGuide)
+              }
+              options={[
+                ['auto', 'Automatic guidance'],
+                ['side', 'Prioritize side view'],
+                ['front', 'Prioritize front view'],
+              ]}
+            />
+          </SettingsRow>
+          <SettingsActionRow
+            label="Camera access"
+            description={cameraStatus}
+            actionLabel="Check access"
+            icon={<RadioTower size={16} aria-hidden="true" />}
+            disabled={!canCheckCamera}
+            onAction={() => void checkCameraAccess()}
           />
-        </label>
+        </SettingsSection>
 
-        <div className="setting-row">
-          <div>
-            <strong>Theme</strong>
-            <span>Follow the system by default, or pin the interface.</span>
+        <SettingsSection
+          icon={<ScanLine size={20} aria-hidden="true" />}
+          title="Skeleton Visualization"
+          description="Control the pose overlay used for movement feedback and debugging."
+        >
+          <SettingsRow
+            label="Show skeleton"
+            description="Render tracked joints and segment lines on the feed."
+          >
+            <SettingsToggle
+              checked={preferences.skeletonVisible}
+              onChange={(checked) => updatePreference('skeletonVisible', checked)}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Overlay style"
+            description="Choose how technical the skeleton display should feel."
+          >
+            <SettingsSelect
+              value={preferences.skeletonStyle}
+              onChange={(value) =>
+                updatePreference('skeletonStyle', value as SettingsSkeletonStyle)
+              }
+              options={[
+                ['tactical', 'Tactical'],
+                ['minimal', 'Minimal'],
+                ['diagnostic', 'Diagnostic'],
+              ]}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Joint points"
+            description="Show individual landmark points for spatial feedback."
+          >
+            <SettingsToggle
+              checked={preferences.skeletonJointsVisible}
+              onChange={(checked) => updatePreference('skeletonJointsVisible', checked)}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Confidence coloring"
+            description="Use confidence state to emphasize weaker landmark detection."
+          >
+            <SettingsToggle
+              checked={preferences.skeletonConfidenceColoring}
+              onChange={(checked) => updatePreference('skeletonConfidenceColoring', checked)}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Line thickness"
+            description="Adjust skeleton line weight for visibility."
+          >
+            <SettingsRange
+              value={preferences.skeletonLineWidth}
+              min={1}
+              max={5}
+              unit="px"
+              onChange={(value) => updatePreference('skeletonLineWidth', value)}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Debug overlay"
+            description="Expose additional detection state while tuning."
+          >
+            <SettingsToggle
+              checked={preferences.skeletonDebugOverlay}
+              onChange={(checked) => updatePreference('skeletonDebugOverlay', checked)}
+            />
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection
+          icon={<Gauge size={20} aria-hidden="true" />}
+          title="Telemetry Display"
+          description="Shape how live movement instrumentation appears during a session."
+        >
+          <SettingsRow
+            label="Telemetry mode"
+            description="Use a fixed sidebar or engraved mirror telemetry."
+          >
+            <SegmentedSetting
+              value={telemetryMode}
+              onChange={(value) => onTelemetryModeChange(value as TelemetryMode)}
+              options={[
+                ['fixed', 'Sidebar'],
+                ['engraved', 'Mirror HUD'],
+              ]}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="HUD density"
+            description="Control how much instrumentation appears at once."
+          >
+            <SettingsSelect
+              value={preferences.telemetryDensity}
+              onChange={(value) =>
+                updatePreference('telemetryDensity', value as SettingsTelemetryDensity)
+              }
+              options={[
+                ['compact', 'Compact'],
+                ['standard', 'Standard'],
+                ['expanded', 'Expanded'],
+              ]}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Overlay opacity"
+            description="Balance readability against the live preview."
+          >
+            <SettingsRange
+              value={preferences.telemetryOpacity}
+              min={55}
+              max={100}
+              unit="%"
+              onChange={(value) => updatePreference('telemetryOpacity', value)}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Overlay blur"
+            description="Tune the frosted HUD separation in overlay contexts."
+          >
+            <SettingsRange
+              value={preferences.telemetryBlur}
+              min={0}
+              max={24}
+              unit="px"
+              onChange={(value) => updatePreference('telemetryBlur', value)}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Live graphs"
+            description="Show compact trendlines when telemetry supports them."
+          >
+            <SettingsToggle
+              checked={preferences.telemetryLiveGraphs}
+              onChange={(checked) => updatePreference('telemetryLiveGraphs', checked)}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Feedback verbosity"
+            description="Choose how assertive movement guidance should be during tracking."
+          >
+            <SettingsSelect
+              value={preferences.telemetryFeedbackVerbosity}
+              onChange={(value) =>
+                updatePreference('telemetryFeedbackVerbosity', value as SettingsFeedbackVerbosity)
+              }
+              options={[
+                ['minimal', 'Minimal'],
+                ['balanced', 'Balanced'],
+                ['detailed', 'Detailed'],
+              ]}
+            />
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection
+          icon={<ShieldCheck size={20} aria-hidden="true" />}
+          title="Data & Privacy Management"
+          description="Manage local sessions, backups, cache, and OS-level behavior without cloud dependency."
+        >
+          <SettingsRow
+            label="Auto-save sessions"
+            description="Persist movement sessions automatically when recordable activity is detected."
+          >
+            <SettingsToggle
+              checked={preferences.autoSaveSessions}
+              onChange={(checked) => updatePreference('autoSaveSessions', checked)}
+            />
+          </SettingsRow>
+          <SettingsActionRow
+            label="Export session data"
+            description="Download a readable JSON backup of the local session log."
+            actionLabel="Export"
+            icon={<Download size={16} aria-hidden="true" />}
+            onAction={() => void exportSessionData()}
+          />
+          <SettingsActionRow
+            label="Import backup"
+            description="Replace local sessions with a CamChad JSON export after validation."
+            actionLabel="Import"
+            icon={<Upload size={16} aria-hidden="true" />}
+            onAction={() => importInputRef.current?.click()}
+          />
+          <input
+            ref={importInputRef}
+            className="visually-hidden"
+            type="file"
+            accept="application/json,.json"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+
+              if (file) {
+                void importSessionData(file);
+              }
+            }}
+          />
+          <SettingsActionRow
+            label="Clear analytics cache"
+            description="Reset interface preferences and cached display state without deleting sessions."
+            actionLabel="Reset cache"
+            icon={<Trash2 size={16} aria-hidden="true" />}
+            variant="secondary"
+            onAction={clearInterfaceCache}
+          />
+          <SettingsActionRow
+            label="Clear all sessions"
+            description={
+              confirmClearSessions
+                ? 'Confirm deletion. This removes all locally saved session history from this device.'
+                : 'Remove every saved local session. Export a backup first if you need one.'
+            }
+            actionLabel={confirmClearSessions ? 'Confirm clear' : 'Clear sessions'}
+            icon={<Trash2 size={16} aria-hidden="true" />}
+            variant="danger"
+            onAction={() => {
+              if (confirmClearSessions) {
+                void clearAllSessions();
+              } else {
+                setConfirmClearSessions(true);
+              }
+            }}
+          />
+          <SettingsRow
+            label="Open on login"
+            description="Start the desktop app when your computer boots."
+          >
+            <SettingsToggle
+              checked={startupEnabled}
+              disabled={!canUseStartup}
+              onChange={(checked) => void toggleStartup(checked)}
+            />
+          </SettingsRow>
+          <SettingsActionRow
+            label="Reminder test"
+            description={reminderStatus}
+            actionLabel="Send"
+            icon={<Bell size={16} aria-hidden="true" />}
+            disabled={!canUseNotifications}
+            onAction={() => {
+              void platform.notifications?.activityReminder('Time for a short movement session.');
+              setReminderStatus('Reminder sent locally through the operating system.');
+            }}
+          />
+        </SettingsSection>
+      </div>
+
+      <aside className="settings-preview-column">
+        <section className="settings-preview-card">
+          <div className="settings-preview-heading">
+            <span>Theme</span>
+            <strong>Interface tone</strong>
           </div>
           <ThemeSegmentedControl value={themePreference} onChange={onThemePreferenceChange} />
-        </div>
+          <SettingsInterfacePreview
+            preferences={preferences}
+            telemetryMode={telemetryMode}
+            themePreference={themePreference}
+          />
+        </section>
 
-        <div className="setting-row">
-          <div>
-            <strong>Reminder test</strong>
-            <span>Send a local OS notification without contacting a server.</span>
+        <section className="settings-preview-card">
+          <div className="settings-preview-heading">
+            <span>Tracking readiness</span>
+            <strong>Camera guidance</strong>
           </div>
-          <button
-            className="icon-action"
-            type="button"
-            disabled={!canUseNotifications}
-            onClick={() => {
-              void platform.notifications?.activityReminder('Time for a short movement session.');
-              setReminderStatus('Reminder sent.');
-            }}
-            aria-label="Send reminder"
-            title="Send reminder"
-          >
-            <Bell size={18} aria-hidden="true" />
-          </button>
-        </div>
-        <p className="setting-note">{reminderStatus}</p>
-      </div>
+          <div className="guidance-panel">
+            <div>
+              <Camera size={18} aria-hidden="true" />
+              <span>{cameraStatus}</span>
+            </div>
+            <p>
+              Keep the full body inside frame, prefer stable lighting, and let automatic movement
+              recognition settle for a few seconds before judging telemetry quality.
+            </p>
+          </div>
+        </section>
+
+        <section className="settings-preview-card">
+          <div className="settings-preview-heading">
+            <span>Local data</span>
+            <strong>On-device storage</strong>
+          </div>
+          <div className="settings-storage-grid">
+            <Metric label="Sessions" value={String(storageInfo.sessionCount)} />
+            <Metric label="Storage" value={formatBytes(storageInfo.bytes)} />
+            <Metric label="Total reps" value={String(summary.totalReps)} />
+            <Metric
+              label="Last activity"
+              value={
+                storageInfo.lastActivityAt ? formatCompactDate(storageInfo.lastActivityAt) : 'None'
+              }
+            />
+          </div>
+          <p className="settings-storage-note">
+            All session data stays on this device. No account, server sync, cloud model upload, or
+            remote analytics pipeline is used.
+          </p>
+          <p className="setting-note">{dataStatus}</p>
+          <small className="settings-location-label">
+            <Database size={14} aria-hidden="true" />
+            {storageInfo.locationLabel}
+          </small>
+        </section>
+      </aside>
     </section>
+  );
+}
+
+function SettingsSection({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  readonly icon: ReactElement;
+  readonly title: string;
+  readonly description: string;
+  readonly children: ReactNode;
+}): ReactElement {
+  return (
+    <section className="settings-section">
+      <header className="settings-section-header">
+        <div className="settings-section-icon">{icon}</div>
+        <div>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+      </header>
+      <div className="settings-section-body">{children}</div>
+    </section>
+  );
+}
+
+function SettingsRow({
+  label,
+  description,
+  children,
+}: {
+  readonly label: string;
+  readonly description: string;
+  readonly children: ReactNode;
+}): ReactElement {
+  return (
+    <div className="settings-control-row">
+      <div className="settings-control-copy">
+        <strong>{label}</strong>
+        <span>{description}</span>
+      </div>
+      <div className="settings-control-value">{children}</div>
+    </div>
+  );
+}
+
+function SettingsActionRow({
+  label,
+  description,
+  actionLabel,
+  icon,
+  onAction,
+  disabled = false,
+  variant = 'primary',
+}: {
+  readonly label: string;
+  readonly description: string;
+  readonly actionLabel: string;
+  readonly icon: ReactElement;
+  readonly onAction: () => void;
+  readonly disabled?: boolean;
+  readonly variant?: 'primary' | 'secondary' | 'danger';
+}): ReactElement {
+  return (
+    <SettingsRow label={label} description={description}>
+      <button
+        className={`settings-action-button settings-action-${variant}`}
+        type="button"
+        disabled={disabled}
+        onClick={onAction}
+      >
+        {icon}
+        <span>{actionLabel}</span>
+      </button>
+    </SettingsRow>
+  );
+}
+
+function SettingsToggle({
+  checked,
+  onChange,
+  disabled = false,
+}: {
+  readonly checked: boolean;
+  readonly onChange: (checked: boolean) => void;
+  readonly disabled?: boolean;
+}): ReactElement {
+  return (
+    <button
+      className="settings-toggle"
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+    >
+      <span />
+    </button>
+  );
+}
+
+function SettingsSelect({
+  value,
+  options,
+  onChange,
+}: {
+  readonly value: string;
+  readonly options: readonly (readonly [string, string])[];
+  readonly onChange: (value: string) => void;
+}): ReactElement {
+  return (
+    <select
+      className="settings-select"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      {options.map(([optionValue, label]) => (
+        <option key={optionValue} value={optionValue}>
+          {label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function SettingsRange({
+  value,
+  min,
+  max,
+  unit,
+  onChange,
+}: {
+  readonly value: number;
+  readonly min: number;
+  readonly max: number;
+  readonly unit: string;
+  readonly onChange: (value: number) => void;
+}): ReactElement {
+  return (
+    <div className="settings-range">
+      <input
+        type="range"
+        value={value}
+        min={min}
+        max={max}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <span>
+        {value}
+        {unit}
+      </span>
+    </div>
+  );
+}
+
+function SegmentedSetting({
+  value,
+  options,
+  onChange,
+}: {
+  readonly value: string;
+  readonly options: readonly (readonly [string, string])[];
+  readonly onChange: (value: string) => void;
+}): ReactElement {
+  return (
+    <div className="settings-segmented-control">
+      {options.map(([optionValue, label]) => (
+        <button
+          key={optionValue}
+          type="button"
+          aria-pressed={value === optionValue}
+          onClick={() => onChange(optionValue)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SettingsInterfacePreview({
+  preferences,
+  telemetryMode,
+  themePreference,
+}: {
+  readonly preferences: AppSettingsPreferences;
+  readonly telemetryMode: TelemetryMode;
+  readonly themePreference: ThemePreference;
+}): ReactElement {
+  const skeletonClass = preferences.skeletonVisible
+    ? `settings-skeleton-preview settings-skeleton-${preferences.skeletonStyle}`
+    : 'settings-skeleton-preview is-hidden';
+
+  return (
+    <div
+      className="settings-interface-preview"
+      data-theme-preview={themePreference}
+      style={
+        {
+          '--preview-hud-opacity': `${preferences.telemetryOpacity / 100}`,
+          '--preview-hud-blur': `${preferences.telemetryBlur}px`,
+          '--preview-line-width': `${preferences.skeletonLineWidth}px`,
+        } as CSSProperties
+      }
+    >
+      <div className="settings-preview-sidebar">
+        <i />
+        <i />
+        <i />
+      </div>
+      <div className="settings-preview-stage">
+        <span>Live feed</span>
+        <div className={skeletonClass}>
+          <i className="joint head" />
+          <i className="joint chest" />
+          <i className="joint hip" />
+          <i className="bone torso" />
+          <i className="bone arm-left" />
+          <i className="bone arm-right" />
+          <i className="bone leg-left" />
+          <i className="bone leg-right" />
+          {preferences.skeletonJointsVisible ? (
+            <>
+              <i className="joint hand-left" />
+              <i className="joint hand-right" />
+              <i className="joint foot-left" />
+              <i className="joint foot-right" />
+            </>
+          ) : null}
+        </div>
+      </div>
+      <div className={`settings-preview-telemetry mode-${telemetryMode}`}>
+        <small>{telemetryMode === 'fixed' ? 'Sidebar telemetry' : 'Mirror HUD'}</small>
+        <strong>{preferences.telemetryDensity}</strong>
+        <span>Graphs {preferences.telemetryLiveGraphs ? 'online' : 'hidden'}</span>
+      </div>
+    </div>
   );
 }
 
@@ -1517,6 +2306,92 @@ function writeTelemetryMode(mode: TelemetryMode): void {
   } catch {
     // A blocked storage write should not prevent live activity tracking.
   }
+}
+
+function readSettingsPreferences(): AppSettingsPreferences {
+  try {
+    const parsed = JSON.parse(
+      localStorage.getItem(settingsPreferencesStorageKey) ?? '{}',
+    ) as Partial<AppSettingsPreferences>;
+
+    return {
+      ...defaultSettingsPreferences,
+      ...parsed,
+      skeletonLineWidth: clampNumber(
+        parsed.skeletonLineWidth,
+        defaultSettingsPreferences.skeletonLineWidth,
+        1,
+        5,
+      ),
+      telemetryOpacity: clampNumber(
+        parsed.telemetryOpacity,
+        defaultSettingsPreferences.telemetryOpacity,
+        55,
+        100,
+      ),
+      telemetryBlur: clampNumber(
+        parsed.telemetryBlur,
+        defaultSettingsPreferences.telemetryBlur,
+        0,
+        24,
+      ),
+    };
+  } catch {
+    return defaultSettingsPreferences;
+  }
+}
+
+function writeSettingsPreferences(preferences: AppSettingsPreferences): void {
+  try {
+    localStorage.setItem(settingsPreferencesStorageKey, JSON.stringify(preferences));
+  } catch {
+    // Settings persistence must never block camera startup or local tracking.
+  }
+}
+
+function cameraResolutionConstraints(
+  resolution: SettingsResolution,
+): Pick<MediaTrackConstraints, 'width' | 'height'> {
+  if (resolution === '1080p') {
+    return {
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    };
+  }
+
+  if (resolution === '720p') {
+    return {
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+    };
+  }
+
+  return {};
+}
+
+function clampNumber(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (value === undefined || Number.isNaN(value)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, value));
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function describeCameraStartupError(error: unknown): string {

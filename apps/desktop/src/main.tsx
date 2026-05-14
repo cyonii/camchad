@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 
-import type { CameraPermissionResult, ActivityPlatform } from '@camchad/ui';
+import type { CameraPermissionResult, ActivityPlatform, HistoryStorageInfo } from '@camchad/ui';
 import { ActivityApp } from '@camchad/ui';
 import '@camchad/ui/styles.css';
 import type { ActivitySession, ActivitySummary } from '@camchad/activity-history';
@@ -18,6 +18,15 @@ const platform: ActivityPlatform = {
     },
     async summary(): Promise<ActivitySummary> {
       return (await desktopApi.history.summary()) as ActivitySummary;
+    },
+    async clear(): Promise<void> {
+      await desktopApi.history.clear();
+    },
+    async replace(sessions: readonly ActivitySession[]): Promise<void> {
+      await desktopApi.history.replace(sessions);
+    },
+    async storageInfo(): Promise<HistoryStorageInfo> {
+      return (await desktopApi.history.storageInfo()) as HistoryStorageInfo;
     },
   },
   cameraPermission: {

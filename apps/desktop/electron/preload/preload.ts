@@ -5,6 +5,9 @@ const api = {
     list: (): Promise<unknown> => ipcRenderer.invoke('history:list'),
     save: (session: unknown): Promise<void> => ipcRenderer.invoke('history:save', session),
     summary: (): Promise<unknown> => ipcRenderer.invoke('history:summary'),
+    clear: (): Promise<void> => ipcRenderer.invoke('history:clear'),
+    replace: (sessions: unknown): Promise<void> => ipcRenderer.invoke('history:replace', sessions),
+    storageInfo: (): Promise<unknown> => ipcRenderer.invoke('history:storage-info'),
   },
   camera: {
     ensurePermission: (): Promise<unknown> => ipcRenderer.invoke('camera:ensure-permission'),

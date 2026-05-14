@@ -7,12 +7,13 @@ import {
   shell,
   systemPreferences,
 } from 'electron';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
   normalizeActivityHistory,
+  normalizeActivitySessions,
   type ActivitySession,
   type ActivitySummary,
   type PersistedActivityHistory,
@@ -25,6 +26,13 @@ app.setName('CamChad');
 interface CameraPermissionResult {
   readonly granted: boolean;
   readonly reason?: string;
+}
+
+interface HistoryStorageInfo {
+  readonly bytes: number;
+  readonly sessionCount: number;
+  readonly locationLabel: string;
+  readonly lastActivityAt?: string;
 }
 
 let mainWindow: BrowserWindow | undefined;
@@ -183,6 +191,38 @@ ipcMain.handle('history:summary', async (): Promise<ActivitySummary> => {
     totalReps: movements.reduce((sum, movement) => sum + movement.reps, 0),
     validReps: movements.reduce((sum, movement) => sum + movement.validReps, 0),
     partialReps: movements.reduce((sum, movement) => sum + movement.partialReps, 0),
+    lastActivityAt: [...history.sessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]
+      ?.startedAt,
+  };
+});
+
+ipcMain.handle('history:clear', async (): Promise<void> => {
+  await writeHistory({ sessions: [] });
+});
+
+ipcMain.handle(
+  'history:replace',
+  async (_event, sessions: readonly ActivitySession[]): Promise<void> => {
+    await writeHistory({ sessions: normalizeActivitySessions(sessions) });
+  },
+);
+
+ipcMain.handle('history:storage-info', async (): Promise<HistoryStorageInfo> => {
+  const history = await readHistory();
+  let bytes = 0;
+
+  try {
+    bytes = (await stat(historyPath())).size;
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+      throw error;
+    }
+  }
+
+  return {
+    bytes,
+    sessionCount: history.sessions.length,
+    locationLabel: app.getPath('userData'),
     lastActivityAt: [...history.sessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]
       ?.startedAt,
   };

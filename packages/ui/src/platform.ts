@@ -9,10 +9,20 @@ export interface CameraPermissionResult {
   readonly reason?: string;
 }
 
+export interface HistoryStorageInfo {
+  readonly bytes: number;
+  readonly sessionCount: number;
+  readonly locationLabel: string;
+  readonly lastActivityAt?: string;
+}
+
 export interface HistoryClient {
   list(): Promise<readonly ActivitySession[]>;
   save(session: ActivitySession): Promise<void>;
   summary(): Promise<ActivitySummary>;
+  clear(): Promise<void>;
+  replace(sessions: readonly ActivitySession[]): Promise<void>;
+  storageInfo(): Promise<HistoryStorageInfo>;
 }
 
 export interface SettingsClient {
@@ -60,6 +70,31 @@ export const localBrowserHistoryClient: HistoryClient = {
       totalReps: movements.reduce((sum, movement) => sum + movement.reps, 0),
       validReps: movements.reduce((sum, movement) => sum + movement.validReps, 0),
       partialReps: movements.reduce((sum, movement) => sum + movement.partialReps, 0),
+      lastActivityAt: sessions[0]?.startedAt,
+    };
+  },
+
+  async clear(): Promise<void> {
+    localStorage.removeItem('camchad:sessions');
+    localStorage.removeItem('home-activity:sessions');
+    localStorage.removeItem('home-workout:sessions');
+  },
+
+  async replace(sessions: readonly ActivitySession[]): Promise<void> {
+    const normalizedSessions = normalizeActivitySessions(sessions);
+    localStorage.setItem('camchad:sessions', JSON.stringify(normalizedSessions));
+    localStorage.removeItem('home-activity:sessions');
+    localStorage.removeItem('home-workout:sessions');
+  },
+
+  async storageInfo(): Promise<HistoryStorageInfo> {
+    const sessions = readLocalSessions();
+    const raw = localStorage.getItem('camchad:sessions') ?? '[]';
+
+    return {
+      bytes: new TextEncoder().encode(raw).byteLength,
+      sessionCount: sessions.length,
+      locationLabel: 'Browser local storage',
       lastActivityAt: sessions[0]?.startedAt,
     };
   },
