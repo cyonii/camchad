@@ -63,6 +63,7 @@ type TelemetryMode = 'fixed' | 'engraved';
 
 export interface ActivityAssets {
   readonly logoAssetPath?: string;
+  readonly exerciseGuideAssetBasePath: string;
   readonly modelAssetPath: string;
   readonly wasmAssetPath: string;
 }
@@ -226,7 +227,9 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
           />
         ) : null}
         {view === 'history' ? <HistoryView sessions={sessions} summary={summary} /> : null}
-        {view === 'exercises' ? <SupportedExercisesView /> : null}
+        {view === 'exercises' ? (
+          <SupportedExercisesView exerciseGuideAssetBasePath={assets.exerciseGuideAssetBasePath} />
+        ) : null}
         {view === 'settings' ? (
           <SettingsView
             platform={platform}
@@ -281,6 +284,12 @@ function ActivityView({
     useState<MovementInterpreterState>(initialDetectorState);
   const [cameraError, setCameraError] = useState<string | undefined>();
   const [telemetryMode, setTelemetryMode] = useState<TelemetryMode>(() => readTelemetryMode());
+  const activeGuide = exerciseGuideFor(
+    sessionTelemetry.movementType ??
+      detectorState.recognition.movementType ??
+      detectorState.movementType,
+    assets.exerciseGuideAssetBasePath,
+  );
 
   useEffect(() => {
     detectorStateRef.current = detectorState;
@@ -595,6 +604,9 @@ function ActivityView({
               </div>
             ) : null}
             <StageTelemetryChrome status={status} isTracking={isTracking} />
+            {activeGuide && detectorState.recognition.status === 'active' ? (
+              <ExerciseGuideOverlay guide={activeGuide} />
+            ) : null}
 
             {telemetryMode === 'engraved' ? (
               <MirrorTelemetryOverlay
@@ -662,6 +674,18 @@ function ActivityView({
         </div>
       </div>
     </section>
+  );
+}
+
+function ExerciseGuideOverlay({ guide }: { readonly guide: ExerciseGuide }): ReactElement {
+  return (
+    <aside className="exercise-guide-overlay" aria-label={`${guide.label} form guide`}>
+      <img src={guide.src} alt="" />
+      <div>
+        <span>Form guide</span>
+        <strong>{guide.label}</strong>
+      </div>
+    </aside>
   );
 }
 
@@ -1195,7 +1219,11 @@ function SettingsView({
   );
 }
 
-function SupportedExercisesView(): ReactElement {
+function SupportedExercisesView({
+  exerciseGuideAssetBasePath,
+}: {
+  readonly exerciseGuideAssetBasePath: string;
+}): ReactElement {
   const validationDefinitions = movementRegistry.filter(
     (definition) => definition.supportLevel === 'validation',
   );
@@ -1252,16 +1280,19 @@ function SupportedExercisesView(): ReactElement {
           <ExerciseCatalogSection
             definitions={validationDefinitions}
             description="Full rep counting and quality validation are implemented."
+            exerciseGuideAssetBasePath={exerciseGuideAssetBasePath}
             title="Validation-ready"
           />
           <ExerciseCatalogSection
             definitions={recognitionDefinitions}
             description="The engine can infer these movement patterns, but form validation is still lightweight."
+            exerciseGuideAssetBasePath={exerciseGuideAssetBasePath}
             title="Recognized now"
           />
           <ExerciseCatalogSection
             definitions={plannedDefinitions}
             description="These are listed deliberately, but do not have active movement definitions yet."
+            exerciseGuideAssetBasePath={exerciseGuideAssetBasePath}
             title="Not defined yet"
           />
         </div>
@@ -1274,10 +1305,12 @@ function ExerciseCatalogSection({
   title,
   description,
   definitions,
+  exerciseGuideAssetBasePath,
 }: {
   readonly title: string;
   readonly description: string;
   readonly definitions: readonly MovementDefinition[];
+  readonly exerciseGuideAssetBasePath: string;
 }): ReactElement {
   return (
     <section className="exercise-definition-section" aria-label={title}>
@@ -1291,7 +1324,11 @@ function ExerciseCatalogSection({
 
       <div className="exercise-definition-rows">
         {definitions.map((definition) => (
-          <ExerciseDefinitionRow definition={definition} key={definition.type} />
+          <ExerciseDefinitionRow
+            definition={definition}
+            exerciseGuideAssetBasePath={exerciseGuideAssetBasePath}
+            key={definition.type}
+          />
         ))}
       </div>
     </section>
@@ -1300,11 +1337,23 @@ function ExerciseCatalogSection({
 
 function ExerciseDefinitionRow({
   definition,
+  exerciseGuideAssetBasePath,
 }: {
   readonly definition: MovementDefinition;
+  readonly exerciseGuideAssetBasePath: string;
 }): ReactElement {
+  const guide = exerciseGuideFor(definition.type, exerciseGuideAssetBasePath);
+
   return (
-    <article className="exercise-definition-row" data-support={definition.supportLevel}>
+    <article
+      className={guide ? 'exercise-definition-row has-guide' : 'exercise-definition-row'}
+      data-support={definition.supportLevel}
+    >
+      {guide ? (
+        <div className="exercise-definition-guide">
+          <img src={guide.src} alt={`${guide.label} form guide`} loading="lazy" />
+        </div>
+      ) : null}
       <div className="exercise-definition-main">
         <div>
           <strong>{definition.label}</strong>
@@ -1706,6 +1755,40 @@ function formatSupportLevel(level: MovementDefinition['supportLevel']): string {
   }
 
   return 'Planned';
+}
+
+interface ExerciseGuide {
+  readonly label: string;
+  readonly src: string;
+}
+
+function exerciseGuideFor(
+  movementType: MovementType | undefined,
+  assetBasePath: string,
+): ExerciseGuide | undefined {
+  if (!movementType) {
+    return undefined;
+  }
+
+  const normalizedBasePath = assetBasePath.endsWith('/')
+    ? assetBasePath.slice(0, -1)
+    : assetBasePath;
+
+  if (movementType === 'push_up') {
+    return {
+      label: 'Push-up',
+      src: `${normalizedBasePath}/push-up-guide.gif`,
+    };
+  }
+
+  if (movementType === 'squat') {
+    return {
+      label: 'Squat',
+      src: `${normalizedBasePath}/squat-guide.gif`,
+    };
+  }
+
+  return undefined;
 }
 
 function defaultCatalogDefinition(): MovementDefinition {

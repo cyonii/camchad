@@ -13,6 +13,7 @@ createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <ActivityApp
       assets={{
+        exerciseGuideAssetBasePath: '/exercise-guides',
         logoAssetPath: '/logo.png',
         modelAssetPath: '/vendor/mediapipe/models/pose_landmarker_full.task',
         wasmAssetPath: '/vendor/mediapipe/wasm',
