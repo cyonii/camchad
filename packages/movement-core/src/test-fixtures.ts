@@ -93,6 +93,14 @@ export function makePartialPushUpSequence(startTimestampMs = 0): PoseSequence {
   ];
 }
 
+export function makeInvalidPushUpAlignmentSequence(startTimestampMs = 0): PoseSequence {
+  return [
+    makePushUpFrame({ timestampMs: startTimestampMs, elbowAngle: 166, hipOffsetY: 0.8 }),
+    makePushUpFrame({ timestampMs: startTimestampMs + 140, elbowAngle: 108, hipOffsetY: 0.8 }),
+    makePushUpFrame({ timestampMs: startTimestampMs + 300, elbowAngle: 164, hipOffsetY: 0.8 }),
+  ];
+}
+
 export function makeSquatRepSequence(startTimestampMs = 0): PoseSequence {
   return [
     makeSquatFrame({ timestampMs: startTimestampMs, kneeAngle: 168 }),
@@ -100,6 +108,16 @@ export function makeSquatRepSequence(startTimestampMs = 0): PoseSequence {
     makeSquatFrame({ timestampMs: startTimestampMs + 260, kneeAngle: 96 }),
     makeSquatFrame({ timestampMs: startTimestampMs + 410, kneeAngle: 132 }),
     makeSquatFrame({ timestampMs: startTimestampMs + 560, kneeAngle: 166 }),
+  ];
+}
+
+export function makeForwardLeaningSquatSequence(startTimestampMs = 0): PoseSequence {
+  return [
+    makeSquatFrame({ timestampMs: startTimestampMs, kneeAngle: 168, torsoLeanX: 0.2 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 120, kneeAngle: 138, torsoLeanX: 0.2 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 260, kneeAngle: 96, torsoLeanX: 0.2 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 410, kneeAngle: 132, torsoLeanX: 0.2 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 560, kneeAngle: 166, torsoLeanX: 0.2 }),
   ];
 }
 
