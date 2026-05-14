@@ -2347,7 +2347,9 @@ function MovementPreviewFrame({
       {guide ? (
         <img src={guide.src} alt="" loading="lazy" />
       ) : (
-        <SkeletonBlueprint definition={definition} />
+        <div className="movement-preview-unavailable">
+          <span>Guide pending</span>
+        </div>
       )}
       <div className="movement-preview-hud">
         <span>{definition.supportLevel === 'planned' ? 'Blueprint' : 'Motion preview'}</span>
@@ -2358,25 +2360,6 @@ function MovementPreviewFrame({
         )}
       </div>
       <i className="preview-scanline" />
-    </div>
-  );
-}
-
-function SkeletonBlueprint({
-  definition,
-}: {
-  readonly definition: MovementDefinition;
-}): ReactElement {
-  return (
-    <div className={`movement-blueprint blueprint-${definition.bodyOrientation}`}>
-      <i className="bp-joint bp-head" />
-      <i className="bp-joint bp-chest" />
-      <i className="bp-joint bp-hip" />
-      <i className="bp-line bp-spine" />
-      <i className="bp-line bp-left-arm" />
-      <i className="bp-line bp-right-arm" />
-      <i className="bp-line bp-left-leg" />
-      <i className="bp-line bp-right-leg" />
     </div>
   );
 }
@@ -3081,22 +3064,16 @@ function exerciseGuideFor(
   const normalizedBasePath = assetBasePath.endsWith('/')
     ? assetBasePath.slice(0, -1)
     : assetBasePath;
+  const definition = movementRegistry.find((movement) => movement.type === movementType);
 
-  if (movementType === 'push_up') {
-    return {
-      label: 'Push-up',
-      src: `${normalizedBasePath}/push-up-guide.gif`,
-    };
+  if (!definition) {
+    return undefined;
   }
 
-  if (movementType === 'squat') {
-    return {
-      label: 'Squat',
-      src: `${normalizedBasePath}/squat-guide.gif`,
-    };
-  }
-
-  return undefined;
+  return {
+    label: definition.label,
+    src: `${normalizedBasePath}/${movementType.replaceAll('_', '-')}-guide.gif`,
+  };
 }
 
 function defaultCatalogDefinition(): MovementDefinition {

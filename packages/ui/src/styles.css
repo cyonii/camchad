@@ -2413,95 +2413,15 @@ button,
   opacity: 0.65;
 }
 
-.movement-blueprint {
-  position: absolute;
-  inset: 12px;
-}
-
-.bp-joint,
-.bp-line {
-  position: absolute;
-  display: block;
-}
-
-.bp-joint {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #a27bff;
-  box-shadow: 0 0 12px rgb(162 123 255 / 40%);
-}
-
-.bp-line {
-  height: 2px;
-  transform-origin: left center;
-  background: rgb(162 123 255 / 70%);
-}
-
-.bp-head {
-  top: 10px;
-  left: 74px;
-}
-
-.bp-chest {
-  top: 40px;
-  left: 72px;
-}
-
-.bp-hip {
-  top: 62px;
-  left: 72px;
-}
-
-.bp-spine {
-  top: 53px;
-  left: 75px;
-  width: 24px;
-  transform: rotate(90deg);
-}
-
-.bp-left-arm {
-  top: 48px;
-  left: 44px;
-  width: 34px;
-  transform: rotate(-20deg);
-}
-
-.bp-right-arm {
-  top: 48px;
-  left: 78px;
-  width: 34px;
-  transform: rotate(20deg);
-}
-
-.bp-left-leg {
-  top: 70px;
-  left: 51px;
-  width: 38px;
-  transform: rotate(108deg);
-}
-
-.bp-right-leg {
-  top: 70px;
-  left: 75px;
-  width: 38px;
-  transform: rotate(72deg);
-}
-
-.blueprint-floor {
-  transform: rotate(82deg) scale(0.92);
-}
-
-.blueprint-seated {
-  transform: rotate(22deg) scale(0.9);
-}
-
-.blueprint-hanging {
-  transform: translateY(-10px) scaleY(1.08);
-}
-
-.blueprint-mixed {
-  transform: rotate(-18deg);
+.movement-preview-unavailable {
+  display: grid;
+  min-height: 98px;
+  place-items: center;
+  color: var(--text-subtle);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .engine-definition-copy {
