@@ -23,6 +23,7 @@ createRoot(document.getElementById('root') as HTMLElement).render(
         cameraPermission: browserCameraPermissionClient,
         appLifecycle: browserAppLifecycleClient,
       }}
+      routingMode="browser"
     />
   </React.StrictMode>,
 );

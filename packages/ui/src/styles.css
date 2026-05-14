@@ -306,7 +306,7 @@ button,
   gap: 6px;
 }
 
-.nav-list button {
+.nav-list a {
   position: relative;
   display: flex;
   align-items: center;
@@ -320,10 +320,11 @@ button,
   background: transparent;
   font-size: 0.86rem;
   text-align: left;
+  text-decoration: none;
   text-transform: uppercase;
 }
 
-.nav-list button::after {
+.nav-list a::after {
   position: absolute;
   top: 8px;
   right: -1px;
@@ -334,15 +335,15 @@ button,
   content: '';
 }
 
-.nav-list button.active,
-.nav-list button:hover {
+.nav-list a.active,
+.nav-list a:hover {
   color: var(--sidebar-text);
   border-color: rgb(var(--primary-rgb) / 18%);
   background:
     linear-gradient(90deg, rgb(var(--primary-rgb) / 12%), transparent 84%), var(--sidebar-active);
 }
 
-.nav-list button.active::after {
+.nav-list a.active::after {
   background: var(--primary);
 }
 

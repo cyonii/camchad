@@ -56,6 +56,7 @@ createRoot(document.getElementById('root') as HTMLElement).render(
         wasmAssetPath: './vendor/mediapipe/wasm',
       }}
       platform={platform}
+      routingMode="memory"
     />
   </React.StrictMode>,
 );

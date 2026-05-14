@@ -33,7 +33,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import type { CSSProperties, ReactElement, ReactNode } from 'react';
+import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
 
 import type {
   ActivitySessionTelemetry,
@@ -74,6 +74,11 @@ const ActivityLogChart = lazy(async () => {
 });
 
 type View = 'activity' | 'history' | 'exercises' | 'settings';
+type AppRoute = {
+  readonly view: View;
+  readonly movementType?: MovementType;
+};
+type RoutingMode = 'browser' | 'memory';
 type ThemePreference = 'system' | 'light' | 'dark';
 type TelemetryMode = 'fixed' | 'engraved';
 type SettingsCameraSource = 'system' | 'integrated' | 'external';
@@ -119,6 +124,7 @@ export interface ActivityAssets {
 export interface ActivityAppProps {
   readonly assets: ActivityAssets;
   readonly platform: ActivityPlatform;
+  readonly routingMode?: RoutingMode;
 }
 
 const themePreferenceStorageKey = 'camchad:theme-preference';
@@ -168,14 +174,98 @@ const initialSessionTelemetry: ActivitySessionTelemetry = {
   recognitionConfidence: 0,
 };
 
+function defaultRoutingMode(): RoutingMode {
+  if (typeof window === 'undefined') {
+    return 'memory';
+  }
+
+  return window.location.protocol === 'http:' || window.location.protocol === 'https:'
+    ? 'browser'
+    : 'memory';
+}
+
+function readInitialRoute(routingMode: RoutingMode): AppRoute {
+  return routingMode === 'browser' ? readRouteFromLocation() : { view: 'activity' };
+}
+
+function readRouteFromLocation(): AppRoute {
+  if (typeof window === 'undefined') {
+    return { view: 'activity' };
+  }
+
+  return routeFromPath(window.location.pathname);
+}
+
+function routeFromPath(pathname: string): AppRoute {
+  const [rootSegment = '', detailSegment] = pathname.replace(/\/+$/, '').split('/').filter(Boolean);
+
+  if (!rootSegment) {
+    return { view: 'activity' };
+  }
+
+  if (rootSegment === 'log') {
+    return { view: 'history' };
+  }
+
+  if (rootSegment === 'settings') {
+    return { view: 'settings' };
+  }
+
+  if (rootSegment === 'exercises') {
+    return {
+      view: 'exercises',
+      movementType: movementTypeFromSlug(detailSegment),
+    };
+  }
+
+  return { view: 'activity' };
+}
+
+function pathForRoute(route: AppRoute): string {
+  if (route.view === 'activity') {
+    return '/';
+  }
+
+  if (route.view === 'history') {
+    return '/log';
+  }
+
+  if (route.view === 'settings') {
+    return '/settings';
+  }
+
+  if (route.movementType) {
+    return `/exercises/${slugForMovementType(route.movementType)}`;
+  }
+
+  return '/exercises';
+}
+
+function slugForMovementType(movementType: MovementType): string {
+  return movementType.replaceAll('_', '-');
+}
+
+function movementTypeFromSlug(slug: string | undefined): MovementType | undefined {
+  if (!slug) {
+    return undefined;
+  }
+
+  const movementType = slug.replaceAll('-', '_') as MovementType;
+
+  return movementRegistry.some((definition) => definition.type === movementType)
+    ? movementType
+    : undefined;
+}
+
 interface ShellSessionTelemetry {
   readonly isActive: boolean;
   readonly elapsedSeconds: number;
   readonly mode: ActivitySessionTelemetry['mode'];
 }
 
-export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElement {
-  const [view, setView] = useState<View>('activity');
+export function ActivityApp({ assets, platform, routingMode }: ActivityAppProps): ReactElement {
+  const activeRoutingMode = routingMode ?? defaultRoutingMode();
+  const [route, setRoute] = useState<AppRoute>(() => readInitialRoute(activeRoutingMode));
   const [sessions, setSessions] = useState<readonly ActivitySession[]>([]);
   const [summary, setSummary] = useState<ActivitySummary>({
     totalSessions: 0,
@@ -196,6 +286,20 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
   const [settingsPreferences, setSettingsPreferences] = useState<AppSettingsPreferences>(() =>
     readSettingsPreferences(),
   );
+  const view = route.view;
+
+  useEffect(() => {
+    if (activeRoutingMode !== 'browser') {
+      return undefined;
+    }
+
+    const handlePopState = (): void => {
+      setRoute(readRouteFromLocation());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeRoutingMode]);
 
   const loadHistory = useCallback(async () => {
     const [nextSessions, nextSummary] = await Promise.all([
@@ -236,6 +340,23 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
     void platform.appLifecycle?.exit();
   }, [platform.appLifecycle]);
 
+  const navigateTo = useCallback(
+    (nextRoute: AppRoute): void => {
+      setRoute(nextRoute);
+
+      if (activeRoutingMode !== 'browser') {
+        return;
+      }
+
+      const nextPath = pathForRoute(nextRoute);
+
+      if (window.location.pathname !== nextPath) {
+        window.history.pushState({}, '', nextPath);
+      }
+    },
+    [activeRoutingMode],
+  );
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -253,28 +374,32 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
           <NavButton
             icon={<Activity size={18} />}
             active={view === 'activity'}
-            onClick={() => setView('activity')}
+            href={pathForRoute({ view: 'activity' })}
+            onNavigate={() => navigateTo({ view: 'activity' })}
           >
             Activity
           </NavButton>
           <NavButton
             icon={<History size={18} />}
             active={view === 'history'}
-            onClick={() => setView('history')}
+            href={pathForRoute({ view: 'history' })}
+            onNavigate={() => navigateTo({ view: 'history' })}
           >
             Log
           </NavButton>
           <NavButton
             icon={<Dumbbell size={18} />}
             active={view === 'exercises'}
-            onClick={() => setView('exercises')}
+            href={pathForRoute({ view: 'exercises' })}
+            onNavigate={() => navigateTo({ view: 'exercises' })}
           >
             Exercises
           </NavButton>
           <NavButton
             icon={<Settings size={18} />}
             active={view === 'settings'}
-            onClick={() => setView('settings')}
+            href={pathForRoute({ view: 'settings' })}
+            onNavigate={() => navigateTo({ view: 'settings' })}
           >
             Settings
           </NavButton>
@@ -315,7 +440,13 @@ export function ActivityApp({ assets, platform }: ActivityAppProps): ReactElemen
         </div>
         {view === 'history' ? <HistoryView sessions={sessions} summary={summary} /> : null}
         {view === 'exercises' ? (
-          <SupportedExercisesView exerciseGuideAssetBasePath={assets.exerciseGuideAssetBasePath} />
+          <SupportedExercisesView
+            exerciseGuideAssetBasePath={assets.exerciseGuideAssetBasePath}
+            selectedMovementType={route.movementType}
+            onSelectedMovementTypeChange={(movementType) =>
+              navigateTo({ view: 'exercises', movementType })
+            }
+          />
         ) : null}
         {view === 'settings' ? (
           <SettingsView
@@ -2024,12 +2155,15 @@ function SettingsInterfacePreview({
 
 function SupportedExercisesView({
   exerciseGuideAssetBasePath,
+  selectedMovementType,
+  onSelectedMovementTypeChange,
 }: {
   readonly exerciseGuideAssetBasePath: string;
+  readonly selectedMovementType: MovementType | undefined;
+  readonly onSelectedMovementTypeChange: (movementType: MovementType) => void;
 }): ReactElement {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ExerciseCatalogFilter>('all');
-  const [selectedType, setSelectedType] = useState<MovementType>(movementRegistry[0].type);
   const validationDefinitions = movementRegistry.filter(
     (definition) => definition.supportLevel === 'validation',
   );
@@ -2041,7 +2175,8 @@ function SupportedExercisesView({
   );
   const recognizedCount = validationDefinitions.length + recognitionDefinitions.length;
   const selectedDefinition =
-    movementRegistry.find((definition) => definition.type === selectedType) ?? movementRegistry[0];
+    movementRegistry.find((definition) => definition.type === selectedMovementType) ??
+    movementRegistry[0];
   const normalizedQuery = query.trim().toLowerCase();
   const filteredDefinitions = movementRegistry.filter((definition) => {
     const matchesFilter =
@@ -2217,7 +2352,7 @@ function SupportedExercisesView({
                   exerciseGuideAssetBasePath={exerciseGuideAssetBasePath}
                   isSelected={definition.type === selectedDefinition.type}
                   key={definition.type}
-                  onSelect={() => setSelectedType(definition.type)}
+                  onSelect={() => onSelectedMovementTypeChange(definition.type)}
                 />
               ))
             )}
@@ -2715,19 +2850,30 @@ function describeCameraStartupError(error: unknown): string {
 function NavButton({
   icon,
   active,
-  onClick,
+  href,
+  onNavigate,
   children,
 }: {
   readonly icon: ReactElement;
   readonly active: boolean;
-  readonly onClick: () => void;
+  readonly href: string;
+  readonly onNavigate: () => void;
   readonly children: string;
 }): ReactElement {
+  const handleClick = (event: MouseEvent<HTMLAnchorElement>): void => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    onNavigate();
+  };
+
   return (
-    <button className={active ? 'active' : undefined} type="button" onClick={onClick}>
+    <a className={active ? 'active' : undefined} href={href} onClick={handleClick}>
       {icon}
       {children}
-    </button>
+    </a>
   );
 }
 
