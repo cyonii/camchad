@@ -7,7 +7,7 @@
   --surface-rgb: 238 245 241;
   --surface-raised: #f7fbf8;
   --surface-muted: #d7e4dd;
-  --surface-video: #d8e5de;
+  --surface-video: #bccbc3;
   --surface-glass: rgb(238 245 241 / 88%);
   --surface-glass-strong: rgb(247 251 248 / 94%);
   --text: #13201c;
@@ -164,9 +164,7 @@ body {
   min-height: 720px;
   overflow: hidden;
   color: var(--text);
-  background:
-    radial-gradient(circle at 18% 4%, rgb(var(--primary-rgb) / 9%), transparent 28rem),
-    linear-gradient(135deg, rgb(var(--app-bg-rgb) / 100%), rgb(0 0 0 / 7%)), var(--app-bg);
+  background: var(--app-bg);
 }
 
 :root {
@@ -221,10 +219,7 @@ button,
   height: 100vh;
   padding: 7px;
   overflow: hidden;
-  background:
-    linear-gradient(90deg, rgb(var(--primary-rgb) / 4%) 1px, transparent 1px),
-    linear-gradient(rgb(var(--primary-rgb) / 3%) 1px, transparent 1px);
-  background-size: 72px 72px;
+  background: var(--app-bg);
 }
 
 .sidebar {
@@ -237,15 +232,7 @@ button,
   color: var(--sidebar-text);
   border: 1px solid rgb(var(--primary-rgb) / 18%);
   border-radius: 8px 0 0 8px;
-  background:
-    radial-gradient(circle at 50% 0%, rgb(var(--primary-rgb) / 10%), transparent 34%),
-    linear-gradient(90deg, rgb(var(--primary-rgb) / 4%) 1px, transparent 1px),
-    linear-gradient(rgb(var(--primary-rgb) / 3%) 1px, transparent 1px), var(--sidebar-bg);
-  background-size:
-    auto,
-    36px 36px,
-    36px 36px,
-    auto;
+  background: var(--sidebar-bg);
 }
 
 .brand {
@@ -339,8 +326,7 @@ button,
 .nav-list a:hover {
   color: var(--sidebar-text);
   border-color: rgb(var(--primary-rgb) / 18%);
-  background:
-    linear-gradient(90deg, rgb(var(--primary-rgb) / 12%), transparent 84%), var(--sidebar-active);
+  background: var(--sidebar-active);
 }
 
 .nav-list a.active::after {
@@ -357,8 +343,7 @@ button,
   padding: 12px 13px;
   border: 1px solid rgb(var(--primary-rgb) / 16%);
   border-radius: 6px;
-  background:
-    linear-gradient(135deg, rgb(var(--primary-rgb) / 7%), transparent 60%), var(--sidebar-panel-bg);
+  background: var(--sidebar-panel-bg);
 }
 
 .sidebar-session-telemetry {
@@ -366,8 +351,7 @@ button,
   padding: 12px 13px;
   border: 1px solid rgb(var(--primary-rgb) / 18%);
   border-radius: 6px;
-  background:
-    linear-gradient(135deg, rgb(var(--primary-rgb) / 10%), transparent 62%), var(--sidebar-panel-bg);
+  background: var(--sidebar-panel-bg);
 }
 
 .sidebar-session-telemetry::after {
@@ -441,7 +425,7 @@ button,
   border: 1px solid rgb(var(--primary-rgb) / 12%);
   border-left: 0;
   border-radius: 0 8px 8px 0;
-  background: linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 22%);
+  background: var(--app-bg);
 }
 
 .view-panel {
@@ -482,33 +466,7 @@ button,
   overflow: hidden;
   border: 1px solid rgb(var(--primary-rgb) / 22%);
   border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgb(var(--primary-rgb) / 9%), transparent 28%),
-    radial-gradient(circle at top right, rgb(var(--primary-rgb) / 15%), transparent 22rem),
-    var(--surface-video);
-}
-
-.activity-stage-panel::before,
-.activity-stage-panel::after {
-  position: absolute;
-  z-index: 2;
-  pointer-events: none;
-  content: '';
-}
-
-.activity-stage-panel::before {
-  inset: 0;
-  background:
-    linear-gradient(90deg, var(--video-grid-line) 1px, transparent 1px),
-    linear-gradient(var(--video-grid-line) 1px, transparent 1px);
-  background-size: 120px 120px;
-  opacity: var(--video-grid-opacity);
-}
-
-.activity-stage-panel::after {
-  inset: auto 0 0;
-  height: 28%;
-  background: linear-gradient(180deg, transparent, var(--video-vignette));
+  background: var(--surface-video);
 }
 
 .video-stage {
@@ -516,9 +474,7 @@ button,
   inset: 0;
   overflow: hidden;
   border-radius: inherit;
-  background:
-    radial-gradient(circle at 50% 30%, rgb(var(--primary-rgb) / 9%), transparent 30rem),
-    var(--surface-video);
+  background: var(--surface-video);
 }
 
 .video-stage video,
@@ -725,8 +681,7 @@ button,
   max-width: 100%;
   border: 1px solid rgb(var(--primary-rgb) / 22%);
   border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgb(var(--primary-rgb) / 9%), transparent 46%), var(--surface-glass);
+  background: var(--surface-glass);
   opacity: var(--activity-hud-opacity, 1);
   backdrop-filter: blur(var(--activity-hud-blur, 18px)) saturate(1.18);
 }
@@ -940,8 +895,7 @@ button,
   padding: 18px;
   border: 1px solid rgb(var(--primary-rgb) / 22%);
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgb(var(--primary-rgb) / 10%), transparent), var(--surface-glass-strong);
+  background: var(--surface-glass-strong);
 }
 
 .rep-counter span,
@@ -968,9 +922,8 @@ button,
   height: 92px;
   place-items: center;
   border-radius: 999px;
-  background:
-    radial-gradient(circle at center, var(--surface) 0 56%, transparent 58%),
-    conic-gradient(var(--primary) var(--quality), rgb(var(--primary-rgb) / 13%) 0);
+  border: 3px solid var(--primary);
+  background: var(--surface);
 }
 
 .quality-dial strong {
@@ -1004,8 +957,7 @@ button,
   padding: 14px;
   border: 1px solid rgb(var(--primary-rgb) / 16%);
   border-radius: 7px;
-  background:
-    linear-gradient(135deg, rgb(var(--primary-rgb) / 5%), transparent), var(--surface-raised);
+  background: var(--surface-raised);
 }
 
 .metric strong {
@@ -1052,9 +1004,7 @@ button,
 
 .camera-advice[data-severity='warning'] {
   border-color: rgb(var(--warning-rgb) / 28%);
-  background:
-    linear-gradient(135deg, rgb(var(--warning-rgb) / 8%), transparent 58%),
-    var(--surface-glass-strong);
+  background: var(--surface-glass-strong);
 }
 
 .camera-advice p {
@@ -1089,11 +1039,11 @@ button,
 }
 
 .rep-history-valid {
-  background: linear-gradient(180deg, var(--primary), var(--primary-dim)) !important;
+  background: var(--primary) !important;
 }
 
 .rep-history-partial {
-  background: linear-gradient(180deg, var(--warning), var(--chart-partial)) !important;
+  background: var(--warning) !important;
 }
 
 .bottom-command-deck {
@@ -1104,8 +1054,7 @@ button,
   padding: 8px;
   border: 1px solid rgb(var(--primary-rgb) / 18%);
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 3%), transparent), rgb(var(--surface-rgb) / 72%);
+  background: rgb(var(--surface-rgb) / 72%);
   backdrop-filter: blur(14px) saturate(1.08);
 }
 
@@ -1201,7 +1150,7 @@ button,
   border: 1px solid var(--border-control);
   border-radius: 6px;
   color: var(--text);
-  background: linear-gradient(180deg, rgb(255 255 255 / 4%), transparent), var(--surface);
+  background: var(--surface);
   font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
   font-size: 0.76rem;
   letter-spacing: 0.02em;
@@ -1212,7 +1161,7 @@ button,
 .theme-segmented-control button[aria-pressed='true'] {
   color: var(--primary-contrast);
   border-color: var(--primary);
-  background: linear-gradient(180deg, rgb(255 255 255 / 22%), transparent), var(--primary);
+  background: var(--primary);
 }
 
 .telemetry-mode-control {
@@ -1240,7 +1189,7 @@ button,
 .primary-action {
   color: var(--primary-contrast);
   border-color: var(--primary);
-  background: linear-gradient(180deg, rgb(255 255 255 / 22%), transparent), var(--primary);
+  background: var(--primary);
 }
 
 .secondary-action {
@@ -1252,8 +1201,7 @@ button,
 .danger-action {
   color: #fff2ee;
   border-color: rgb(var(--danger-rgb) / 46%);
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 14%), transparent), rgb(var(--danger-rgb) / 82%);
+  background: rgb(var(--danger-rgb) / 82%);
 }
 
 .icon-action {
@@ -1320,8 +1268,7 @@ button,
   padding: 16px;
   border: 1px solid rgb(var(--primary-rgb) / 15%);
   border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgb(var(--primary-rgb) / 8%), transparent 58%), var(--surface-glass);
+  background: var(--surface-glass);
 }
 
 .settings-summary-grid svg {
@@ -1618,11 +1565,7 @@ button,
   overflow: hidden;
   border: 1px solid rgb(var(--primary-rgb) / 10%);
   border-radius: 7px;
-  background:
-    linear-gradient(90deg, rgb(var(--primary-rgb) / 4%) 1px, transparent 1px),
-    linear-gradient(rgb(var(--primary-rgb) / 3%) 1px, transparent 1px),
-    rgb(var(--surface-rgb) / 46%);
-  background-size: 44px 44px;
+  background: rgb(var(--surface-rgb) / 46%);
 }
 
 .activity-chart-stack {
@@ -1812,7 +1755,7 @@ button,
   height: var(--spark);
   min-height: 4px;
   border-radius: 3px 3px 0 0;
-  background: linear-gradient(180deg, var(--primary), rgb(var(--primary-rgb) / 28%));
+  background: var(--primary);
 }
 
 .history-table-panel,
@@ -1999,11 +1942,7 @@ button,
 .movement-inspector-card {
   border: 1px solid rgb(var(--primary-rgb) / 12%);
   border-radius: 8px;
-  background:
-    linear-gradient(90deg, rgb(var(--primary-rgb) / 3%) 1px, transparent 1px),
-    linear-gradient(rgb(var(--primary-rgb) / 3%) 1px, transparent 1px),
-    rgb(var(--surface-rgb) / 58%);
-  background-size: 42px 42px;
+  background: rgb(var(--surface-rgb) / 58%);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 2%);
 }
 
@@ -2013,9 +1952,7 @@ button,
   gap: 24px;
   align-items: start;
   padding: 26px;
-  background:
-    radial-gradient(circle at 78% 18%, rgb(var(--primary-rgb) / 12%), transparent 32%),
-    linear-gradient(135deg, rgb(var(--surface-rgb) / 76%), rgb(var(--surface-rgb) / 36%));
+  background: rgb(var(--surface-rgb) / 58%);
 }
 
 .exercise-hero-panel span,
@@ -2118,9 +2055,7 @@ button,
   padding: 16px;
   border: 1px solid rgb(var(--primary-rgb) / 12%);
   border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgb(var(--primary-rgb) / 6%), transparent 48%),
-    rgb(var(--surface-rgb) / 52%);
+  background: rgb(var(--surface-rgb) / 52%);
 }
 
 .engine-stat-card {
@@ -2355,9 +2290,7 @@ button,
   padding-left: 16px;
   border: 1px solid rgb(var(--primary-rgb) / 34%);
   border-radius: 8px;
-  background:
-    linear-gradient(90deg, rgb(var(--primary-rgb) / 10%), transparent 64%),
-    rgb(var(--primary-rgb) / 5%);
+  background: rgb(var(--primary-rgb) / 5%);
 }
 
 .engine-definition-row[data-support='planned'] {
@@ -2370,10 +2303,7 @@ button,
   overflow: hidden;
   border: 1px solid rgb(var(--primary-rgb) / 12%);
   border-radius: 7px;
-  background:
-    linear-gradient(90deg, rgb(var(--primary-rgb) / 5%) 1px, transparent 1px),
-    linear-gradient(rgb(var(--primary-rgb) / 5%) 1px, transparent 1px), rgb(2 10 12 / 72%);
-  background-size: 28px 28px;
+  background: rgb(2 10 12 / 72%);
 }
 
 .movement-preview-frame img {
@@ -2410,7 +2340,7 @@ button,
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(180deg, transparent, rgb(var(--primary-rgb) / 9%), transparent);
+  background: transparent;
   opacity: 0.65;
 }
 
@@ -2500,9 +2430,8 @@ button,
   aspect-ratio: 1;
   place-items: center;
   border-radius: 999px;
-  background:
-    radial-gradient(circle at center, rgb(var(--surface-rgb) / 92%) 58%, transparent 60%),
-    conic-gradient(var(--primary) calc(var(--score) * 1%), rgb(var(--primary-rgb) / 12%) 0);
+  border: 2px solid var(--primary);
+  background: rgb(var(--surface-rgb) / 92%);
 }
 
 .mini-signal-ring span {
@@ -2694,9 +2623,7 @@ button,
   padding: 28px;
   border: 1px solid rgb(var(--primary-rgb) / 9%);
   border-radius: 8px;
-  background:
-    radial-gradient(circle at 82% 18%, rgb(var(--primary-rgb) / 10%), transparent 30%),
-    linear-gradient(135deg, rgb(var(--surface-rgb) / 72%), rgb(var(--surface-rgb) / 34%));
+  background: rgb(var(--surface-rgb) / 58%);
 }
 
 .settings-page-heading span,
@@ -2740,11 +2667,7 @@ button,
 .settings-preview-card {
   border: 1px solid rgb(var(--primary-rgb) / 12%);
   border-radius: 8px;
-  background:
-    linear-gradient(90deg, rgb(var(--primary-rgb) / 3%) 1px, transparent 1px),
-    linear-gradient(rgb(var(--primary-rgb) / 3%) 1px, transparent 1px),
-    rgb(var(--surface-rgb) / 58%);
-  background-size: 42px 42px;
+  background: rgb(var(--surface-rgb) / 58%);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 2%);
 }
 
@@ -2961,9 +2884,7 @@ button,
   padding: 12px;
   border: 1px solid rgb(var(--primary-rgb) / 32%);
   border-radius: 8px;
-  background:
-    radial-gradient(circle at 74% 24%, rgb(var(--primary-rgb) / 16%), transparent 28%),
-    linear-gradient(135deg, rgb(2 12 14 / 86%), rgb(var(--surface-rgb) / 50%));
+  background: rgb(var(--surface-rgb) / 58%);
 }
 
 .settings-preview-sidebar,
