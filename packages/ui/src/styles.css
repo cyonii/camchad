@@ -222,6 +222,217 @@ button,
   background: var(--app-bg);
 }
 
+.app-shell-windowed {
+  grid-template-rows: 46px minmax(0, 1fr);
+  --window-chrome-hairline: rgb(var(--primary-rgb) / 18%);
+  --window-chrome-frost: rgb(var(--surface-rgb) / 76%);
+  --window-chrome-frost-strong: rgb(var(--surface-rgb) / 88%);
+}
+
+.app-shell-windowed.app-shell-chrome-hidden {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.window-chrome {
+  position: relative;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(190px, 244px) minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  height: 46px;
+  overflow: hidden;
+  color: var(--text);
+  border: 1px solid var(--window-chrome-hairline);
+  border-bottom-color: rgb(var(--primary-rgb) / 24%);
+  border-radius: 8px 8px 0 0;
+  background:
+    linear-gradient(90deg, rgb(var(--primary-rgb) / 9%), transparent 34%),
+    linear-gradient(180deg, var(--window-chrome-frost-strong), var(--window-chrome-frost));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 5%),
+    inset 0 -1px 0 rgb(var(--primary-rgb) / 10%);
+  -webkit-app-region: drag;
+  backdrop-filter: blur(22px) saturate(1.28);
+}
+
+.window-chrome::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 17px,
+      rgb(var(--primary-rgb) / 3%) 18px
+    ),
+    radial-gradient(circle at 18% 0, rgb(var(--primary-rgb) / 16%), transparent 36%);
+  content: '';
+}
+
+.window-chrome-traffic-reserve {
+  position: relative;
+  z-index: 1;
+  width: 12px;
+  height: 100%;
+}
+
+.window-platform-macos .window-chrome-traffic-reserve {
+  width: 82px;
+}
+
+.window-chrome-identity,
+.window-chrome-status,
+.window-chrome-native-status {
+  position: relative;
+  z-index: 1;
+}
+
+.window-chrome-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.window-chrome-glyph {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  color: var(--primary);
+  border: 1px solid rgb(var(--primary-rgb) / 34%);
+  border-radius: 6px;
+  background: rgb(var(--primary-rgb) / 9%);
+  box-shadow: 0 0 18px rgb(var(--primary-rgb) / 12%);
+}
+
+.window-chrome-identity strong,
+.window-chrome-identity span,
+.window-chrome-status span {
+  display: block;
+  overflow: hidden;
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.window-chrome-identity strong {
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.window-chrome-identity span {
+  max-width: 180px;
+  color: var(--text-subtle);
+  font-size: 0.58rem;
+}
+
+.window-chrome-status {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 16px;
+  color: var(--text-subtle);
+}
+
+.window-chrome-status span {
+  font-size: 0.62rem;
+}
+
+.window-chrome-status i {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 12px rgb(var(--primary-rgb) / 54%);
+}
+
+.window-chrome-native-status {
+  display: grid;
+  width: 50px;
+  height: 100%;
+  place-items: center;
+  color: var(--text-subtle);
+}
+
+.window-control-cluster {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 46px);
+  align-self: stretch;
+  -webkit-app-region: no-drag;
+}
+
+.window-control-cluster button {
+  display: grid;
+  width: 46px;
+  height: 100%;
+  place-items: center;
+  border: 0;
+  color: var(--text-subtle);
+  background: transparent;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.window-control-cluster button:hover {
+  color: var(--text);
+  background: rgb(var(--primary-rgb) / 12%);
+}
+
+.window-control-cluster .window-control-close:hover {
+  color: #ffe7e2;
+  background: rgb(var(--danger-rgb) / 72%);
+}
+
+.window-inactive .window-chrome {
+  opacity: 0.72;
+}
+
+.app-shell-windowed .sidebar {
+  grid-row: 2;
+  height: 100%;
+  border-top: 0;
+  border-radius: 0 0 0 8px;
+}
+
+.app-shell-windowed .main-content {
+  grid-row: 2;
+  height: 100%;
+  border-top: 0;
+  border-radius: 0 0 8px 0;
+}
+
+.app-shell-windowed.app-shell-chrome-hidden .sidebar,
+.app-shell-windowed.app-shell-chrome-hidden .main-content {
+  grid-row: 1;
+}
+
+.app-shell-windowed.app-shell-chrome-hidden .sidebar {
+  border-top: 1px solid rgb(var(--primary-rgb) / 18%);
+  border-radius: 8px 0 0 8px;
+}
+
+.app-shell-windowed.app-shell-chrome-hidden .main-content {
+  border-top: 1px solid rgb(var(--primary-rgb) / 12%);
+  border-radius: 0 8px 8px 0;
+}
+
+.app-shell-windowed .view-panel-active {
+  height: 100%;
+}
+
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -233,6 +444,7 @@ button,
   border: 1px solid rgb(var(--primary-rgb) / 18%);
   border-radius: 8px 0 0 8px;
   background: var(--sidebar-bg);
+  -webkit-app-region: no-drag;
 }
 
 .brand {
@@ -426,6 +638,7 @@ button,
   border-left: 0;
   border-radius: 0 8px 8px 0;
   background: var(--app-bg);
+  -webkit-app-region: no-drag;
 }
 
 .view-panel {
@@ -444,6 +657,10 @@ button,
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 14px;
   overflow: hidden;
+}
+
+.app-shell-windowed .activity-layout {
+  height: 100%;
 }
 
 .activity-command-grid {
@@ -3221,6 +3438,10 @@ button,
 @media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 232px minmax(0, 1fr);
+  }
+
+  .app-shell-windowed .window-chrome {
+    grid-template-columns: auto minmax(178px, 232px) minmax(0, 1fr) auto;
   }
 
   .telemetry-fixed .activity-command-grid {

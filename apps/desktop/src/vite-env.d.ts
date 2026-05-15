@@ -24,6 +24,13 @@ declare global {
       app: {
         exit(): Promise<void>;
       };
+      windowControls: {
+        getState(): Promise<unknown>;
+        minimize(): Promise<void>;
+        toggleMaximize(): Promise<void>;
+        close(): Promise<void>;
+        subscribe(listener: (state: unknown) => void): () => void;
+      };
     };
   }
 }

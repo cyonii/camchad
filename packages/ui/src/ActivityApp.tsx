@@ -15,24 +15,46 @@ import {
   Layers3,
   List,
   Lock,
+  Maximize2,
+  Minus,
   Monitor,
   Moon,
   Move,
-  Pause,
   PanelRight,
+  Pause,
   Play,
   Power,
   RadioTower,
   ScanLine,
   Search,
-  ShieldCheck,
   Settings,
+  ShieldCheck,
   Square,
   Sun,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+
+import { ActivitySessionService, normalizeActivitySessions } from '@camchad/activity-history';
+import {
+  ActivitySessionOrchestrator,
+  createMovementRecognitionEngine,
+  movementDefinitionFor,
+  movementRegistry,
+} from '@camchad/movement-core';
+import { ExponentialPoseSmoother, MediaPipePoseEstimator } from '@camchad/pose-core';
+
+import { buildHistoryChartModel } from './history-chart.js';
+
+import type {
+  ActivityRepository,
+  ActivitySession,
+  ActivitySummary,
+  MovementSegment,
+} from '@camchad/activity-history';
+import type { LandmarkName, PoseEstimator, PoseFrame } from '@camchad/pose-core';
 import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
 
 import type {
@@ -40,33 +62,9 @@ import type {
   CameraAngle,
   MovementInterpreterState,
   MovementType,
+  MovementDefinition,
 } from '@camchad/movement-core';
-import {
-  ActivitySessionOrchestrator,
-  createMovementRecognitionEngine,
-  movementDefinitionFor,
-  movementRegistry,
-  type MovementDefinition,
-} from '@camchad/movement-core';
-import {
-  ExponentialPoseSmoother,
-  MediaPipePoseEstimator,
-  type LandmarkName,
-  type PoseEstimator,
-  type PoseFrame,
-} from '@camchad/pose-core';
-import {
-  ActivitySessionService,
-  normalizeActivitySessions,
-  type ActivityRepository,
-  type MovementSegment,
-  type ActivitySession,
-  type ActivitySummary,
-} from '@camchad/activity-history';
-
-import type { ActivityPlatform, HistoryStorageInfo } from './platform.js';
-import { buildHistoryChartModel } from './history-chart.js';
-
+import type { ActivityPlatform, HistoryStorageInfo, WindowChromeState } from './platform.js';
 const ActivityLogChart = lazy(async () => {
   const module = await import('./ActivityLogChart.js');
 
@@ -172,6 +170,12 @@ const initialDetectorState: MovementInterpreterState = {
 const initialSessionTelemetry: ActivitySessionTelemetry = {
   mode: 'idle',
   recognitionConfidence: 0,
+};
+const defaultWindowChromeState: WindowChromeState = {
+  platform: 'browser',
+  isFocused: true,
+  isFullscreen: false,
+  isMaximized: false,
 };
 
 function defaultRoutingMode(): RoutingMode {
@@ -279,6 +283,8 @@ export function ActivityApp({ assets, platform, routingMode }: ActivityAppProps)
     elapsedSeconds: 0,
     mode: 'idle',
   });
+  const [windowChromeState, setWindowChromeState] =
+    useState<WindowChromeState>(defaultWindowChromeState);
   const [themePreference, setThemePreference] = useState<ThemePreference>(() =>
     readThemePreference(),
   );
@@ -328,6 +334,34 @@ export function ActivityApp({ assets, platform, routingMode }: ActivityAppProps)
     writeSettingsPreferences(settingsPreferences);
   }, [settingsPreferences]);
 
+  useEffect(() => {
+    const windowControls = platform.windowControls;
+
+    if (!windowControls) {
+      setWindowChromeState(defaultWindowChromeState);
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    void windowControls.getState().then((state) => {
+      if (isMounted) {
+        setWindowChromeState(state);
+      }
+    });
+
+    const unsubscribe = windowControls.subscribe?.((state) => {
+      if (isMounted) {
+        setWindowChromeState(state);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe?.();
+    };
+  }, [platform.windowControls]);
+
   const saveSession = useCallback(
     async (session: ActivitySession) => {
       await platform.history.save(session);
@@ -357,8 +391,21 @@ export function ActivityApp({ assets, platform, routingMode }: ActivityAppProps)
     [activeRoutingMode],
   );
 
+  const hasWindowChrome = Boolean(platform.windowControls);
+  const shouldShowWindowChrome = hasWindowChrome && !windowChromeState.isFullscreen;
+
   return (
-    <div className="app-shell">
+    <div
+      className={`app-shell${hasWindowChrome ? ' app-shell-windowed' : ''}${
+        shouldShowWindowChrome ? '' : ' app-shell-chrome-hidden'
+      } window-platform-${windowChromeState.platform}${
+        windowChromeState.isFocused ? '' : ' window-inactive'
+      }`}
+    >
+      {shouldShowWindowChrome ? (
+        <WindowChrome state={windowChromeState} controls={platform.windowControls} />
+      ) : null}
+
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">
@@ -466,6 +513,68 @@ export function ActivityApp({ assets, platform, routingMode }: ActivityAppProps)
         ) : null}
       </main>
     </div>
+  );
+}
+
+function WindowChrome({
+  state,
+  controls,
+}: {
+  readonly state: WindowChromeState;
+  readonly controls: ActivityPlatform['windowControls'];
+}): ReactElement {
+  const isMac = state.platform === 'macos';
+  const maximizeLabel =
+    state.isFullscreen || state.isMaximized ? 'Restore window' : 'Maximize window';
+
+  return (
+    <header className="window-chrome" data-focused={state.isFocused}>
+      <div className="window-chrome-traffic-reserve" aria-hidden="true" />
+      <div className="window-chrome-identity">
+        <div className="window-chrome-glyph" aria-hidden="true">
+          <RadioTower size={14} />
+        </div>
+        <div>
+          <strong>CamChad</strong>
+          <span>Motion telemetry console</span>
+        </div>
+      </div>
+      <div className="window-chrome-status" aria-hidden="true">
+        <span>Local inference</span>
+        <i />
+        <span>{state.isFocused ? 'Active link' : 'Standby'}</span>
+      </div>
+      {isMac ? (
+        <div className="window-chrome-native-status" aria-hidden="true">
+          <Monitor size={14} />
+        </div>
+      ) : (
+        <div className="window-control-cluster" aria-label="Window controls">
+          <button
+            type="button"
+            aria-label="Minimize window"
+            onClick={() => void controls?.minimize()}
+          >
+            <Minus size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            aria-label={maximizeLabel}
+            onClick={() => void controls?.toggleMaximize()}
+          >
+            <Maximize2 size={13} aria-hidden="true" />
+          </button>
+          <button
+            className="window-control-close"
+            type="button"
+            aria-label="Close window"
+            onClick={() => void controls?.close()}
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </header>
   );
 }
 

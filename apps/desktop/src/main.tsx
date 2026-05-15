@@ -1,7 +1,12 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 
-import type { CameraPermissionResult, ActivityPlatform, HistoryStorageInfo } from '@camchad/ui';
+import type {
+  CameraPermissionResult,
+  ActivityPlatform,
+  HistoryStorageInfo,
+  WindowChromeState,
+} from '@camchad/ui';
 import { ActivityApp } from '@camchad/ui';
 import '@camchad/ui/styles.css';
 import type { ActivitySession, ActivitySummary } from '@camchad/activity-history';
@@ -43,6 +48,16 @@ const platform: ActivityPlatform = {
   },
   appLifecycle: {
     exit: () => desktopApi.app.exit(),
+  },
+  windowControls: {
+    getState: async () => (await desktopApi.windowControls.getState()) as WindowChromeState,
+    minimize: () => desktopApi.windowControls.minimize(),
+    toggleMaximize: () => desktopApi.windowControls.toggleMaximize(),
+    close: () => desktopApi.windowControls.close(),
+    subscribe: (listener) =>
+      desktopApi.windowControls.subscribe((state) => {
+        listener(state as WindowChromeState);
+      }),
   },
 };
 

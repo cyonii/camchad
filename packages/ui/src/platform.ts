@@ -42,12 +42,30 @@ export interface AppLifecycleClient {
   exit(): Promise<void>;
 }
 
+export type WindowChromePlatform = 'macos' | 'windows' | 'linux' | 'browser';
+
+export interface WindowChromeState {
+  readonly platform: WindowChromePlatform;
+  readonly isFocused: boolean;
+  readonly isFullscreen: boolean;
+  readonly isMaximized: boolean;
+}
+
+export interface WindowControlsClient {
+  getState(): Promise<WindowChromeState>;
+  minimize(): Promise<void>;
+  toggleMaximize(): Promise<void>;
+  close(): Promise<void>;
+  subscribe?(listener: (state: WindowChromeState) => void): () => void;
+}
+
 export interface ActivityPlatform {
   readonly history: HistoryClient;
   readonly settings?: SettingsClient;
   readonly notifications?: NotificationClient;
   readonly cameraPermission?: CameraPermissionClient;
   readonly appLifecycle?: AppLifecycleClient;
+  readonly windowControls?: WindowControlsClient;
 }
 
 export const localBrowserHistoryClient: HistoryClient = {

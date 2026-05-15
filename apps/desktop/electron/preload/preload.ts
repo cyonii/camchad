@@ -24,6 +24,21 @@ const api = {
   app: {
     exit: (): Promise<void> => ipcRenderer.invoke('app:exit'),
   },
+  windowControls: {
+    getState: (): Promise<unknown> => ipcRenderer.invoke('window:get-state'),
+    minimize: (): Promise<void> => ipcRenderer.invoke('window:minimize'),
+    toggleMaximize: (): Promise<void> => ipcRenderer.invoke('window:toggle-maximize'),
+    close: (): Promise<void> => ipcRenderer.invoke('window:close'),
+    subscribe: (listener: (state: unknown) => void): (() => void) => {
+      const wrappedListener = (_event: Electron.IpcRendererEvent, state: unknown): void => {
+        listener(state);
+      };
+
+      ipcRenderer.on('window:state-changed', wrappedListener);
+
+      return () => ipcRenderer.removeListener('window:state-changed', wrappedListener);
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld('camChad', api);

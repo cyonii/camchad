@@ -37,6 +37,50 @@ interface HistoryStorageInfo {
 
 let mainWindow: BrowserWindow | undefined;
 
+function windowChromePlatform(): 'macos' | 'windows' | 'linux' {
+  if (process.platform === 'darwin') {
+    return 'macos';
+  }
+
+  if (process.platform === 'win32') {
+    return 'windows';
+  }
+
+  return 'linux';
+}
+
+function readWindowChromeState(window: BrowserWindow): {
+  readonly platform: 'macos' | 'windows' | 'linux';
+  readonly isFocused: boolean;
+  readonly isFullscreen: boolean;
+  readonly isMaximized: boolean;
+} {
+  return {
+    platform: windowChromePlatform(),
+    isFocused: window.isFocused(),
+    isFullscreen: window.isFullScreen(),
+    isMaximized: window.isMaximized(),
+  };
+}
+
+function emitWindowChromeState(window: BrowserWindow): void {
+  if (!window.webContents.isDestroyed()) {
+    window.webContents.send('window:state-changed', readWindowChromeState(window));
+  }
+}
+
+function configureWindowChromeStateEvents(window: BrowserWindow): void {
+  const emitState = (): void => emitWindowChromeState(window);
+
+  window.on('focus', emitState);
+  window.on('blur', emitState);
+  window.on('maximize', emitState);
+  window.on('unmaximize', emitState);
+  window.on('enter-full-screen', emitState);
+  window.on('leave-full-screen', emitState);
+  window.on('restore', emitState);
+}
+
 function configureMediaPermissions(): void {
   session.defaultSession.setPermissionRequestHandler(
     (_webContents, permission, callback, details) => {
@@ -51,12 +95,20 @@ function configureMediaPermissions(): void {
 }
 
 async function createWindow(): Promise<void> {
+  const isMac = process.platform === 'darwin';
+
   mainWindow = new BrowserWindow({
     width: 1220,
     height: 820,
     minWidth: 980,
     minHeight: 680,
     title: 'CamChad',
+    frame: isMac,
+    titleBarStyle: isMac ? 'hiddenInset' : undefined,
+    trafficLightPosition: isMac ? { x: 18, y: 18 } : undefined,
+    vibrancy: isMac ? 'under-window' : undefined,
+    visualEffectState: isMac ? 'active' : undefined,
+    backgroundColor: '#050908',
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
@@ -64,6 +116,8 @@ async function createWindow(): Promise<void> {
       sandbox: false,
     },
   });
+
+  configureWindowChromeStateEvents(mainWindow);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
@@ -249,6 +303,48 @@ ipcMain.handle('notify:activity-reminder', (_event, body: string): void => {
 
 ipcMain.handle('app:exit', (): void => {
   app.quit();
+});
+
+ipcMain.handle('window:get-state', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+
+  if (!window) {
+    return {
+      platform: windowChromePlatform(),
+      isFocused: true,
+      isFullscreen: false,
+      isMaximized: false,
+    };
+  }
+
+  return readWindowChromeState(window);
+});
+
+ipcMain.handle('window:minimize', (event): void => {
+  BrowserWindow.fromWebContents(event.sender)?.minimize();
+});
+
+ipcMain.handle('window:toggle-maximize', (event): void => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+
+  if (!window) {
+    return;
+  }
+
+  if (process.platform === 'darwin') {
+    window.setFullScreen(!window.isFullScreen());
+    return;
+  }
+
+  if (window.isMaximized()) {
+    window.unmaximize();
+  } else {
+    window.maximize();
+  }
+});
+
+ipcMain.handle('window:close', (event): void => {
+  BrowserWindow.fromWebContents(event.sender)?.close();
 });
 
 void app.whenReady().then(() => {
