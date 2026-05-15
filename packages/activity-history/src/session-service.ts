@@ -1,5 +1,7 @@
 import type {
+  ActivityStateKind,
   CameraAngle,
+  MovementGuidanceEvent,
   MovementInterpreterState,
   MovementType,
   RepEvent,
@@ -14,6 +16,12 @@ export interface Clock {
 
 export interface IdGenerator {
   createId(prefix: string): string;
+}
+
+export interface MovementTelemetryUpdate {
+  readonly activityState?: ActivityStateKind;
+  readonly recognitionConfidence?: number;
+  readonly guidanceEvents?: readonly MovementGuidanceEvent[];
 }
 
 export class SystemClock implements Clock {
@@ -78,7 +86,10 @@ export class ActivitySessionService {
     return this.activeSegment;
   }
 
-  public updateMovement(state: MovementInterpreterState): MovementSegment {
+  public updateMovement(
+    state: MovementInterpreterState,
+    telemetry: MovementTelemetryUpdate = {},
+  ): MovementSegment {
     if (!this.activeSegment) {
       throw new Error('Cannot update movement because no movement segment is active.');
     }
@@ -95,6 +106,17 @@ export class ActivitySessionService {
       reps: state.reps,
       validReps: state.validReps,
       partialReps: state.partialReps,
+      activityState: telemetry.activityState ?? this.activeSegment.activityState,
+      recognitionConfidence:
+        telemetry.recognitionConfidence ?? this.activeSegment.recognitionConfidence,
+      telemetryMetrics: {
+        ...this.activeSegment.telemetryMetrics,
+        ...numericMetrics(state.metrics),
+      },
+      guidanceEvents: mergeGuidanceEvents(
+        this.activeSegment.guidanceEvents ?? [],
+        telemetry.guidanceEvents ?? [],
+      ),
       formWarnings: mergeWarnings(this.activeSegment.formWarnings, state.warnings),
       repEvents,
     };
@@ -148,6 +170,25 @@ export class ActivitySessionService {
   public getActiveSession(): ActivitySession | undefined {
     return this.activeSession;
   }
+}
+
+function numericMetrics(
+  metrics: Readonly<Record<string, number>>,
+): Readonly<Record<string, number>> {
+  return Object.fromEntries(Object.entries(metrics).filter(([, value]) => Number.isFinite(value)));
+}
+
+function mergeGuidanceEvents(
+  existing: readonly MovementGuidanceEvent[],
+  incoming: readonly MovementGuidanceEvent[],
+): readonly MovementGuidanceEvent[] {
+  const byCode = new Map(existing.map((event) => [event.code, event]));
+
+  for (const event of incoming) {
+    byCode.set(event.code, event);
+  }
+
+  return [...byCode.values()];
 }
 
 function mergeWarnings(

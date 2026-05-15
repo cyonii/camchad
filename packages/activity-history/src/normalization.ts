@@ -1,4 +1,11 @@
-import type { CameraAngle, FormWarning, MovementType, RepEvent } from '@camchad/movement-core';
+import type {
+  ActivityStateKind,
+  CameraAngle,
+  FormWarning,
+  MovementGuidanceEvent,
+  MovementType,
+  RepEvent,
+} from '@camchad/movement-core';
 
 import type { ActivitySession, MovementSegment } from './models.js';
 
@@ -69,6 +76,17 @@ export function normalizeMovementSegment(value: unknown): readonly MovementSegme
       reps: typeof value.reps === 'number' ? value.reps : 0,
       validReps: typeof value.validReps === 'number' ? value.validReps : 0,
       partialReps: typeof value.partialReps === 'number' ? value.partialReps : 0,
+      activityState: isActivityState(value.activityState) ? value.activityState : undefined,
+      recognitionConfidence:
+        typeof value.recognitionConfidence === 'number'
+          ? clamp01(value.recognitionConfidence)
+          : undefined,
+      telemetryMetrics: isRecord(value.telemetryMetrics)
+        ? normalizeTelemetryMetrics(value.telemetryMetrics)
+        : undefined,
+      guidanceEvents: Array.isArray(value.guidanceEvents)
+        ? value.guidanceEvents.flatMap((event) => normalizeGuidanceEvent(event))
+        : [],
       formWarnings: Array.isArray(value.formWarnings)
         ? value.formWarnings.flatMap((warning) => normalizeFormWarning(warning))
         : [],
@@ -126,8 +144,83 @@ function isMovementType(value: unknown): value is MovementType {
     value === 'mountain_climber' ||
     value === 'high_knees' ||
     value === 'lateral_raise' ||
-    value === 'yoga_hold'
+    value === 'yoga_hold' ||
+    value === 'crunch' ||
+    value === 'leg_raise' ||
+    value === 'glute_bridge' ||
+    value === 'wall_sit' ||
+    value === 'calf_raise' ||
+    value === 'step_up' ||
+    value === 'tricep_dip' ||
+    value === 'bicep_curl' ||
+    value === 'shoulder_press' ||
+    value === 'deadlift' ||
+    value === 'bear_crawl' ||
+    value === 'side_plank' ||
+    value === 'bird_dog' ||
+    value === 'superman_hold' ||
+    value === 'russian_twist'
   );
+}
+
+function isActivityState(value: unknown): value is ActivityStateKind {
+  return (
+    value === 'idle' ||
+    value === 'setup' ||
+    value === 'moving' ||
+    value === 'resting' ||
+    value === 'tracking_lost' ||
+    value === 'unknown'
+  );
+}
+
+function normalizeTelemetryMetrics(
+  value: Record<string, unknown>,
+): Readonly<Record<string, number>> {
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, number] => typeof entry[1] === 'number',
+    ),
+  );
+}
+
+function normalizeGuidanceEvent(value: unknown): readonly MovementGuidanceEvent[] {
+  if (
+    !isRecord(value) ||
+    !isGuidanceCode(value.code) ||
+    !isGuidanceSeverity(value.severity) ||
+    typeof value.title !== 'string' ||
+    typeof value.message !== 'string' ||
+    typeof value.confidence !== 'number'
+  ) {
+    return [];
+  }
+
+  return [
+    {
+      code: value.code,
+      severity: value.severity,
+      title: value.title,
+      message: value.message,
+      confidence: clamp01(value.confidence),
+    },
+  ];
+}
+
+function isGuidanceCode(value: unknown): value is MovementGuidanceEvent['code'] {
+  return (
+    value === 'tracking_lost' ||
+    value === 'full_body_not_visible' ||
+    value === 'low_confidence' ||
+    value === 'recent_tracking_gap' ||
+    value === 'orientation_mismatch' ||
+    value === 'movement_uncertain' ||
+    value === 'conditions_usable'
+  );
+}
+
+function isGuidanceSeverity(value: unknown): value is MovementGuidanceEvent['severity'] {
+  return value === 'info' || value === 'warning';
 }
 
 function isCameraAngle(value: unknown): value is CameraAngle {
@@ -139,9 +232,15 @@ function isFormWarningCode(value: unknown): value is FormWarning['code'] {
     value === 'tracking_lost' ||
     value === 'low_confidence' ||
     value === 'body_alignment' ||
+    value === 'posture_alignment' ||
     value === 'partial_depth' ||
+    value === 'range_of_motion' ||
     value === 'camera_angle_experimental'
   );
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

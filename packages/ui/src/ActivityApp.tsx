@@ -736,7 +736,10 @@ function ActivityView({
         activeMovementTypeRef.current = telemetry.movementType;
       }
 
-      const updatedMovement = service.updateMovement(state);
+      const updatedMovement = service.updateMovement(state, {
+        activityState: telemetry.activityState,
+        recognitionConfidence: telemetry.recognitionConfidence,
+      });
       hasRecordableActivityRef.current =
         hasRecordableActivityRef.current || isRecordableMovement(updatedMovement);
     },

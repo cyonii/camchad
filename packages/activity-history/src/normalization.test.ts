@@ -19,6 +19,21 @@ describe('activity history normalization', () => {
               reps: 3,
               validReps: 2,
               partialReps: 1,
+              activityState: 'moving',
+              recognitionConfidence: 1.4,
+              telemetryMetrics: {
+                temporalMovementConfidence: 0.82,
+                noisy: 'drop',
+              },
+              guidanceEvents: [
+                {
+                  code: 'low_confidence',
+                  severity: 'warning',
+                  title: 'Signal confidence low',
+                  message: 'Improve lighting.',
+                  confidence: 1.2,
+                },
+              ],
               formWarnings: [{ code: 'partial_depth', message: 'Lower farther.' }],
               repEvents: [
                 {
@@ -41,6 +56,20 @@ describe('activity history normalization', () => {
       movementType: 'push_up',
       validReps: 2,
       partialReps: 1,
+      activityState: 'moving',
+      recognitionConfidence: 1,
+      telemetryMetrics: {
+        temporalMovementConfidence: 0.82,
+      },
+      guidanceEvents: [
+        {
+          code: 'low_confidence',
+          severity: 'warning',
+          title: 'Signal confidence low',
+          message: 'Improve lighting.',
+          confidence: 1,
+        },
+      ],
     });
   });
 

@@ -1,4 +1,11 @@
-import type { CameraAngle, MovementType, FormWarning, RepEvent } from '@camchad/movement-core';
+import type {
+  ActivityStateKind,
+  CameraAngle,
+  MovementGuidanceEvent,
+  MovementType,
+  FormWarning,
+  RepEvent,
+} from '@camchad/movement-core';
 
 export interface ActivitySession {
   readonly id: string;
@@ -18,6 +25,10 @@ export interface MovementSegment {
   readonly reps: number;
   readonly validReps: number;
   readonly partialReps: number;
+  readonly activityState?: ActivityStateKind;
+  readonly recognitionConfidence?: number;
+  readonly telemetryMetrics?: Readonly<Record<string, number>>;
+  readonly guidanceEvents?: readonly MovementGuidanceEvent[];
   readonly formWarnings: readonly FormWarning[];
   readonly repEvents: readonly RepEvent[];
   readonly videoRecording?: VideoRecording;

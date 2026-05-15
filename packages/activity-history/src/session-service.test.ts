@@ -52,8 +52,15 @@ describe('ActivitySessionService', () => {
         partialReps: 0,
         lastRep: repEvent(1),
         warnings: [],
-        metrics: {},
+        metrics: {
+          temporalMovementConfidence: 0.84,
+          sampleWindowMs: 320,
+        },
       }),
+      {
+        activityState: 'moving',
+        recognitionConfidence: 0.91,
+      },
     );
     service.endMovement();
     const session = await service.endSession('Felt steady.');
@@ -62,6 +69,14 @@ describe('ActivitySessionService', () => {
     expect(session.durationSeconds).toBe(125);
     expect(session.movements).toHaveLength(1);
     expect(session.movements[0]?.repEvents).toHaveLength(1);
+    expect(session.movements[0]).toMatchObject({
+      activityState: 'moving',
+      recognitionConfidence: 0.91,
+      telemetryMetrics: {
+        temporalMovementConfidence: 0.84,
+        sampleWindowMs: 320,
+      },
+    });
     expect(await repository.summary()).toEqual({
       totalSessions: 1,
       totalReps: 1,
@@ -107,6 +122,42 @@ describe('ActivitySessionService', () => {
     );
 
     expect(set.repEvents).toHaveLength(1);
+  });
+
+  it('merges guidance events by code while updating movement telemetry', () => {
+    const service = new ActivitySessionService(
+      new InMemoryActivityRepository(),
+      new FixedClock([new Date('2026-05-12T07:00:00.000Z')]),
+      new SequentialIds(),
+    );
+
+    service.startSession();
+    service.startMovement('push_up', 'side');
+    service.updateMovement(movementState({}), {
+      guidanceEvents: [
+        {
+          code: 'low_confidence',
+          severity: 'warning',
+          title: 'Signal confidence low',
+          message: 'Improve lighting.',
+          confidence: 0.5,
+        },
+      ],
+    });
+    const set = service.updateMovement(movementState({}), {
+      guidanceEvents: [
+        {
+          code: 'low_confidence',
+          severity: 'warning',
+          title: 'Signal confidence low',
+          message: 'Improve lighting and contrast.',
+          confidence: 0.7,
+        },
+      ],
+    });
+
+    expect(set.guidanceEvents).toHaveLength(1);
+    expect(set.guidanceEvents?.[0]?.message).toBe('Improve lighting and contrast.');
   });
 });
 
