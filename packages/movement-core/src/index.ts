@@ -2,6 +2,7 @@ export * from './activity-session-orchestrator.js';
 export * from './activity-state-segmenter.js';
 export * from './body-state.js';
 export * from './movement-interpreter.js';
+export * from './movement-diagnostics.js';
 export * from './movement-recognition-engine.js';
 export * from './movement-registry.js';
 export * from './movement-temporal-tracker.js';
