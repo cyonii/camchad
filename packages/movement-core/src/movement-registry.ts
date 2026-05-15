@@ -26,6 +26,7 @@ export interface MovementDefinition {
   readonly supportedCameraAngles: readonly CameraAngle[];
   readonly cameraGuidance: MovementCameraGuidance;
   readonly telemetryMetrics: readonly MovementTelemetryMetricDefinition[];
+  readonly profile: MovementProfileMetadata;
   readonly createInterpreter?: (options?: MovementInterpreterFactoryOptions) => MovementInterpreter;
 }
 
@@ -34,6 +35,25 @@ export type MovementCategory = 'repetition' | 'hold' | 'compound';
 export type MovementSupportLevel = 'validation' | 'recognition' | 'planned';
 
 export type MovementBodyOrientation = 'standing' | 'floor' | 'seated' | 'hanging' | 'mixed';
+
+export type MovementRegion = 'head' | 'torso' | 'arms' | 'hands' | 'hips' | 'legs' | 'feet';
+
+export type MovementRhythmType = 'cyclic' | 'hold' | 'compound' | 'unknown';
+
+export type MovementValidationReadiness = 'rep_validation' | 'recognition_only' | 'profile_pending';
+
+export type MovementCameraSensitivity = 'low' | 'medium' | 'high';
+
+export interface MovementProfileMetadata {
+  readonly requiredRegions: readonly MovementRegion[];
+  readonly primaryJoints: readonly string[];
+  readonly phaseModel: readonly string[];
+  readonly rhythm: MovementRhythmType;
+  readonly validationReadiness: MovementValidationReadiness;
+  readonly cameraSensitivity: MovementCameraSensitivity;
+  readonly telemetrySignals: readonly string[];
+  readonly failureCriteria: readonly string[];
+}
 
 export interface MovementInterpreterFactoryOptions {
   readonly cameraAngle?: CameraAngle;
@@ -93,6 +113,22 @@ export const movementRegistry: readonly MovementDefinition[] = [
       { key: 'alignmentScore', label: 'Alignment', unit: '%' },
       { key: 'movementConfidence', label: 'Signal', unit: '%' },
     ],
+    profile: {
+      requiredRegions: ['torso', 'arms', 'hips', 'legs'],
+      primaryJoints: ['elbow', 'shoulder', 'hip'],
+      phaseModel: ['top', 'descending', 'bottom', 'ascending'],
+      rhythm: 'cyclic',
+      validationReadiness: 'rep_validation',
+      cameraSensitivity: 'high',
+      telemetrySignals: [
+        'elbow angle',
+        'elbow velocity',
+        'body line deviation',
+        'range of motion',
+        'temporal confidence',
+      ],
+      failureCriteria: ['tracking loss', 'severe body-line drift', 'partial depth'],
+    },
     createInterpreter: (options) =>
       new PushUpMovementInterpreter({
         ...defaultPushUpConfig,
@@ -131,6 +167,22 @@ export const movementRegistry: readonly MovementDefinition[] = [
       { key: 'postureScore', label: 'Posture', unit: '%' },
       { key: 'movementConfidence', label: 'Signal', unit: '%' },
     ],
+    profile: {
+      requiredRegions: ['torso', 'hips', 'legs', 'feet'],
+      primaryJoints: ['knee', 'hip', 'ankle'],
+      phaseModel: ['standing', 'lowering', 'bottom', 'rising'],
+      rhythm: 'cyclic',
+      validationReadiness: 'rep_validation',
+      cameraSensitivity: 'medium',
+      telemetrySignals: [
+        'knee angle',
+        'knee velocity',
+        'torso inclination',
+        'range of motion',
+        'temporal confidence',
+      ],
+      failureCriteria: ['tracking loss', 'forward torso collapse', 'partial depth'],
+    },
     createInterpreter: (options) =>
       new SquatMovementInterpreter({
         ...defaultSquatConfig,
@@ -300,6 +352,12 @@ function recognitionExercise(
       { key: 'movementConfidence', label: 'Signal', unit: '%' },
       { key: 'rangeOfMotionScore', label: 'Range', unit: '%' },
     ],
+    profile: profileFor({
+      supportLevel: 'recognition',
+      category: type === 'plank' || type === 'yoga_hold' ? 'hold' : 'repetition',
+      bodyOrientation,
+      analysisSignals,
+    }),
     createInterpreter: () => createRecognitionMovementInterpreter(type),
   };
 }
@@ -334,5 +392,78 @@ function plannedExercise(
       warningMessage: `${label} needs a movement definition before the engine can recognize it.`,
     },
     telemetryMetrics: [],
+    profile: profileFor({
+      supportLevel: 'planned',
+      category:
+        type.includes('hold') || type === 'wall_sit' || type === 'side_plank'
+          ? 'hold'
+          : 'repetition',
+      bodyOrientation,
+      analysisSignals,
+    }),
   };
+}
+
+function profileFor(options: {
+  readonly supportLevel: MovementSupportLevel;
+  readonly category: MovementCategory;
+  readonly bodyOrientation: MovementBodyOrientation;
+  readonly analysisSignals: readonly string[];
+}): MovementProfileMetadata {
+  return {
+    requiredRegions: requiredRegionsFor(options.bodyOrientation),
+    primaryJoints: primaryJointsFor(options.bodyOrientation),
+    phaseModel:
+      options.category === 'hold'
+        ? ['setup', 'hold', 'release']
+        : ['setup', 'active movement', 'return'],
+    rhythm:
+      options.category === 'hold'
+        ? 'hold'
+        : options.category === 'compound'
+          ? 'compound'
+          : 'cyclic',
+    validationReadiness:
+      options.supportLevel === 'validation'
+        ? 'rep_validation'
+        : options.supportLevel === 'recognition'
+          ? 'recognition_only'
+          : 'profile_pending',
+    cameraSensitivity: options.supportLevel === 'planned' ? 'high' : 'medium',
+    telemetrySignals: options.analysisSignals,
+    failureCriteria:
+      options.supportLevel === 'planned'
+        ? ['movement profile not implemented']
+        : ['tracking loss', 'low confidence', 'incomplete movement evidence'],
+  };
+}
+
+function requiredRegionsFor(bodyOrientation: MovementBodyOrientation): readonly MovementRegion[] {
+  switch (bodyOrientation) {
+    case 'standing':
+      return ['torso', 'hips', 'legs', 'feet'];
+    case 'floor':
+      return ['torso', 'arms', 'hips', 'legs'];
+    case 'seated':
+      return ['torso', 'hips', 'legs'];
+    case 'hanging':
+      return ['torso', 'arms', 'hands'];
+    case 'mixed':
+      return ['torso', 'arms', 'hips', 'legs', 'feet'];
+  }
+}
+
+function primaryJointsFor(bodyOrientation: MovementBodyOrientation): readonly string[] {
+  switch (bodyOrientation) {
+    case 'standing':
+      return ['hip', 'knee', 'ankle'];
+    case 'floor':
+      return ['shoulder', 'elbow', 'hip', 'knee'];
+    case 'seated':
+      return ['hip', 'spine', 'shoulder'];
+    case 'hanging':
+      return ['shoulder', 'elbow', 'wrist'];
+    case 'mixed':
+      return ['shoulder', 'elbow', 'hip', 'knee'];
+  }
 }
