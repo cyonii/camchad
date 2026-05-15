@@ -69,6 +69,79 @@ describe('MovementRecognitionEngine', () => {
     expect(squatState.movementType).toBe('squat');
     expect(pushUpState.movementType).toBe('push_up');
   });
+
+  it('uses temporal confidence instead of promoting a single-frame spike', () => {
+    const stable = sequencedInterpreter([
+      movementState({
+        movementType: 'squat',
+        recognition: {
+          movementType: 'squat',
+          confidence: 0.72,
+          status: 'active',
+          evidence: ['stable'],
+        },
+      }),
+      movementState({
+        movementType: 'squat',
+        recognition: {
+          movementType: 'squat',
+          confidence: 0.72,
+          status: 'active',
+          evidence: ['stable'],
+        },
+      }),
+      movementState({
+        movementType: 'squat',
+        recognition: {
+          movementType: 'squat',
+          confidence: 0.72,
+          status: 'active',
+          evidence: ['stable'],
+        },
+      }),
+    ]);
+    const spike = sequencedInterpreter([
+      movementState({
+        movementType: 'push_up',
+        recognition: {
+          movementType: 'push_up',
+          confidence: 0.1,
+          status: 'candidate',
+          evidence: [],
+        },
+      }),
+      movementState({
+        movementType: 'push_up',
+        recognition: {
+          movementType: 'push_up',
+          confidence: 0.1,
+          status: 'candidate',
+          evidence: [],
+        },
+      }),
+      movementState({
+        movementType: 'push_up',
+        recognition: {
+          movementType: 'push_up',
+          confidence: 0.98,
+          status: 'active',
+          evidence: ['single_frame_spike'],
+        },
+      }),
+    ]);
+    const engine = new MovementRecognitionEngine([stable, spike]);
+
+    engine.processPose(undefined);
+    engine.processPose(undefined);
+    const state = engine.processPose(undefined);
+
+    expect(state.primary.movementType).toBe('squat');
+    expect(state.primary.recognition.evidence).toContain('temporal_candidate_confidence');
+    expect(
+      state.candidates.find((candidate) => candidate.movementType === 'push_up')?.recognition
+        .status,
+    ).toBe('candidate');
+  });
 });
 
 function fakeInterpreter(
@@ -103,5 +176,24 @@ function movementState(
     warnings: [],
     metrics: {},
     ...overrides,
+  };
+}
+
+function sequencedInterpreter(states: readonly MovementInterpreterState[]): MovementInterpreter {
+  let index = 0;
+  let state = states[0] as MovementInterpreterState;
+
+  return {
+    movementType: state.movementType,
+    processPose: () => {
+      state = states[Math.min(index, states.length - 1)] as MovementInterpreterState;
+      index += 1;
+      return state;
+    },
+    getState: () => state,
+    reset: () => {
+      index = 0;
+      state = states[0] as MovementInterpreterState;
+    },
   };
 }
