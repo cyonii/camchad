@@ -39,10 +39,13 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import { ActivitySessionService, normalizeActivitySessions } from '@camchad/activity-history';
 import {
+  ActivityStateSegmenter,
   ActivitySessionOrchestrator,
   createMovementRecognitionEngine,
+  extractBodyState,
   movementDefinitionFor,
   movementRegistry,
+  MovementWindow,
 } from '@camchad/movement-core';
 import { ExponentialPoseSmoother, MediaPipePoseEstimator } from '@camchad/pose-core';
 
@@ -600,6 +603,14 @@ function ActivityView({
   const estimatorRef = useRef<PoseEstimator | null>(null);
   const smootherRef = useRef(new ExponentialPoseSmoother());
   const recognitionEngineRef = useRef(createMovementRecognitionEngine());
+  const activityWindowRef = useRef(new MovementWindow({ maxAgeMs: 1400 }));
+  const activityStateSegmenterRef = useRef(
+    new ActivityStateSegmenter({
+      minCoverage: 0.2,
+      restAfterMs: 1200,
+      idleAfterMs: 6500,
+    }),
+  );
   const sessionOrchestratorRef = useRef(
     new ActivitySessionOrchestrator({ cameraAngle: defaultCameraAngle }),
   );
@@ -758,8 +769,17 @@ function ActivityView({
       }
 
       const smoothed = poseFrame ? smootherRef.current.smooth(poseFrame) : undefined;
+      const bodyState = extractBodyState(smoothed);
+      const activityWindowSnapshot = bodyState
+        ? activityWindowRef.current.add(bodyState)
+        : activityWindowRef.current.addMissing(timestampMs);
+      const activityState = activityStateSegmenterRef.current.process(activityWindowSnapshot);
       const nextState = recognitionEngineRef.current.processPose(smoothed).primary;
-      const nextSessionTelemetry = sessionOrchestratorRef.current.process(nextState, timestampMs);
+      const nextSessionTelemetry = {
+        ...sessionOrchestratorRef.current.process(nextState, timestampMs),
+        activityState: activityState.state,
+        activityConfidence: activityState.confidence,
+      };
       detectorStateRef.current = nextState;
       setDetectorState(nextState);
       setSessionTelemetry(nextSessionTelemetry);
@@ -833,6 +853,8 @@ function ActivityView({
       recognitionEngineRef.current = createMovementRecognitionEngine({
         cameraAngle: defaultCameraAngle,
       });
+      activityWindowRef.current.reset();
+      activityStateSegmenterRef.current.reset();
       sessionOrchestratorRef.current.reset();
       sessionOrchestratorRef.current.updateOptions({ cameraAngle: defaultCameraAngle });
       lastInferenceAtRef.current = 0;
@@ -923,6 +945,8 @@ function ActivityView({
     sessionServiceRef.current = undefined;
     activeMovementTypeRef.current = undefined;
     hasRecordableActivityRef.current = false;
+    activityWindowRef.current.reset();
+    activityStateSegmenterRef.current.reset();
     sessionOrchestratorRef.current.reset();
     setSessionElapsedSeconds(0);
     setSessionTelemetry(initialSessionTelemetry);
@@ -1112,6 +1136,10 @@ function SidebarTelemetryPanel({
       <div className="metric-grid telemetry-block">
         <Metric label="Session" value={formatSessionMode(sessionTelemetry.mode)} />
         <Metric
+          label="Activity"
+          value={formatActivityState(sessionTelemetry.activityState ?? 'idle')}
+        />
+        <Metric
           label="Recognition"
           value={formatMetric(sessionTelemetry.recognitionConfidence, '%')}
         />
@@ -1218,6 +1246,10 @@ function MirrorTelemetryOverlay({
         <div>
           <dt>Phase</dt>
           <dd>{formatPhase(detectorState.phase)}</dd>
+        </div>
+        <div>
+          <dt>Activity</dt>
+          <dd>{formatActivityState(sessionTelemetry.activityState ?? 'idle')}</dd>
         </div>
         {telemetryMetrics.slice(0, 3).map((metric) => (
           <div key={metric.label}>
@@ -3563,6 +3595,12 @@ function formatPhase(phase: string): string {
 
 function formatSessionMode(mode: ActivitySessionTelemetry['mode']): string {
   return mode.replaceAll('_', ' ');
+}
+
+function formatActivityState(
+  state: NonNullable<ActivitySessionTelemetry['activityState']>,
+): string {
+  return state.replaceAll('_', ' ');
 }
 
 function formatDuration(totalSeconds: number): string {

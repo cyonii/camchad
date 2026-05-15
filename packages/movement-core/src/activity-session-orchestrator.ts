@@ -3,12 +3,15 @@ import type {
   MovementInterpreterState,
   MovementType,
 } from './movement-interpreter.js';
+import type { ActivityStateKind } from './activity-state-segmenter.js';
 import { cameraAdviceFor, type CameraAngleAdvice } from './movement-registry.js';
 
 export type ActivitySessionMode = 'idle' | 'observing' | 'moving' | 'resting';
 
 export interface ActivitySessionTelemetry {
   readonly mode: ActivitySessionMode;
+  readonly activityState?: ActivityStateKind;
+  readonly activityConfidence?: number;
   readonly movementType?: MovementType;
   readonly recognitionConfidence: number;
   readonly activeSetStartedAtMs?: number;
