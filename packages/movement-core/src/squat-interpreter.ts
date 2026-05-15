@@ -7,7 +7,10 @@ import type {
   MovementRecognition,
   RepEvent,
 } from './movement-interpreter.js';
+import { extractBodyState } from './body-state.js';
+import { MovementWindow } from './movement-window.js';
 import { extractPoseMovementFeatures } from './pose-movement-features.js';
+import { TemporalConfidenceAccumulator } from './temporal-confidence.js';
 
 export interface SquatMovementInterpreterConfig {
   readonly cameraAngle: CameraAngle;
@@ -40,6 +43,15 @@ export class SquatMovementInterpreter implements MovementInterpreter {
   private warnings: FormWarning[] = [];
   private metrics: Record<string, number> = {};
   private recognition: MovementRecognition = trackingLostRecognition;
+  private lastTimestampMs?: number;
+  private readonly movementWindow = new MovementWindow({ maxAgeMs: 1200 });
+  private readonly recognitionConfidence = new TemporalConfidenceAccumulator({
+    activationThreshold: 0.7,
+    deactivationThreshold: 0.42,
+    candidateThreshold: 0.48,
+    riseAlpha: 0.6,
+    fallAlpha: 0.45,
+  });
 
   public constructor(
     private readonly config: SquatMovementInterpreterConfig = defaultSquatConfig,
@@ -48,16 +60,29 @@ export class SquatMovementInterpreter implements MovementInterpreter {
   public processPose(
     frame: Parameters<MovementInterpreter['processPose']>[0],
   ): MovementInterpreterState {
-    const features = extractPoseMovementFeatures(frame, this.config.minVisibility);
-
-    if (!features || features.averageKneeAngle === undefined) {
+    if (!frame) {
+      this.movementWindow.addMissing(this.nextMissingTimestamp());
+      this.recognitionConfidence.addSample(0);
       this.phase = 'tracking_lost';
       this.warnings = [trackingLostWarning];
       this.recognition = trackingLostRecognition;
       return this.getState();
     }
 
-    if (features.bodyOrientation === 'horizontal') {
+    this.lastTimestampMs = frame.timestampMs;
+    const bodyState = extractBodyState(frame);
+    const features = extractPoseMovementFeatures(frame, this.config.minVisibility);
+
+    if (!bodyState || !features || features.averageKneeAngle === undefined) {
+      this.movementWindow.addMissing(frame.timestampMs);
+      this.recognitionConfidence.addSample(0);
+      this.phase = 'tracking_lost';
+      this.warnings = [trackingLostWarning];
+      this.recognition = trackingLostRecognition;
+      return this.getState();
+    }
+
+    if (features.bodyOrientation === 'horizontal' || bodyState.orientation.kind === 'floor') {
       this.phase = 'setup_needed';
       this.warnings = [];
       this.recognition = {
@@ -68,7 +93,11 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
+    const windowSnapshot = this.movementWindow.add(bodyState);
     const kneeAngle = features.averageKneeAngle;
+    const kneeVelocity = this.movementWindow.signalVelocity((state) =>
+      averagedDefined(state.jointAngles.leftKnee, state.jointAngles.rightKnee),
+    );
     const torsoInclination = features.torsoInclinationDegrees ?? 0;
     const postureScore = clamp01(1 - torsoInclination / this.config.maxTorsoInclinationDegrees);
     const reachedBottom = kneeAngle <= this.config.bottomKneeAngle;
@@ -84,11 +113,20 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       movementConfidence: movementConfidence(
         features.movementConfidence,
         features.bodyOrientationScore,
+        bodyState.orientation.confidence,
       ),
+      temporalMovementConfidence: this.recognitionConfidence.snapshot().confidence,
       poseConfidence: features.poseConfidence,
       torsoInclination,
       kneeLiftRatio: features.kneeLiftRatio ?? 0,
+      sampleWindowMs: windowSnapshot.durationMs,
+      missingSampleRatio: windowSnapshot.missingSampleRatio,
+      primaryJointVelocity: kneeVelocity?.valuePerSecond ?? 0,
     };
+    const confidenceSnapshot = this.recognitionConfidence.addSample(
+      this.metrics.movementConfidence ?? 0,
+    );
+    this.metrics.temporalMovementConfidence = confidenceSnapshot.confidence;
     this.warnings = this.buildWarnings(hasPostureWarning);
 
     switch (this.phase) {
@@ -139,7 +177,9 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     }
 
     this.recognition = this.buildRecognition(
-      this.phase === 'setup_needed' ? 'candidate' : 'active',
+      this.phase === 'setup_needed' || confidenceSnapshot.state !== 'active'
+        ? 'candidate'
+        : 'active',
     );
 
     return this.getState();
@@ -156,6 +196,9 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     this.warnings = [];
     this.metrics = {};
     this.recognition = trackingLostRecognition;
+    this.lastTimestampMs = undefined;
+    this.movementWindow.reset();
+    this.recognitionConfidence.reset();
   }
 
   public getState(): MovementInterpreterState {
@@ -239,10 +282,33 @@ export class SquatMovementInterpreter implements MovementInterpreter {
 
     return clamp01((this.config.topKneeAngle - this.lowestKneeAngle) / depthRange);
   }
+
+  private nextMissingTimestamp(): number {
+    this.lastTimestampMs = (this.lastTimestampMs ?? 0) + 16;
+    return this.lastTimestampMs;
+  }
 }
 
-function movementConfidence(poseConfidence: number, orientationScore: number): number {
-  return clamp01(poseConfidence * 0.58 + orientationScore * 0.42);
+function movementConfidence(
+  poseConfidence: number,
+  orientationScore: number,
+  bodyOrientationConfidence: number,
+): number {
+  return clamp01(
+    poseConfidence * 0.46 + orientationScore * 0.32 + bodyOrientationConfidence * 0.22,
+  );
+}
+
+function averagedDefined(a: number | undefined, b: number | undefined): number | undefined {
+  if (a === undefined) {
+    return b;
+  }
+
+  if (b === undefined) {
+    return a;
+  }
+
+  return (a + b) / 2;
 }
 
 function clamp01(value: number): number {

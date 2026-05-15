@@ -33,4 +33,16 @@ describe('SquatMovementInterpreter', () => {
     });
     expect(state.reps).toBe(0);
   });
+
+  it('reports temporal movement telemetry while interpreting squats', () => {
+    const interpreter = new SquatMovementInterpreter();
+
+    interpreter.processPose(makeSquatFrame({ timestampMs: 0, kneeAngle: 168 }));
+    const state = interpreter.processPose(makeSquatFrame({ timestampMs: 120, kneeAngle: 138 }));
+
+    expect(state.metrics.temporalMovementConfidence).toBeGreaterThan(0.7);
+    expect(state.metrics.sampleWindowMs).toBe(120);
+    expect(state.metrics.missingSampleRatio).toBe(0);
+    expect(state.metrics.primaryJointVelocity).toBeLessThan(0);
+  });
 });
