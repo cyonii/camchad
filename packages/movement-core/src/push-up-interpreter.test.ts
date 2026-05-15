@@ -109,4 +109,16 @@ describe('PushUpMovementInterpreter', () => {
     expect(state.recognition.status).toBe('tracking_lost');
     expect(state.warnings[0]?.code).toBe('tracking_lost');
   });
+
+  it('reports temporal movement telemetry while interpreting push-ups', () => {
+    const detector = new PushUpMovementInterpreter();
+
+    detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
+    const state = detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 132 }));
+
+    expect(state.metrics.temporalMovementConfidence).toBeGreaterThan(0.7);
+    expect(state.metrics.sampleWindowMs).toBe(120);
+    expect(state.metrics.missingSampleRatio).toBe(0);
+    expect(state.metrics.primaryJointVelocity).toBeLessThan(0);
+  });
 });
