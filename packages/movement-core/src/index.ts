@@ -1,4 +1,5 @@
 export * from './activity-session-orchestrator.js';
+export * from './activity-state-segmenter.js';
 export * from './body-state.js';
 export * from './movement-interpreter.js';
 export * from './movement-recognition-engine.js';
