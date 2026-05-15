@@ -27,6 +27,8 @@ export interface PushUpMovementInterpreterConfig {
   readonly maxBodyLineDeviation: number;
   readonly maxInvalidBodyLineDeviation: number;
   readonly minBottomHoldMs: number;
+  readonly minPhaseVelocityDegPerSecond: number;
+  readonly phaseHysteresisDegrees: number;
 }
 
 export const defaultPushUpConfig: PushUpMovementInterpreterConfig = {
@@ -37,6 +39,8 @@ export const defaultPushUpConfig: PushUpMovementInterpreterConfig = {
   maxBodyLineDeviation: 0.16,
   maxInvalidBodyLineDeviation: 0.28,
   minBottomHoldMs: 80,
+  minPhaseVelocityDegPerSecond: 12,
+  phaseHysteresisDegrees: 8,
 };
 
 export class PushUpMovementInterpreter implements MovementInterpreter {
@@ -97,8 +101,6 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
     const hasInvalidAlignment = bodyLineDeviation > this.config.maxInvalidBodyLineDeviation;
     const reachedBottom = elbowAngle <= this.config.bottomElbowAngle;
     const reachedTop = elbowAngle >= this.config.topElbowAngle;
-
-    this.lowestElbowAngle = Math.min(this.lowestElbowAngle, elbowAngle);
     const rawMovementConfidence = movementConfidence(
       frame.confidence,
       trackingSide.visibilityScore,
@@ -108,7 +110,15 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
     const elbowVelocity = this.temporalTracker.signalVelocity((state) =>
       trackingSide.side === 'left' ? state.jointAngles.leftElbow : state.jointAngles.rightElbow,
     );
+    const elbowVelocityValue = elbowVelocity?.valuePerSecond ?? 0;
+    const isDescendingSignal =
+      elbowVelocity?.direction === 'decreasing' &&
+      Math.abs(elbowVelocityValue) >= this.config.minPhaseVelocityDegPerSecond;
+    const isAscendingSignal =
+      elbowVelocity?.direction === 'increasing' &&
+      Math.abs(elbowVelocityValue) >= this.config.minPhaseVelocityDegPerSecond;
 
+    this.lowestElbowAngle = Math.min(this.lowestElbowAngle, elbowAngle);
     this.metrics = {
       elbowAngle,
       primaryJointAngle: elbowAngle,
@@ -120,7 +130,11 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
       temporalMovementConfidence: temporalSnapshot.confidence.confidence,
       sampleWindowMs: temporalSnapshot.window.durationMs,
       missingSampleRatio: temporalSnapshot.window.missingSampleRatio,
-      primaryJointVelocity: elbowVelocity?.valuePerSecond ?? 0,
+      primaryJointVelocity: elbowVelocityValue,
+      phaseVelocity: elbowVelocityValue,
+      temporalStabilityScore: clamp01(
+        1 - temporalSnapshot.window.missingSampleRatio - bodyLineDeviation,
+      ),
       trackingSide: trackingSide.side === 'left' ? 0 : 1,
       shoulderY: sample.shoulder.y,
       hipY: sample.hip.y,
@@ -152,7 +166,11 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
         break;
 
       case 'top':
-        if (!reachedTop) {
+        if (
+          !reachedTop &&
+          (isDescendingSignal ||
+            elbowAngle <= this.config.topElbowAngle - this.config.phaseHysteresisDegrees)
+        ) {
           this.phase = 'descending';
         }
         break;
@@ -161,7 +179,7 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
         if (reachedBottom) {
           this.phase = 'bottom';
           this.bottomEnteredAt = frame.timestampMs;
-        } else if (reachedTop) {
+        } else if (reachedTop && isAscendingSignal) {
           this.recordPartialRep(frame.timestampMs, alignmentScore);
           this.phase = 'top';
         }
@@ -175,7 +193,11 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
           break;
         }
 
-        if (!reachedBottom) {
+        if (
+          !reachedBottom &&
+          (isAscendingSignal ||
+            elbowAngle >= this.config.bottomElbowAngle + this.config.phaseHysteresisDegrees)
+        ) {
           this.phase = 'ascending';
         }
         break;
@@ -184,7 +206,7 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
         if (reachedTop) {
           this.recordValidRep(frame.timestampMs, alignmentScore);
           this.phase = 'top';
-        } else if (reachedBottom) {
+        } else if (reachedBottom && isDescendingSignal) {
           this.phase = 'bottom';
           this.bottomEnteredAt = frame.timestampMs;
         }

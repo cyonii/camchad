@@ -120,5 +120,17 @@ describe('PushUpMovementInterpreter', () => {
     expect(state.metrics.sampleWindowMs).toBe(120);
     expect(state.metrics.missingSampleRatio).toBe(0);
     expect(state.metrics.primaryJointVelocity).toBeLessThan(0);
+    expect(state.metrics.temporalStabilityScore).toBeGreaterThan(0.8);
+  });
+
+  it('does not enter a rep phase for slow top-position threshold drift', () => {
+    const detector = new PushUpMovementInterpreter();
+
+    detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
+    const state = detector.processPose(makePushUpFrame({ timestampMs: 6000, elbowAngle: 146 }));
+
+    expect(state.phase).toBe('top');
+    expect(state.reps).toBe(0);
+    expect(Math.abs(state.metrics.phaseVelocity ?? 0)).toBeLessThan(12);
   });
 });
