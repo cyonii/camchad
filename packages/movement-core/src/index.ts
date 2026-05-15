@@ -3,6 +3,7 @@ export * from './body-state.js';
 export * from './movement-interpreter.js';
 export * from './movement-recognition-engine.js';
 export * from './movement-registry.js';
+export * from './movement-temporal-tracker.js';
 export * from './movement-window.js';
 export * from './pose-movement-features.js';
 export * from './push-up-interpreter.js';

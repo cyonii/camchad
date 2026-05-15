@@ -16,9 +16,8 @@ import type {
   RepEvent,
 } from './movement-interpreter.js';
 import { extractBodyState } from './body-state.js';
-import { MovementWindow } from './movement-window.js';
+import { MovementTemporalTracker } from './movement-temporal-tracker.js';
 import { extractPoseMovementFeatures } from './pose-movement-features.js';
-import { TemporalConfidenceAccumulator } from './temporal-confidence.js';
 
 export interface PushUpMovementInterpreterConfig {
   readonly cameraAngle: CameraAngle;
@@ -53,14 +52,15 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
   private warnings: FormWarning[] = [];
   private metrics: Record<string, number> = {};
   private recognition: MovementRecognition = trackingLostRecognition;
-  private lastTimestampMs?: number;
-  private readonly movementWindow = new MovementWindow({ maxAgeMs: 1200 });
-  private readonly recognitionConfidence = new TemporalConfidenceAccumulator({
-    activationThreshold: 0.7,
-    deactivationThreshold: 0.42,
-    candidateThreshold: 0.48,
-    riseAlpha: 0.6,
-    fallAlpha: 0.45,
+  private readonly temporalTracker = new MovementTemporalTracker({
+    windowMaxAgeMs: 1200,
+    confidence: {
+      activationThreshold: 0.7,
+      deactivationThreshold: 0.42,
+      candidateThreshold: 0.48,
+      riseAlpha: 0.6,
+      fallAlpha: 0.45,
+    },
   });
 
   public constructor(
@@ -69,35 +69,28 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
 
   public processPose(frame: PoseFrame | undefined): MovementInterpreterState {
     if (!frame) {
-      this.movementWindow.addMissing(this.nextMissingTimestamp());
-      this.recognitionConfidence.addSample(0);
+      this.temporalTracker.addMissing();
       this.phase = 'tracking_lost';
       this.warnings = [trackingLostWarning];
       this.recognition = trackingLostRecognition;
       return this.getState();
     }
 
-    this.lastTimestampMs = frame.timestampMs;
     const bodyState = extractBodyState(frame);
     const features = extractPoseMovementFeatures(frame, this.config.minVisibility);
 
     const trackingSide = selectTrackingSide(frame, this.config.minVisibility);
 
     if (!bodyState || !trackingSide) {
-      this.movementWindow.addMissing(frame.timestampMs);
-      this.recognitionConfidence.addSample(0);
+      this.temporalTracker.addMissing(frame.timestampMs);
       this.phase = 'tracking_lost';
       this.warnings = [lowConfidenceWarning];
       this.recognition = trackingLostRecognition;
       return this.getState();
     }
 
-    const windowSnapshot = this.movementWindow.add(bodyState);
     const sample = readPushUpSample(frame, trackingSide.side);
     const elbowAngle = sample.elbowAngle;
-    const elbowVelocity = this.movementWindow.signalVelocity((state) =>
-      trackingSide.side === 'left' ? state.jointAngles.leftElbow : state.jointAngles.rightElbow,
-    );
     const bodyLineDeviation = sample.bodyLineDeviation;
     const alignmentScore = clamp01(1 - bodyLineDeviation / this.config.maxBodyLineDeviation);
     const hasAlignmentWarning = bodyLineDeviation > this.config.maxBodyLineDeviation;
@@ -106,6 +99,16 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
     const reachedTop = elbowAngle >= this.config.topElbowAngle;
 
     this.lowestElbowAngle = Math.min(this.lowestElbowAngle, elbowAngle);
+    const rawMovementConfidence = movementConfidence(
+      frame.confidence,
+      trackingSide.visibilityScore,
+      bodyState.orientation.confidence,
+    );
+    const temporalSnapshot = this.temporalTracker.add(bodyState, rawMovementConfidence);
+    const elbowVelocity = this.temporalTracker.signalVelocity((state) =>
+      trackingSide.side === 'left' ? state.jointAngles.leftElbow : state.jointAngles.rightElbow,
+    );
+
     this.metrics = {
       elbowAngle,
       primaryJointAngle: elbowAngle,
@@ -113,23 +116,15 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
       alignmentScore,
       rangeOfMotionScore: this.depthScore(),
       poseConfidence: frame.confidence,
-      movementConfidence: movementConfidence(
-        frame.confidence,
-        trackingSide.visibilityScore,
-        bodyState.orientation.confidence,
-      ),
-      temporalMovementConfidence: this.recognitionConfidence.snapshot().confidence,
-      sampleWindowMs: windowSnapshot.durationMs,
-      missingSampleRatio: windowSnapshot.missingSampleRatio,
+      movementConfidence: rawMovementConfidence,
+      temporalMovementConfidence: temporalSnapshot.confidence.confidence,
+      sampleWindowMs: temporalSnapshot.window.durationMs,
+      missingSampleRatio: temporalSnapshot.window.missingSampleRatio,
       primaryJointVelocity: elbowVelocity?.valuePerSecond ?? 0,
       trackingSide: trackingSide.side === 'left' ? 0 : 1,
       shoulderY: sample.shoulder.y,
       hipY: sample.hip.y,
     };
-    const confidenceSnapshot = this.recognitionConfidence.addSample(
-      this.metrics.movementConfidence ?? 0,
-    );
-    this.metrics.temporalMovementConfidence = confidenceSnapshot.confidence;
     this.warnings = this.buildWarnings(hasAlignmentWarning);
 
     if (hasInvalidAlignment) {
@@ -197,7 +192,7 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
     }
 
     this.recognition = this.buildRecognition(
-      this.phase === 'setup_needed' || confidenceSnapshot.state !== 'active'
+      this.phase === 'setup_needed' || temporalSnapshot.confidence.state !== 'active'
         ? 'candidate'
         : 'active',
     );
@@ -216,9 +211,7 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
     this.warnings = [];
     this.metrics = {};
     this.recognition = trackingLostRecognition;
-    this.lastTimestampMs = undefined;
-    this.movementWindow.reset();
-    this.recognitionConfidence.reset();
+    this.temporalTracker.reset();
   }
 
   public getState(): MovementInterpreterState {
@@ -308,11 +301,6 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
     }
 
     return clamp01((this.config.topElbowAngle - this.lowestElbowAngle) / depthRange);
-  }
-
-  private nextMissingTimestamp(): number {
-    this.lastTimestampMs = (this.lastTimestampMs ?? 0) + 16;
-    return this.lastTimestampMs;
   }
 }
 

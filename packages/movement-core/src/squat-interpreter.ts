@@ -8,9 +8,8 @@ import type {
   RepEvent,
 } from './movement-interpreter.js';
 import { extractBodyState } from './body-state.js';
-import { MovementWindow } from './movement-window.js';
+import { MovementTemporalTracker } from './movement-temporal-tracker.js';
 import { extractPoseMovementFeatures } from './pose-movement-features.js';
-import { TemporalConfidenceAccumulator } from './temporal-confidence.js';
 
 export interface SquatMovementInterpreterConfig {
   readonly cameraAngle: CameraAngle;
@@ -43,14 +42,15 @@ export class SquatMovementInterpreter implements MovementInterpreter {
   private warnings: FormWarning[] = [];
   private metrics: Record<string, number> = {};
   private recognition: MovementRecognition = trackingLostRecognition;
-  private lastTimestampMs?: number;
-  private readonly movementWindow = new MovementWindow({ maxAgeMs: 1200 });
-  private readonly recognitionConfidence = new TemporalConfidenceAccumulator({
-    activationThreshold: 0.7,
-    deactivationThreshold: 0.42,
-    candidateThreshold: 0.48,
-    riseAlpha: 0.6,
-    fallAlpha: 0.45,
+  private readonly temporalTracker = new MovementTemporalTracker({
+    windowMaxAgeMs: 1200,
+    confidence: {
+      activationThreshold: 0.7,
+      deactivationThreshold: 0.42,
+      candidateThreshold: 0.48,
+      riseAlpha: 0.6,
+      fallAlpha: 0.45,
+    },
   });
 
   public constructor(
@@ -61,21 +61,18 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     frame: Parameters<MovementInterpreter['processPose']>[0],
   ): MovementInterpreterState {
     if (!frame) {
-      this.movementWindow.addMissing(this.nextMissingTimestamp());
-      this.recognitionConfidence.addSample(0);
+      this.temporalTracker.addMissing();
       this.phase = 'tracking_lost';
       this.warnings = [trackingLostWarning];
       this.recognition = trackingLostRecognition;
       return this.getState();
     }
 
-    this.lastTimestampMs = frame.timestampMs;
     const bodyState = extractBodyState(frame);
     const features = extractPoseMovementFeatures(frame, this.config.minVisibility);
 
     if (!bodyState || !features || features.averageKneeAngle === undefined) {
-      this.movementWindow.addMissing(frame.timestampMs);
-      this.recognitionConfidence.addSample(0);
+      this.temporalTracker.addMissing(frame.timestampMs);
       this.phase = 'tracking_lost';
       this.warnings = [trackingLostWarning];
       this.recognition = trackingLostRecognition;
@@ -93,16 +90,21 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
-    const windowSnapshot = this.movementWindow.add(bodyState);
     const kneeAngle = features.averageKneeAngle;
-    const kneeVelocity = this.movementWindow.signalVelocity((state) =>
-      averagedDefined(state.jointAngles.leftKnee, state.jointAngles.rightKnee),
-    );
     const torsoInclination = features.torsoInclinationDegrees ?? 0;
     const postureScore = clamp01(1 - torsoInclination / this.config.maxTorsoInclinationDegrees);
     const reachedBottom = kneeAngle <= this.config.bottomKneeAngle;
     const reachedTop = kneeAngle >= this.config.topKneeAngle;
     const hasPostureWarning = torsoInclination > this.config.maxTorsoInclinationDegrees;
+    const rawMovementConfidence = movementConfidence(
+      features.movementConfidence,
+      features.bodyOrientationScore,
+      bodyState.orientation.confidence,
+    );
+    const temporalSnapshot = this.temporalTracker.add(bodyState, rawMovementConfidence);
+    const kneeVelocity = this.temporalTracker.signalVelocity((state) =>
+      averagedDefined(state.jointAngles.leftKnee, state.jointAngles.rightKnee),
+    );
 
     this.lowestKneeAngle = Math.min(this.lowestKneeAngle, kneeAngle);
     this.metrics = {
@@ -110,23 +112,15 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       kneeAngle,
       rangeOfMotionScore: this.depthScore(),
       postureScore,
-      movementConfidence: movementConfidence(
-        features.movementConfidence,
-        features.bodyOrientationScore,
-        bodyState.orientation.confidence,
-      ),
-      temporalMovementConfidence: this.recognitionConfidence.snapshot().confidence,
+      movementConfidence: rawMovementConfidence,
+      temporalMovementConfidence: temporalSnapshot.confidence.confidence,
       poseConfidence: features.poseConfidence,
       torsoInclination,
       kneeLiftRatio: features.kneeLiftRatio ?? 0,
-      sampleWindowMs: windowSnapshot.durationMs,
-      missingSampleRatio: windowSnapshot.missingSampleRatio,
+      sampleWindowMs: temporalSnapshot.window.durationMs,
+      missingSampleRatio: temporalSnapshot.window.missingSampleRatio,
       primaryJointVelocity: kneeVelocity?.valuePerSecond ?? 0,
     };
-    const confidenceSnapshot = this.recognitionConfidence.addSample(
-      this.metrics.movementConfidence ?? 0,
-    );
-    this.metrics.temporalMovementConfidence = confidenceSnapshot.confidence;
     this.warnings = this.buildWarnings(hasPostureWarning);
 
     switch (this.phase) {
@@ -177,7 +171,7 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     }
 
     this.recognition = this.buildRecognition(
-      this.phase === 'setup_needed' || confidenceSnapshot.state !== 'active'
+      this.phase === 'setup_needed' || temporalSnapshot.confidence.state !== 'active'
         ? 'candidate'
         : 'active',
     );
@@ -196,9 +190,7 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     this.warnings = [];
     this.metrics = {};
     this.recognition = trackingLostRecognition;
-    this.lastTimestampMs = undefined;
-    this.movementWindow.reset();
-    this.recognitionConfidence.reset();
+    this.temporalTracker.reset();
   }
 
   public getState(): MovementInterpreterState {
@@ -281,11 +273,6 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     }
 
     return clamp01((this.config.topKneeAngle - this.lowestKneeAngle) / depthRange);
-  }
-
-  private nextMissingTimestamp(): number {
-    this.lastTimestampMs = (this.lastTimestampMs ?? 0) + 16;
-    return this.lastTimestampMs;
   }
 }
 
