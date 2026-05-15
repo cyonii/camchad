@@ -2076,7 +2076,7 @@ button,
   grid-template-columns: minmax(0, 1fr) 52px 62px 72px;
   align-items: center;
   gap: 10px;
-  min-height: 52px;
+  min-height: 66px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border-soft);
 }
@@ -2087,6 +2087,12 @@ button,
 
 .movement-breakdown-list strong {
   display: block;
+}
+
+.movement-breakdown-list small + small {
+  display: block;
+  margin-top: 3px;
+  color: var(--primary);
 }
 
 .movement-breakdown-list > div > span {
@@ -2105,6 +2111,49 @@ button,
   border: 1px solid rgb(var(--primary-rgb) / 10%);
   border-radius: 7px;
   background: rgb(var(--surface-rgb) / 34%);
+}
+
+.segment-telemetry-list {
+  display: grid;
+  gap: 10px;
+}
+
+.segment-telemetry-list > div {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border-radius: 7px;
+  background: rgb(var(--surface-rgb) / 30%);
+}
+
+.segment-telemetry-list strong {
+  font-size: 0.9rem;
+}
+
+.segment-telemetry-list dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.segment-telemetry-list dl > div {
+  display: grid;
+  gap: 2px;
+}
+
+.segment-telemetry-list dt {
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.segment-telemetry-list dd {
+  margin: 0;
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.82rem;
 }
 
 .compact-breakdown {

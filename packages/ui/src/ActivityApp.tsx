@@ -1464,12 +1464,19 @@ function HistoryView({
                 <div className="movement-breakdown-list">
                   {latestSession.movements.map((movement) => {
                     const definition = movementDefinitionFor(movement.movementType);
+                    const primaryGuidance = movement.guidanceEvents?.find(
+                      (event) => event.code !== 'conditions_usable',
+                    );
 
                     return (
                       <div key={movement.id}>
                         <div>
                           <strong>{definition.label}</strong>
-                          <small>{formatCameraAngle(movement.cameraAngle)}</small>
+                          <small>
+                            {formatCameraAngle(movement.cameraAngle)} /{' '}
+                            {formatMovementSegmentState(movement)}
+                          </small>
+                          {primaryGuidance ? <small>{primaryGuidance.title}</small> : null}
                         </div>
                         <span>{movement.validReps}</span>
                         <span>{movement.partialReps}</span>
@@ -1496,8 +1503,42 @@ function HistoryView({
                   label="Avg quality"
                   value={formatQualityScore(sessionAverageQuality(latestSession))}
                 />
+                <Metric
+                  label="Avg signal"
+                  value={formatMetric(sessionAverageRecognitionConfidence(latestSession), '%')}
+                />
                 <Metric label="Warnings" value={String(sessionWarningCount(latestSession))} />
+                <Metric label="Guidance" value={String(sessionGuidanceCount(latestSession))} />
               </div>
+            </section>
+
+            <section className="history-detail-card">
+              <div className="history-section-heading">
+                <div>
+                  <span>Segment telemetry</span>
+                  <h2>Latest movement signals</h2>
+                </div>
+              </div>
+
+              {latestSession.movements.length === 0 ? (
+                <div className="history-empty-line">No movement telemetry recorded.</div>
+              ) : (
+                <div className="segment-telemetry-list">
+                  {latestSession.movements.map((movement) => (
+                    <div key={movement.id}>
+                      <strong>{movementDefinitionFor(movement.movementType).label}</strong>
+                      <dl>
+                        {movementTelemetryEntries(movement).map(([label, value]) => (
+                          <div key={label}>
+                            <dt>{label}</dt>
+                            <dd>{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
 
             <section className="history-detail-card">
@@ -3213,6 +3254,27 @@ function sessionWarningCount(session: ActivitySession): number {
   return session.movements.reduce((sum, movement) => sum + movement.formWarnings.length, 0);
 }
 
+function sessionGuidanceCount(session: ActivitySession): number {
+  return session.movements.reduce(
+    (sum, movement) =>
+      sum +
+      (movement.guidanceEvents?.filter((event) => event.code !== 'conditions_usable').length ?? 0),
+    0,
+  );
+}
+
+function sessionAverageRecognitionConfidence(session: ActivitySession): number | undefined {
+  const confidences = session.movements
+    .map((movement) => movement.recognitionConfidence)
+    .filter((value): value is number => value !== undefined);
+
+  if (confidences.length === 0) {
+    return undefined;
+  }
+
+  return confidences.reduce((sum, value) => sum + value, 0) / confidences.length;
+}
+
 function averageMovementQuality(movement: MovementSegment): number | undefined {
   if (movement.repEvents.length === 0) {
     return undefined;
@@ -3222,6 +3284,29 @@ function averageMovementQuality(movement: MovementSegment): number | undefined {
     movement.repEvents.reduce((sum, event) => sum + event.qualityScore, 0) /
       movement.repEvents.length,
   );
+}
+
+function formatMovementSegmentState(movement: MovementSegment): string {
+  return [
+    movement.activityState ? formatActivityState(movement.activityState) : 'state n/a',
+    movement.recognitionConfidence !== undefined
+      ? `${formatMetric(movement.recognitionConfidence, '%')} signal`
+      : 'signal n/a',
+  ].join(' / ');
+}
+
+function movementTelemetryEntries(
+  movement: MovementSegment,
+): readonly (readonly [string, string])[] {
+  const metrics = movement.telemetryMetrics ?? {};
+
+  return [
+    ['activity', movement.activityState ? formatActivityState(movement.activityState) : 'n/a'],
+    ['signal', formatMetric(movement.recognitionConfidence, '%')],
+    ['range', formatMetric(metrics.rangeOfMotionScore, '%')],
+    ['stability', formatMetric(metrics.temporalStabilityScore, '%')],
+    ['phase velocity', formatMetric(metrics.phaseVelocity, 'deg')],
+  ];
 }
 
 function formatQualityScore(score: number | undefined): string {
