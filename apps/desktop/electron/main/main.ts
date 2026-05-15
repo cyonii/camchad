@@ -81,6 +81,12 @@ function configureWindowChromeStateEvents(window: BrowserWindow): void {
   window.on('restore', emitState);
 }
 
+function appIconPath(): string {
+  return app.isPackaged
+    ? join(__dirname, '../../dist/logo.png')
+    : join(__dirname, '../../public/logo.png');
+}
+
 function configureMediaPermissions(): void {
   session.defaultSession.setPermissionRequestHandler(
     (_webContents, permission, callback, details) => {
@@ -109,6 +115,7 @@ async function createWindow(): Promise<void> {
     vibrancy: isMac ? 'under-window' : undefined,
     visualEffectState: isMac ? 'active' : undefined,
     backgroundColor: '#050908',
+    icon: appIconPath(),
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
@@ -348,6 +355,10 @@ ipcMain.handle('window:close', (event): void => {
 });
 
 void app.whenReady().then(() => {
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(appIconPath());
+  }
+
   configureMediaPermissions();
   void createWindow();
 
