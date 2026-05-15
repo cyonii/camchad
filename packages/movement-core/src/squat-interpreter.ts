@@ -18,6 +18,8 @@ export interface SquatMovementInterpreterConfig {
   readonly bottomKneeAngle: number;
   readonly maxTorsoInclinationDegrees: number;
   readonly minBottomHoldMs: number;
+  readonly minPhaseVelocityDegPerSecond: number;
+  readonly phaseHysteresisDegrees: number;
 }
 
 export const defaultSquatConfig: SquatMovementInterpreterConfig = {
@@ -27,6 +29,8 @@ export const defaultSquatConfig: SquatMovementInterpreterConfig = {
   bottomKneeAngle: 112,
   maxTorsoInclinationDegrees: 38,
   minBottomHoldMs: 80,
+  minPhaseVelocityDegPerSecond: 12,
+  phaseHysteresisDegrees: 8,
 };
 
 export class SquatMovementInterpreter implements MovementInterpreter {
@@ -105,6 +109,13 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     const kneeVelocity = this.temporalTracker.signalVelocity((state) =>
       averagedDefined(state.jointAngles.leftKnee, state.jointAngles.rightKnee),
     );
+    const kneeVelocityValue = kneeVelocity?.valuePerSecond ?? 0;
+    const isDescendingSignal =
+      kneeVelocity?.direction === 'decreasing' &&
+      Math.abs(kneeVelocityValue) >= this.config.minPhaseVelocityDegPerSecond;
+    const isAscendingSignal =
+      kneeVelocity?.direction === 'increasing' &&
+      Math.abs(kneeVelocityValue) >= this.config.minPhaseVelocityDegPerSecond;
 
     this.lowestKneeAngle = Math.min(this.lowestKneeAngle, kneeAngle);
     this.metrics = {
@@ -119,7 +130,11 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       kneeLiftRatio: features.kneeLiftRatio ?? 0,
       sampleWindowMs: temporalSnapshot.window.durationMs,
       missingSampleRatio: temporalSnapshot.window.missingSampleRatio,
-      primaryJointVelocity: kneeVelocity?.valuePerSecond ?? 0,
+      primaryJointVelocity: kneeVelocityValue,
+      phaseVelocity: kneeVelocityValue,
+      temporalStabilityScore: clamp01(
+        1 - temporalSnapshot.window.missingSampleRatio - torsoInclination / 90,
+      ),
     };
     this.warnings = this.buildWarnings(hasPostureWarning);
 
@@ -131,7 +146,11 @@ export class SquatMovementInterpreter implements MovementInterpreter {
         break;
 
       case 'top':
-        if (!reachedTop) {
+        if (
+          !reachedTop &&
+          (isDescendingSignal ||
+            kneeAngle <= this.config.topKneeAngle - this.config.phaseHysteresisDegrees)
+        ) {
           this.phase = 'descending';
         }
         break;
@@ -140,7 +159,7 @@ export class SquatMovementInterpreter implements MovementInterpreter {
         if (reachedBottom) {
           this.phase = 'bottom';
           this.bottomEnteredAt = features.timestampMs;
-        } else if (reachedTop) {
+        } else if (reachedTop && isAscendingSignal) {
           this.recordPartialRep(features.timestampMs, postureScore);
           this.phase = 'top';
         }
@@ -154,7 +173,11 @@ export class SquatMovementInterpreter implements MovementInterpreter {
           break;
         }
 
-        if (!reachedBottom) {
+        if (
+          !reachedBottom &&
+          (isAscendingSignal ||
+            kneeAngle >= this.config.bottomKneeAngle + this.config.phaseHysteresisDegrees)
+        ) {
           this.phase = 'ascending';
         }
         break;
@@ -163,7 +186,7 @@ export class SquatMovementInterpreter implements MovementInterpreter {
         if (reachedTop) {
           this.recordValidRep(features.timestampMs, postureScore);
           this.phase = 'top';
-        } else if (reachedBottom) {
+        } else if (reachedBottom && isDescendingSignal) {
           this.phase = 'bottom';
           this.bottomEnteredAt = features.timestampMs;
         }

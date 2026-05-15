@@ -44,5 +44,17 @@ describe('SquatMovementInterpreter', () => {
     expect(state.metrics.sampleWindowMs).toBe(120);
     expect(state.metrics.missingSampleRatio).toBe(0);
     expect(state.metrics.primaryJointVelocity).toBeLessThan(0);
+    expect(state.metrics.temporalStabilityScore).toBeGreaterThan(0.7);
+  });
+
+  it('does not enter a rep phase for slow standing threshold drift', () => {
+    const interpreter = new SquatMovementInterpreter();
+
+    interpreter.processPose(makeSquatFrame({ timestampMs: 0, kneeAngle: 168 }));
+    const state = interpreter.processPose(makeSquatFrame({ timestampMs: 6000, kneeAngle: 152 }));
+
+    expect(state.phase).toBe('top');
+    expect(state.reps).toBe(0);
+    expect(Math.abs(state.metrics.phaseVelocity ?? 0)).toBeLessThan(12);
   });
 });
