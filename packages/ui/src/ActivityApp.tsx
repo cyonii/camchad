@@ -42,6 +42,7 @@ import {
   ActivityStateSegmenter,
   ActivitySessionOrchestrator,
   createMovementRecognitionEngine,
+  diagnoseMovement,
   extractBodyState,
   movementDefinitionFor,
   movementRegistry,
@@ -739,6 +740,7 @@ function ActivityView({
       const updatedMovement = service.updateMovement(state, {
         activityState: telemetry.activityState,
         recognitionConfidence: telemetry.recognitionConfidence,
+        guidanceEvents: telemetry.guidanceEvents,
       });
       hasRecordableActivityRef.current =
         hasRecordableActivityRef.current || isRecordableMovement(updatedMovement);
@@ -778,10 +780,16 @@ function ActivityView({
         : activityWindowRef.current.addMissing(timestampMs);
       const activityState = activityStateSegmenterRef.current.process(activityWindowSnapshot);
       const nextState = recognitionEngineRef.current.processPose(smoothed).primary;
+      const diagnostics = diagnoseMovement({
+        activityState,
+        window: activityWindowSnapshot,
+        interpreterState: nextState,
+      });
       const nextSessionTelemetry = {
         ...sessionOrchestratorRef.current.process(nextState, timestampMs),
         activityState: activityState.state,
         activityConfidence: activityState.confidence,
+        guidanceEvents: diagnostics.events,
       };
       detectorStateRef.current = nextState;
       setDetectorState(nextState);
@@ -1020,9 +1028,14 @@ function ActivityView({
         <div className="command-module command-module-guidance">
           <span>Camera guidance</span>
           <div className="camera-guidance">
-            <strong>{sessionTelemetry.cameraAdvice?.title ?? 'Awaiting movement'}</strong>
+            <strong>
+              {primaryGuidanceFor(sessionTelemetry)?.title ??
+                sessionTelemetry.cameraAdvice?.title ??
+                'Awaiting movement'}
+            </strong>
             <small>
-              {sessionTelemetry.cameraAdvice?.message ??
+              {primaryGuidanceFor(sessionTelemetry)?.message ??
+                sessionTelemetry.cameraAdvice?.message ??
                 'Step into frame and begin moving for automatic movement guidance.'}
             </small>
           </div>
@@ -1118,7 +1131,7 @@ function SidebarTelemetryPanel({
     <aside className="telemetry-panel telemetry-panel-fixed" aria-label="Movement telemetry">
       <div className="telemetry-panel-header">
         <div>
-          <span>Movement</span>
+          <span>Inferred movement</span>
           <strong>{sessionTelemetry.movementType ? movementDefinition.label : 'Observing'}</strong>
           <small>
             {status} / {formatSessionMode(sessionTelemetry.mode)}
@@ -1129,7 +1142,7 @@ function SidebarTelemetryPanel({
 
       <div className="rep-counter telemetry-block">
         <div>
-          <span>Valid reps</span>
+          <span>Validated reps</span>
           <strong>{detectorState.validReps}</strong>
           <small>{detectorState.partialReps} partial reps</small>
         </div>
@@ -1137,33 +1150,38 @@ function SidebarTelemetryPanel({
       </div>
 
       <div className="metric-grid telemetry-block">
-        <Metric label="Session" value={formatSessionMode(sessionTelemetry.mode)} />
+        <Metric label="Session state" value={formatSessionMode(sessionTelemetry.mode)} />
         <Metric
           label="Activity"
           value={formatActivityState(sessionTelemetry.activityState ?? 'idle')}
         />
-        <Metric
-          label="Recognition"
-          value={formatMetric(sessionTelemetry.recognitionConfidence, '%')}
-        />
-        <Metric label="Phase" value={formatPhase(detectorState.phase)} />
+        <Metric label="Signal" value={formatMetric(sessionTelemetry.recognitionConfidence, '%')} />
+        <Metric label="Movement phase" value={formatPhase(detectorState.phase)} />
         {telemetryMetrics.map((metric) => (
           <Metric key={metric.label} label={metric.label} value={metric.value} />
         ))}
       </div>
 
-      {sessionTelemetry.cameraAdvice ? (
+      {(primaryGuidanceFor(sessionTelemetry) ?? sessionTelemetry.cameraAdvice) ? (
         <div
           className="camera-advice telemetry-block"
-          data-severity={sessionTelemetry.cameraAdvice.severity}
+          data-severity={
+            primaryGuidanceFor(sessionTelemetry)?.severity ??
+            sessionTelemetry.cameraAdvice?.severity
+          }
         >
-          <span>{sessionTelemetry.cameraAdvice.title}</span>
-          <p>{sessionTelemetry.cameraAdvice.message}</p>
+          <span>
+            {primaryGuidanceFor(sessionTelemetry)?.title ?? sessionTelemetry.cameraAdvice?.title}
+          </span>
+          <p>
+            {primaryGuidanceFor(sessionTelemetry)?.message ??
+              sessionTelemetry.cameraAdvice?.message}
+          </p>
         </div>
       ) : null}
 
       <div className="form-feedback telemetry-block">
-        <span>Form feedback</span>
+        <span>Analysis guidance</span>
         {detectorState.warnings.length === 0 ? (
           <p>
             <CheckCircle2 size={18} aria-hidden="true" />
@@ -1230,7 +1248,7 @@ function MirrorTelemetryOverlay({
       </div>
 
       <div className="mirror-telemetry-heading">
-        <span>Movement</span>
+        <span>Inferred movement</span>
         <strong>{sessionTelemetry.movementType ? movementDefinition.label : 'Observing'}</strong>
         <small>
           {status} / {formatSessionMode(sessionTelemetry.mode)}
@@ -1239,7 +1257,7 @@ function MirrorTelemetryOverlay({
 
       <dl className="mirror-telemetry-readout">
         <div className="mirror-primary-metric">
-          <dt>Valid reps</dt>
+          <dt>Validated reps</dt>
           <dd>{detectorState.validReps}</dd>
         </div>
         <div>
@@ -1261,12 +1279,16 @@ function MirrorTelemetryOverlay({
           </div>
         ))}
         <div>
-          <dt>Recognition</dt>
+          <dt>Signal</dt>
           <dd>{formatMetric(sessionTelemetry.recognitionConfidence, '%')}</dd>
         </div>
       </dl>
 
-      <p className="mirror-form-message">{sessionTelemetry.cameraAdvice?.message ?? formMessage}</p>
+      <p className="mirror-form-message">
+        {primaryGuidanceFor(sessionTelemetry)?.message ??
+          sessionTelemetry.cameraAdvice?.message ??
+          formMessage}
+      </p>
     </aside>
   );
 }
@@ -3590,6 +3612,12 @@ function stopCamera(video: HTMLVideoElement | null): void {
 
 function stopMediaStream(stream: MediaStream | null): void {
   stream?.getTracks().forEach((track) => track.stop());
+}
+
+function primaryGuidanceFor(
+  telemetry: ActivitySessionTelemetry,
+): NonNullable<ActivitySessionTelemetry['guidanceEvents']>[number] | undefined {
+  return telemetry.guidanceEvents?.find((event) => event.code !== 'conditions_usable');
 }
 
 function formatPhase(phase: string): string {

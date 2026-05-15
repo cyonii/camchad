@@ -4,6 +4,7 @@ import type {
   MovementType,
 } from './movement-interpreter.js';
 import type { ActivityStateKind } from './activity-state-segmenter.js';
+import type { MovementGuidanceEvent } from './movement-diagnostics.js';
 import { cameraAdviceFor, type CameraAngleAdvice } from './movement-registry.js';
 
 export type ActivitySessionMode = 'idle' | 'observing' | 'moving' | 'resting';
@@ -12,6 +13,7 @@ export interface ActivitySessionTelemetry {
   readonly mode: ActivitySessionMode;
   readonly activityState?: ActivityStateKind;
   readonly activityConfidence?: number;
+  readonly guidanceEvents?: readonly MovementGuidanceEvent[];
   readonly movementType?: MovementType;
   readonly recognitionConfidence: number;
   readonly activeSetStartedAtMs?: number;
