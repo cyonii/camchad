@@ -2386,6 +2386,37 @@ button,
   border-bottom: 1px solid var(--border-soft);
 }
 
+.history-table-button {
+  width: 100%;
+  color: inherit;
+  background: transparent;
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+.history-table-button:hover,
+.history-table-button:focus-visible {
+  background: rgb(var(--primary-rgb) / 6%);
+}
+
+.history-table-button:focus-visible {
+  outline: 1px solid rgb(var(--primary-rgb) / 60%);
+  outline-offset: -3px;
+}
+
+.history-table-button.is-selected {
+  background: rgb(var(--primary-rgb) / 9%);
+  box-shadow: inset 3px 0 0 rgb(var(--primary-rgb) / 85%);
+}
+
 .history-table-row:last-child {
   border-bottom: 0;
 }

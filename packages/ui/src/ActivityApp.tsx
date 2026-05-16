@@ -52,6 +52,7 @@ import { ExponentialPoseSmoother, MediaPipePoseEstimator } from '@camchad/pose-c
 
 import { deriveCameraFrameFeedback, impulseForRep } from './camera-frame-feedback.js';
 import { buildHistoryChartModel } from './history-chart.js';
+import { selectedHistorySession } from './history-session-selection.js';
 
 import type {
   ActivityRepository,
@@ -1442,8 +1443,9 @@ function HistoryView({
   readonly sessions: readonly ActivitySession[];
   readonly summary: ActivitySummary;
 }): ReactElement {
+  const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
   const chartModel = buildHistoryChartModel(sessions);
-  const latestSession = sessions[0];
+  const selectedSession = selectedHistorySession(sessions, selectedSessionId);
   const overview = historyOverviewFor(sessions);
 
   return (
@@ -1520,7 +1522,15 @@ function HistoryView({
               <div className="empty-state">No saved activities yet.</div>
             ) : (
               sessions.map((session) => (
-                <article className="history-table-row" key={session.id}>
+                <button
+                  aria-pressed={session.id === selectedSession?.id}
+                  className={`history-table-row history-table-button${
+                    session.id === selectedSession?.id ? ' is-selected' : ''
+                  }`}
+                  key={session.id}
+                  onClick={() => setSelectedSessionId(session.id)}
+                  type="button"
+                >
                   <div>
                     <strong>{formatCompactDate(session.startedAt)}</strong>
                     <small>{formatCompactTime(session.startedAt)}</small>
@@ -1530,7 +1540,7 @@ function HistoryView({
                   <span>{sessionTotalReps(session)}</span>
                   <span>{formatQualityScore(sessionAverageQuality(session))}</span>
                   <span>{sessionWarningCount(session)}</span>
-                </article>
+                </button>
               ))
             )}
           </div>
@@ -1538,14 +1548,14 @@ function HistoryView({
       </div>
 
       <aside className="history-detail-panel" aria-label="Session details">
-        {latestSession ? (
+        {selectedSession ? (
           <>
             <section className="history-detail-card session-detail-hero">
               <span>Session details</span>
-              <strong>{formatDate(latestSession.startedAt)}</strong>
+              <strong>{formatDate(selectedSession.startedAt)}</strong>
               <div>
-                <small>{formatSessionMovementSummary(latestSession)}</small>
-                <b>{formatDuration(latestSession.durationSeconds ?? 0)}</b>
+                <small>{formatSessionMovementSummary(selectedSession)}</small>
+                <b>{formatDuration(selectedSession.durationSeconds ?? 0)}</b>
               </div>
             </section>
 
@@ -1557,11 +1567,11 @@ function HistoryView({
                 </div>
               </div>
 
-              {latestSession.movements.length === 0 ? (
+              {selectedSession.movements.length === 0 ? (
                 <div className="history-empty-line">No movement segments recorded.</div>
               ) : (
                 <div className="movement-breakdown-list">
-                  {latestSession.movements.map((movement) => {
+                  {selectedSession.movements.map((movement) => {
                     const definition = movementDefinitionFor(movement.movementType);
                     const primaryGuidance = movement.guidanceEvents?.find(
                       (event) => event.code !== 'conditions_usable',
@@ -1596,18 +1606,18 @@ function HistoryView({
               </div>
 
               <div className="detail-metric-grid">
-                <Metric label="Valid reps" value={String(sessionValidReps(latestSession))} />
-                <Metric label="Partial reps" value={String(sessionPartialReps(latestSession))} />
+                <Metric label="Valid reps" value={String(sessionValidReps(selectedSession))} />
+                <Metric label="Partial reps" value={String(sessionPartialReps(selectedSession))} />
                 <Metric
                   label="Avg quality"
-                  value={formatQualityScore(sessionAverageQuality(latestSession))}
+                  value={formatQualityScore(sessionAverageQuality(selectedSession))}
                 />
                 <Metric
                   label="Avg signal"
-                  value={formatMetric(sessionAverageRecognitionConfidence(latestSession), '%')}
+                  value={formatMetric(sessionAverageRecognitionConfidence(selectedSession), '%')}
                 />
-                <Metric label="Warnings" value={String(sessionWarningCount(latestSession))} />
-                <Metric label="Guidance" value={String(sessionGuidanceCount(latestSession))} />
+                <Metric label="Warnings" value={String(sessionWarningCount(selectedSession))} />
+                <Metric label="Guidance" value={String(sessionGuidanceCount(selectedSession))} />
               </div>
             </section>
 
@@ -1619,11 +1629,11 @@ function HistoryView({
                 </div>
               </div>
 
-              {latestSession.movements.length === 0 ? (
+              {selectedSession.movements.length === 0 ? (
                 <div className="history-empty-line">No movement telemetry recorded.</div>
               ) : (
                 <div className="segment-telemetry-list">
-                  {latestSession.movements.map((movement) => (
+                  {selectedSession.movements.map((movement) => (
                     <div key={movement.id}>
                       <strong>{movementDefinitionFor(movement.movementType).label}</strong>
                       <dl>
