@@ -10,6 +10,8 @@ describe('movementRegistry profiles', () => {
       expect(movement.profile.requiredRegions.length).toBeGreaterThan(0);
       expect(movement.profile.primaryJoints.length).toBeGreaterThan(0);
       expect(movement.profile.phaseModel.length).toBeGreaterThan(0);
+      expect(movement.profile.recognitionCriteria.length).toBeGreaterThan(0);
+      expect(movement.profile.validationCriteria.length).toBeGreaterThan(0);
       expect(movement.profile.telemetrySignals.length).toBeGreaterThan(0);
       expect(movement.profile.telemetryExtractors.length).toBeGreaterThan(0);
       expect(movement.profile.failureCriteria.length).toBeGreaterThan(0);
@@ -41,6 +43,24 @@ describe('movementRegistry profiles', () => {
       expect.arrayContaining([
         expect.objectContaining({ key: 'postureScore', source: 'metric' }),
         expect.objectContaining({ key: 'primaryJointRange', source: 'metric' }),
+      ]),
+    );
+  });
+
+  it('separates recognition criteria from validation criteria', () => {
+    expect(movementDefinitionFor('push_up').profile.recognitionCriteria).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'floor_orientation', source: 'declarative' }),
+      ]),
+    );
+    expect(movementDefinitionFor('push_up').profile.validationCriteria).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'push_up_phase_machine', source: 'custom_validator' }),
+      ]),
+    );
+    expect(movementDefinitionFor('sit_up').profile.validationCriteria).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'validation_pending', source: 'planned' }),
       ]),
     );
   });

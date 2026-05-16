@@ -51,9 +51,19 @@ export interface MovementProfileMetadata {
   readonly rhythm: MovementRhythmType;
   readonly validationReadiness: MovementValidationReadiness;
   readonly cameraSensitivity: MovementCameraSensitivity;
+  readonly recognitionCriteria: readonly MovementProfileCriterion[];
+  readonly validationCriteria: readonly MovementProfileCriterion[];
   readonly telemetrySignals: readonly string[];
   readonly telemetryExtractors: readonly MovementTelemetryExtractorDefinition[];
   readonly failureCriteria: readonly string[];
+}
+
+export type MovementProfileCriterionSource = 'declarative' | 'custom_validator' | 'planned';
+
+export interface MovementProfileCriterion {
+  readonly key: string;
+  readonly label: string;
+  readonly source: MovementProfileCriterionSource;
 }
 
 export type MovementTelemetryExtractorSource = 'metric' | 'derived' | 'planned';
@@ -130,6 +140,20 @@ export const movementRegistry: readonly MovementDefinition[] = [
       rhythm: 'cyclic',
       validationReadiness: 'rep_validation',
       cameraSensitivity: 'high',
+      recognitionCriteria: [
+        profileCriterion('floor_orientation', 'Floor-oriented torso', 'declarative'),
+        profileCriterion('elbow_flexion_signal', 'Elbow flexion signal', 'declarative'),
+        profileCriterion('body_line_signal', 'Body-line signal', 'declarative'),
+      ],
+      validationCriteria: [
+        profileCriterion(
+          'push_up_phase_machine',
+          'Top-bottom-top phase validation',
+          'custom_validator',
+        ),
+        profileCriterion('push_up_depth', 'Elbow depth threshold', 'declarative'),
+        profileCriterion('body_line_quality', 'Shoulder-hip-ankle line quality', 'declarative'),
+      ],
       telemetrySignals: [
         'elbow angle',
         'elbow velocity',
@@ -205,6 +229,20 @@ export const movementRegistry: readonly MovementDefinition[] = [
       rhythm: 'cyclic',
       validationReadiness: 'rep_validation',
       cameraSensitivity: 'medium',
+      recognitionCriteria: [
+        profileCriterion('standing_orientation', 'Standing torso orientation', 'declarative'),
+        profileCriterion('knee_flexion_signal', 'Knee flexion signal', 'declarative'),
+        profileCriterion('hip_level_change', 'Hip level change', 'declarative'),
+      ],
+      validationCriteria: [
+        profileCriterion(
+          'squat_phase_machine',
+          'Standing-bottom-standing phase validation',
+          'custom_validator',
+        ),
+        profileCriterion('squat_depth', 'Knee depth threshold', 'declarative'),
+        profileCriterion('torso_control', 'Torso control threshold', 'declarative'),
+      ],
       telemetrySignals: [
         'knee angle',
         'knee velocity',
@@ -482,6 +520,26 @@ function profileFor(options: {
           ? 'recognition_only'
           : 'profile_pending',
     cameraSensitivity: options.supportLevel === 'planned' ? 'high' : 'medium',
+    recognitionCriteria: options.analysisSignals.map((signal) =>
+      profileCriterion(
+        signal
+          .toLowerCase()
+          .replaceAll(/[^a-z0-9]+/g, '_')
+          .replaceAll(/^_|_$/g, ''),
+        signal,
+        options.supportLevel === 'planned' ? 'planned' : 'declarative',
+      ),
+    ),
+    validationCriteria:
+      options.supportLevel === 'planned'
+        ? [profileCriterion('profile_pending', 'Movement profile not implemented', 'planned')]
+        : [
+            profileCriterion(
+              'validation_pending',
+              'Validation rules not implemented yet',
+              'planned',
+            ),
+          ],
     telemetrySignals: options.analysisSignals,
     telemetryExtractors: options.analysisSignals.map((signal) =>
       telemetryExtractor(
@@ -500,6 +558,18 @@ function profileFor(options: {
       options.supportLevel === 'planned'
         ? ['movement profile not implemented']
         : ['tracking loss', 'low confidence', 'incomplete movement evidence'],
+  };
+}
+
+function profileCriterion(
+  key: string,
+  label: string,
+  source: MovementProfileCriterionSource,
+): MovementProfileCriterion {
+  return {
+    key,
+    label,
+    source,
   };
 }
 
