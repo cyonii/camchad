@@ -117,6 +117,9 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
     const elbowStats = this.temporalTracker.signalStats((state) =>
       trackingSide.side === 'left' ? state.jointAngles.leftElbow : state.jointAngles.rightElbow,
     );
+    const elbowRhythm = this.temporalTracker.signalRhythm((state) =>
+      trackingSide.side === 'left' ? state.jointAngles.leftElbow : state.jointAngles.rightElbow,
+    );
     const shoulderTravelStats = this.temporalTracker.signalStats((state) =>
       normalizedLandmarkY(state, `${trackingSide.side}_shoulder` as LandmarkName),
     );
@@ -143,6 +146,9 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
       elbowAngle,
       primaryJointAngle: elbowAngle,
       primaryJointRange,
+      rhythmScore: elbowRhythm.rhythmScore,
+      rhythmCycleCount: elbowRhythm.cycleCount,
+      averageCycleMs: elbowRhythm.averageCycleMs ?? 0,
       bodyLineDeviation,
       bodyLineScore: alignmentScore,
       alignmentScore,

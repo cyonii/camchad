@@ -114,6 +114,9 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     const kneeStats = this.temporalTracker.signalStats((state) =>
       averagedDefined(state.jointAngles.leftKnee, state.jointAngles.rightKnee),
     );
+    const kneeRhythm = this.temporalTracker.signalRhythm((state) =>
+      averagedDefined(state.jointAngles.leftKnee, state.jointAngles.rightKnee),
+    );
     const torsoInclinationStats = this.temporalTracker.signalStats(
       (state) => state.geometry.torsoInclinationDegrees,
     );
@@ -138,6 +141,9 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     this.metrics = {
       primaryJointAngle: kneeAngle,
       primaryJointRange,
+      rhythmScore: kneeRhythm.rhythmScore,
+      rhythmCycleCount: kneeRhythm.cycleCount,
+      averageCycleMs: kneeRhythm.averageCycleMs ?? 0,
       kneeAngle,
       rangeOfMotionScore: this.depthScore(),
       depthDeficitDegrees: Math.max(0, this.lowestKneeAngle - this.config.bottomKneeAngle),

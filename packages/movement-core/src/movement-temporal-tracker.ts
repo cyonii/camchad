@@ -60,6 +60,12 @@ export class MovementTemporalTracker {
     return this.window.signalStats(selector);
   }
 
+  public signalRhythm(
+    selector: Parameters<MovementWindow['signalRhythm']>[0],
+  ): ReturnType<MovementWindow['signalRhythm']> {
+    return this.window.signalRhythm(selector);
+  }
+
   public reset(): void {
     this.lastTimestampMs = undefined;
     this.window.reset();

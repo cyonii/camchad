@@ -81,6 +81,23 @@ describe('MovementWindow', () => {
     expect(stats.sampleCount).toBe(3);
   });
 
+  it('detects oscillating rhythm across a repeated signal', () => {
+    const window = new MovementWindow({ maxAgeMs: 2000 });
+
+    window.add(requiredBodyState(0, 168));
+    window.add(requiredBodyState(200, 118));
+    window.add(requiredBodyState(400, 168));
+    window.add(requiredBodyState(600, 118));
+    window.add(requiredBodyState(800, 168));
+
+    const rhythm = window.signalRhythm((bodyState) => bodyState.jointAngles.leftKnee);
+
+    expect(rhythm.cycleCount).toBe(1);
+    expect(rhythm.amplitude).toBeCloseTo(50);
+    expect(rhythm.averageCycleMs).toBeCloseTo(400);
+    expect(rhythm.rhythmScore).toBeGreaterThan(0);
+  });
+
   it('rejects invalid configuration early', () => {
     expect(() => new MovementWindow({ maxAgeMs: 0 })).toThrow(/maxAgeMs/);
   });

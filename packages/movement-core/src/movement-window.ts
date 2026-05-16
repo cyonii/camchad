@@ -31,6 +31,14 @@ export interface SignalStats {
   readonly sampleCount: number;
 }
 
+export interface SignalRhythm {
+  readonly cycleCount: number;
+  readonly amplitude: number;
+  readonly averageCycleMs?: number;
+  readonly rhythmScore: number;
+  readonly sampleCount: number;
+}
+
 export interface MovementWindowSnapshot {
   readonly samples: readonly MovementWindowSample[];
   readonly validSamples: readonly ValidMovementWindowSample[];
@@ -167,6 +175,45 @@ export class MovementWindow {
     };
   }
 
+  public signalRhythm(selector: (bodyState: BodyState) => number | undefined): SignalRhythm {
+    const samples = this.snapshot()
+      .validSamples.map((sample) => ({
+        timestampMs: sample.timestampMs,
+        value: selector(sample.bodyState),
+      }))
+      .filter(
+        (sample): sample is { readonly timestampMs: number; readonly value: number } =>
+          sample.value !== undefined && Number.isFinite(sample.value),
+      );
+
+    if (samples.length < 3) {
+      return {
+        cycleCount: 0,
+        amplitude: 0,
+        rhythmScore: 0,
+        sampleCount: samples.length,
+      };
+    }
+
+    const values = samples.map((sample) => sample.value);
+    const amplitude = Math.max(...values) - Math.min(...values);
+    const turningPoints = signalTurningPoints(samples);
+    const cycleCount = Math.floor(turningPoints.length / 2);
+    const cycleDurations = turningPoints
+      .slice(2)
+      .map((point, index) => point.timestampMs - turningPoints[index]?.timestampMs)
+      .filter((duration): duration is number => duration !== undefined && duration > 0);
+    const averageCycleMs = cycleDurations.length === 0 ? undefined : average(cycleDurations);
+
+    return {
+      cycleCount,
+      amplitude,
+      averageCycleMs,
+      rhythmScore: clamp01((cycleCount / 2) * clamp01(amplitude / 40)),
+      sampleCount: samples.length,
+    };
+  }
+
   private addSample(sample: MovementWindowSample): MovementWindowSnapshot {
     this.samples = [...this.samples, sample]
       .filter((candidate) => sample.timestampMs - candidate.timestampMs <= this.maxAgeMs)
@@ -174,6 +221,31 @@ export class MovementWindow {
 
     return this.snapshot();
   }
+}
+
+function signalTurningPoints(
+  samples: readonly { readonly timestampMs: number; readonly value: number }[],
+): readonly { readonly timestampMs: number; readonly value: number }[] {
+  const points: { readonly timestampMs: number; readonly value: number }[] = [];
+
+  for (let index = 1; index < samples.length - 1; index += 1) {
+    const previous = samples[index - 1];
+    const current = samples[index];
+    const next = samples[index + 1];
+
+    if (!previous || !current || !next) {
+      continue;
+    }
+
+    if (
+      (current.value >= previous.value && current.value > next.value) ||
+      (current.value <= previous.value && current.value < next.value)
+    ) {
+      points.push(current);
+    }
+  }
+
+  return points;
 }
 
 function latestSignalSample(
@@ -201,4 +273,8 @@ function average(values: readonly number[]): number {
   }
 
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
 }
