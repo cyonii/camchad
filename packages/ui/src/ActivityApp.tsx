@@ -53,6 +53,7 @@ import { ExponentialPoseSmoother, MediaPipePoseEstimator } from '@camchad/pose-c
 import { deriveCameraFrameFeedback, impulseForRep } from './camera-frame-feedback.js';
 import { buildHistoryChartModel } from './history-chart.js';
 import { selectedHistorySession } from './history-session-selection.js';
+import { liveTelemetryStateFor } from './live-telemetry-state.js';
 
 import type {
   ActivityRepository,
@@ -1226,6 +1227,7 @@ function SidebarTelemetryPanel({
       detectorState.movementType,
   );
   const telemetryMetrics = telemetryMetricsFor(movementDefinition, detectorState);
+  const liveState = liveTelemetryStateFor(detectorState, sessionTelemetry);
 
   return (
     <aside className="telemetry-panel telemetry-panel-fixed" aria-label="Movement telemetry">
@@ -1234,7 +1236,7 @@ function SidebarTelemetryPanel({
           <span>Inferred movement</span>
           <strong>{sessionTelemetry.movementType ? movementDefinition.label : 'Observing'}</strong>
           <small>
-            {status} / {formatSessionMode(sessionTelemetry.mode)}
+            {liveState.label} / {status}
           </small>
         </div>
         <TelemetryModeControl value={telemetryMode} onChange={onTelemetryModeChange} />
@@ -1256,7 +1258,8 @@ function SidebarTelemetryPanel({
           value={formatActivityState(sessionTelemetry.activityState ?? 'idle')}
         />
         <Metric label="Signal" value={formatMetric(sessionTelemetry.recognitionConfidence, '%')} />
-        <Metric label="Movement phase" value={formatPhase(detectorState.phase)} />
+        <Metric label="Movement state" value={liveState.label} />
+        <Metric label="State detail" value={liveState.detail} />
         {telemetryMetrics.map((metric) => (
           <Metric key={metric.label} label={metric.label} value={metric.value} />
         ))}
@@ -1336,6 +1339,7 @@ function MirrorTelemetryOverlay({
       detectorState.movementType,
   );
   const telemetryMetrics = telemetryMetricsFor(movementDefinition, detectorState);
+  const liveState = liveTelemetryStateFor(detectorState, sessionTelemetry);
   const formMessage =
     detectorState.warnings.length === 0
       ? 'Tracking conditions look usable.'
@@ -1351,7 +1355,7 @@ function MirrorTelemetryOverlay({
         <span>Inferred movement</span>
         <strong>{sessionTelemetry.movementType ? movementDefinition.label : 'Observing'}</strong>
         <small>
-          {status} / {formatSessionMode(sessionTelemetry.mode)}
+          {liveState.label} / {status}
         </small>
       </div>
 
@@ -1365,12 +1369,12 @@ function MirrorTelemetryOverlay({
           <dd>{detectorState.partialReps}</dd>
         </div>
         <div>
-          <dt>Phase</dt>
-          <dd>{formatPhase(detectorState.phase)}</dd>
+          <dt>State</dt>
+          <dd>{liveState.label}</dd>
         </div>
         <div>
-          <dt>Activity</dt>
-          <dd>{formatActivityState(sessionTelemetry.activityState ?? 'idle')}</dd>
+          <dt>Detail</dt>
+          <dd>{liveState.detail}</dd>
         </div>
         {telemetryMetrics.slice(0, 3).map((metric) => (
           <div key={metric.label}>
@@ -3812,10 +3816,6 @@ function primaryGuidanceFor(
   telemetry: ActivitySessionTelemetry,
 ): NonNullable<ActivitySessionTelemetry['guidanceEvents']>[number] | undefined {
   return telemetry.guidanceEvents?.find((event) => event.code !== 'conditions_usable');
-}
-
-function formatPhase(phase: string): string {
-  return phase.replaceAll('_', ' ');
 }
 
 function formatSessionMode(mode: ActivitySessionTelemetry['mode']): string {
