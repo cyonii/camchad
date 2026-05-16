@@ -15,7 +15,7 @@ import type {
   RepEvent,
 } from './movement-interpreter.js';
 import { CyclicPhaseMachine } from './cyclic-phase-machine.js';
-import { extractBodyState } from './body-state.js';
+import { extractBodyState, type BodyState } from './body-state.js';
 import { MovementTemporalTracker } from './movement-temporal-tracker.js';
 import { extractPoseMovementFeatures } from './pose-movement-features.js';
 
@@ -114,6 +114,15 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
     const elbowVelocity = this.temporalTracker.signalVelocity((state) =>
       trackingSide.side === 'left' ? state.jointAngles.leftElbow : state.jointAngles.rightElbow,
     );
+    const elbowStats = this.temporalTracker.signalStats((state) =>
+      trackingSide.side === 'left' ? state.jointAngles.leftElbow : state.jointAngles.rightElbow,
+    );
+    const shoulderTravelStats = this.temporalTracker.signalStats((state) =>
+      normalizedLandmarkY(state, `${trackingSide.side}_shoulder` as LandmarkName),
+    );
+    const hipTravelStats = this.temporalTracker.signalStats((state) =>
+      normalizedLandmarkY(state, `${trackingSide.side}_hip` as LandmarkName),
+    );
     const elbowVelocityValue = elbowVelocity?.valuePerSecond ?? 0;
     const isDescendingSignal =
       elbowVelocity?.direction === 'decreasing' &&
@@ -121,14 +130,30 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
     const isAscendingSignal =
       elbowVelocity?.direction === 'increasing' &&
       Math.abs(elbowVelocityValue) >= this.config.minPhaseVelocityDegPerSecond;
+    const primaryJointRange = elbowStats.range;
+    const wristShoulderOffsetRatio = Math.abs(sample.wrist.x - sample.shoulder.x) / bodyState.scale;
+    const lockoutScore = jointLockoutScore(
+      elbowAngle,
+      this.config.bottomElbowAngle,
+      this.config.topElbowAngle,
+    );
 
     this.lowestElbowAngle = Math.min(this.lowestElbowAngle, elbowAngle);
     this.metrics = {
       elbowAngle,
       primaryJointAngle: elbowAngle,
+      primaryJointRange,
       bodyLineDeviation,
+      bodyLineScore: alignmentScore,
       alignmentScore,
+      lockoutScore,
       rangeOfMotionScore: this.depthScore(),
+      depthDeficitDegrees: Math.max(0, this.lowestElbowAngle - this.config.bottomElbowAngle),
+      shoulderTravelRatio: shoulderTravelStats.range,
+      hipTravelRatio: hipTravelStats.range,
+      wristShoulderOffsetRatio,
+      handStackScore: clamp01(1 - wristShoulderOffsetRatio / 1.4),
+      hipSagRatio: Math.abs(sample.hip.y - sample.shoulder.y) / bodyState.scale,
       poseConfidence: frame.confidence,
       movementConfidence: rawMovementConfidence,
       temporalMovementConfidence: temporalSnapshot.confidence.confidence,
@@ -289,6 +314,7 @@ interface PushUpSample {
   readonly elbowAngle: number;
   readonly bodyLineDeviation: number;
   readonly shoulder: PoseLandmark;
+  readonly wrist: PoseLandmark;
   readonly hip: PoseLandmark;
 }
 
@@ -310,8 +336,13 @@ function readPushUpSample(frame: PoseFrame, side: TrackingSide): PushUpSample {
     elbowAngle: angleDegrees(shoulder, elbow, wrist),
     bodyLineDeviation: lineDeviationRatio(shoulder, hip, ankle),
     shoulder,
+    wrist,
     hip,
   };
+}
+
+function normalizedLandmarkY(state: BodyState, name: LandmarkName): number | undefined {
+  return state.landmarks.get(name)?.normalizedY;
 }
 
 function selectTrackingSide(
@@ -376,6 +407,16 @@ function landmarkVisibility(landmark: PoseLandmark | undefined): number {
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
+}
+
+function jointLockoutScore(angle: number, bottomAngle: number, topAngle: number): number {
+  const range = topAngle - bottomAngle;
+
+  if (range <= 0) {
+    return 0;
+  }
+
+  return clamp01((angle - bottomAngle) / range);
 }
 
 function movementConfidence(

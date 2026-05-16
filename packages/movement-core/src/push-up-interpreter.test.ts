@@ -120,6 +120,11 @@ describe('PushUpMovementInterpreter', () => {
     expect(state.metrics.sampleWindowMs).toBe(120);
     expect(state.metrics.missingSampleRatio).toBe(0);
     expect(state.metrics.primaryJointVelocity).toBeLessThan(0);
+    expect(state.metrics.primaryJointRange).toBeGreaterThan(30);
+    expect(state.metrics.lockoutScore).toBeGreaterThan(0);
+    expect(state.metrics.depthDeficitDegrees).toBeGreaterThan(0);
+    expect(state.metrics.handStackScore).toBeGreaterThan(0);
+    expect(state.metrics.shoulderTravelRatio).toBe(0);
     expect(state.metrics.temporalStabilityScore).toBeGreaterThan(0.8);
   });
 

@@ -23,6 +23,14 @@ export interface SignalVelocity {
   readonly toTimestampMs: number;
 }
 
+export interface SignalStats {
+  readonly min: number;
+  readonly max: number;
+  readonly average: number;
+  readonly range: number;
+  readonly sampleCount: number;
+}
+
 export interface MovementWindowSnapshot {
   readonly samples: readonly MovementWindowSample[];
   readonly validSamples: readonly ValidMovementWindowSample[];
@@ -129,6 +137,33 @@ export class MovementWindow {
       direction: directionForVelocity(valuePerSecond),
       fromTimestampMs: previous.timestampMs,
       toTimestampMs: latest.timestampMs,
+    };
+  }
+
+  public signalStats(selector: (bodyState: BodyState) => number | undefined): SignalStats {
+    const values = this.snapshot()
+      .validSamples.map((sample) => selector(sample.bodyState))
+      .filter((value): value is number => value !== undefined && Number.isFinite(value));
+
+    if (values.length === 0) {
+      return {
+        min: 0,
+        max: 0,
+        average: 0,
+        range: 0,
+        sampleCount: 0,
+      };
+    }
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+
+    return {
+      min,
+      max,
+      average: average(values),
+      range: max - min,
+      sampleCount: values.length,
     };
   }
 

@@ -64,6 +64,23 @@ describe('MovementWindow', () => {
     expect(window.signalVelocity((bodyState) => bodyState.jointAngles.leftKnee)).toBeUndefined();
   });
 
+  it('summarizes signal range across valid samples', () => {
+    const window = new MovementWindow({ maxAgeMs: 1000 });
+
+    window.add(requiredBodyState(0, 168));
+    window.addMissing(100);
+    window.add(requiredBodyState(250, 118));
+    window.add(requiredBodyState(500, 140));
+
+    const stats = window.signalStats((bodyState) => bodyState.jointAngles.leftKnee);
+
+    expect(stats.min).toBeCloseTo(118);
+    expect(stats.max).toBeCloseTo(168);
+    expect(stats.average).toBeCloseTo(142);
+    expect(stats.range).toBeCloseTo(50);
+    expect(stats.sampleCount).toBe(3);
+  });
+
   it('rejects invalid configuration early', () => {
     expect(() => new MovementWindow({ maxAgeMs: 0 })).toThrow(/maxAgeMs/);
   });

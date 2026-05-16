@@ -54,6 +54,12 @@ export class MovementTemporalTracker {
     return this.window.signalVelocity(selector);
   }
 
+  public signalStats(
+    selector: Parameters<MovementWindow['signalStats']>[0],
+  ): ReturnType<MovementWindow['signalStats']> {
+    return this.window.signalStats(selector);
+  }
+
   public reset(): void {
     this.lastTimestampMs = undefined;
     this.window.reset();
