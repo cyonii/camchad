@@ -3,10 +3,10 @@ import type {
   FormWarning,
   MovementInterpreter,
   MovementInterpreterState,
-  MovementPhase,
   MovementRecognition,
   RepEvent,
 } from './movement-interpreter.js';
+import { CyclicPhaseMachine } from './cyclic-phase-machine.js';
 import { extractBodyState } from './body-state.js';
 import { MovementTemporalTracker } from './movement-temporal-tracker.js';
 import { extractPoseMovementFeatures } from './pose-movement-features.js';
@@ -36,16 +36,15 @@ export const defaultSquatConfig: SquatMovementInterpreterConfig = {
 export class SquatMovementInterpreter implements MovementInterpreter {
   public readonly movementType = 'squat';
 
-  private phase: MovementPhase = 'setup_needed';
   private reps = 0;
   private validReps = 0;
   private partialReps = 0;
   private lastRep?: RepEvent;
-  private bottomEnteredAt?: number;
   private lowestKneeAngle = 180;
   private warnings: FormWarning[] = [];
   private metrics: Record<string, number> = {};
   private recognition: MovementRecognition = trackingLostRecognition;
+  private readonly phaseMachine: CyclicPhaseMachine;
   private readonly temporalTracker = new MovementTemporalTracker({
     windowMaxAgeMs: 1200,
     confidence: {
@@ -57,16 +56,21 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     },
   });
 
-  public constructor(
-    private readonly config: SquatMovementInterpreterConfig = defaultSquatConfig,
-  ) {}
+  public constructor(private readonly config: SquatMovementInterpreterConfig = defaultSquatConfig) {
+    this.phaseMachine = new CyclicPhaseMachine({
+      topThreshold: config.topKneeAngle,
+      bottomThreshold: config.bottomKneeAngle,
+      hysteresis: config.phaseHysteresisDegrees,
+      minBottomHoldMs: config.minBottomHoldMs,
+    });
+  }
 
   public processPose(
     frame: Parameters<MovementInterpreter['processPose']>[0],
   ): MovementInterpreterState {
     if (!frame) {
       this.temporalTracker.addMissing();
-      this.phase = 'tracking_lost';
+      this.phaseMachine.setPhase('tracking_lost');
       this.warnings = [trackingLostWarning];
       this.recognition = trackingLostRecognition;
       return this.getState();
@@ -77,14 +81,14 @@ export class SquatMovementInterpreter implements MovementInterpreter {
 
     if (!bodyState || !features || features.averageKneeAngle === undefined) {
       this.temporalTracker.addMissing(frame.timestampMs);
-      this.phase = 'tracking_lost';
+      this.phaseMachine.setPhase('tracking_lost');
       this.warnings = [trackingLostWarning];
       this.recognition = trackingLostRecognition;
       return this.getState();
     }
 
     if (features.bodyOrientation === 'horizontal' || bodyState.orientation.kind === 'floor') {
-      this.phase = 'setup_needed';
+      this.phaseMachine.setPhase('setup_needed');
       this.warnings = [];
       this.recognition = {
         confidence: 0.12,
@@ -97,8 +101,6 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     const kneeAngle = features.averageKneeAngle;
     const torsoInclination = features.torsoInclinationDegrees ?? 0;
     const postureScore = clamp01(1 - torsoInclination / this.config.maxTorsoInclinationDegrees);
-    const reachedBottom = kneeAngle <= this.config.bottomKneeAngle;
-    const reachedTop = kneeAngle >= this.config.topKneeAngle;
     const hasPostureWarning = torsoInclination > this.config.maxTorsoInclinationDegrees;
     const rawMovementConfidence = movementConfidence(
       features.movementConfidence,
@@ -138,63 +140,21 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     };
     this.warnings = this.buildWarnings(hasPostureWarning);
 
-    switch (this.phase) {
-      case 'tracking_lost':
-      case 'setup_needed':
-      case 'invalid_form':
-        this.phase = reachedTop ? 'top' : 'setup_needed';
-        break;
+    const transition = this.phaseMachine.update({
+      signal: kneeAngle,
+      timestampMs: features.timestampMs,
+      isDescendingSignal,
+      isAscendingSignal,
+    });
 
-      case 'top':
-        if (
-          !reachedTop &&
-          (isDescendingSignal ||
-            kneeAngle <= this.config.topKneeAngle - this.config.phaseHysteresisDegrees)
-        ) {
-          this.phase = 'descending';
-        }
-        break;
-
-      case 'descending':
-        if (reachedBottom) {
-          this.phase = 'bottom';
-          this.bottomEnteredAt = features.timestampMs;
-        } else if (reachedTop && isAscendingSignal) {
-          this.recordPartialRep(features.timestampMs, postureScore);
-          this.phase = 'top';
-        }
-        break;
-
-      case 'bottom':
-        if (
-          this.bottomEnteredAt !== undefined &&
-          features.timestampMs - this.bottomEnteredAt < this.config.minBottomHoldMs
-        ) {
-          break;
-        }
-
-        if (
-          !reachedBottom &&
-          (isAscendingSignal ||
-            kneeAngle >= this.config.bottomKneeAngle + this.config.phaseHysteresisDegrees)
-        ) {
-          this.phase = 'ascending';
-        }
-        break;
-
-      case 'ascending':
-        if (reachedTop) {
-          this.recordValidRep(features.timestampMs, postureScore);
-          this.phase = 'top';
-        } else if (reachedBottom && isDescendingSignal) {
-          this.phase = 'bottom';
-          this.bottomEnteredAt = features.timestampMs;
-        }
-        break;
+    if (transition.completedRep === 'valid') {
+      this.recordValidRep(features.timestampMs, postureScore);
+    } else if (transition.completedRep === 'partial') {
+      this.recordPartialRep(features.timestampMs, postureScore);
     }
 
     this.recognition = this.buildRecognition(
-      this.phase === 'setup_needed' || temporalSnapshot.confidence.state !== 'active'
+      this.phaseMachine.phase === 'setup_needed' || temporalSnapshot.confidence.state !== 'active'
         ? 'candidate'
         : 'active',
     );
@@ -203,12 +163,11 @@ export class SquatMovementInterpreter implements MovementInterpreter {
   }
 
   public reset(): void {
-    this.phase = 'setup_needed';
+    this.phaseMachine.reset();
     this.reps = 0;
     this.validReps = 0;
     this.partialReps = 0;
     this.lastRep = undefined;
-    this.bottomEnteredAt = undefined;
     this.lowestKneeAngle = 180;
     this.warnings = [];
     this.metrics = {};
@@ -220,7 +179,7 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     return {
       movementType: this.movementType,
       recognition: this.recognition,
-      phase: this.phase,
+      phase: this.phaseMachine.phase,
       reps: this.reps,
       validReps: this.validReps,
       partialReps: this.partialReps,
@@ -264,7 +223,6 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       warnings: this.warnings,
     };
     this.lowestKneeAngle = 180;
-    this.bottomEnteredAt = undefined;
   }
 
   private recordPartialRep(timestampMs: number, postureScore: number): void {
@@ -285,7 +243,6 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       ],
     };
     this.lowestKneeAngle = 180;
-    this.bottomEnteredAt = undefined;
   }
 
   private depthScore(): number {
