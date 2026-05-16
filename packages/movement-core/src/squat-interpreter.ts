@@ -10,6 +10,7 @@ import type {
 import { CyclicPhaseMachine } from './cyclic-phase-machine.js';
 import { extractBodyState } from './body-state.js';
 import { MovementTemporalTracker } from './movement-temporal-tracker.js';
+import type { MovementWindowSnapshot } from './movement-window.js';
 import { extractPoseMovementFeatures } from './pose-movement-features.js';
 
 export interface SquatMovementInterpreterConfig {
@@ -137,24 +138,45 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       this.config.bottomKneeAngle,
       this.config.topKneeAngle,
     );
+    const confidenceDecay = confidenceDecayFor(temporalSnapshot.window);
+    const leftRightImbalance = jointImbalanceRatio(
+      bodyState.jointAngles.leftKnee,
+      bodyState.jointAngles.rightKnee,
+    );
+    const torsoCollapseRatio = clamp01(torsoInclination / 90);
 
     this.lowestKneeAngle = Math.min(this.lowestKneeAngle, kneeAngle);
+    const depthDeficitDegrees = Math.max(0, this.lowestKneeAngle - this.config.bottomKneeAngle);
+    const depthDriftRatio = clamp01(depthDeficitDegrees / 55);
+    const fatigueSignal = fatigueScore({
+      confidenceDecay,
+      depthDriftRatio,
+      tempoDriftRatio: kneeRhythm.tempoDriftRatio,
+      torsoCollapseRatio,
+      leftRightImbalance,
+    });
     this.metrics = {
       primaryJointAngle: kneeAngle,
       primaryJointRange,
       rhythmScore: kneeRhythm.rhythmScore,
       rhythmCycleCount: kneeRhythm.cycleCount,
       averageCycleMs: kneeRhythm.averageCycleMs ?? 0,
+      tempoDriftRatio: kneeRhythm.tempoDriftRatio,
+      tempoDriftMs: kneeRhythm.cycleDurationRangeMs,
       kneeAngle,
       rangeOfMotionScore: this.depthScore(),
-      depthDeficitDegrees: Math.max(0, this.lowestKneeAngle - this.config.bottomKneeAngle),
+      depthDeficitDegrees,
+      depthConsistencyScore: clamp01(1 - depthDriftRatio),
       postureScore,
+      torsoCollapseRatio,
       standingRecoveryScore,
       torsoInclinationRange: torsoInclinationStats.range,
       centerOfMassTravelRatio: centerOfMassTravelStats.range,
+      leftRightImbalance,
       lowerBodyCoverage: bodyState.coverage.lowerBody,
       movementConfidence: rawMovementConfidence,
       temporalMovementConfidence: temporalSnapshot.confidence.confidence,
+      confidenceDecay,
       poseConfidence: features.poseConfidence,
       torsoInclination,
       kneeLiftRatio: features.kneeLiftRatio ?? 0,
@@ -165,6 +187,8 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       temporalStabilityScore: clamp01(
         1 - temporalSnapshot.window.missingSampleRatio - torsoInclination / 90,
       ),
+      bottomHoldMs: this.phaseMachine.lastBottomHoldMs,
+      fatigueScore: fatigueSignal,
     };
     this.warnings = this.buildWarnings(hasPostureWarning);
 
@@ -179,6 +203,13 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       this.recordValidRep(features.timestampMs, postureScore);
     } else if (transition.completedRep === 'partial') {
       this.recordPartialRep(features.timestampMs, postureScore);
+    }
+
+    if (transition.bottomHoldMs !== undefined) {
+      this.metrics = {
+        ...this.metrics,
+        bottomHoldMs: transition.bottomHoldMs,
+      };
     }
 
     this.recognition = this.buildRecognition(
@@ -330,6 +361,14 @@ function averagedDefined(a: number | undefined, b: number | undefined): number |
   return (a + b) / 2;
 }
 
+function jointImbalanceRatio(a: number | undefined, b: number | undefined): number {
+  if (a === undefined || b === undefined) {
+    return 0;
+  }
+
+  return clamp01(Math.abs(a - b) / 45);
+}
+
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
@@ -342,6 +381,33 @@ function jointLockoutScore(angle: number, bottomAngle: number, topAngle: number)
   }
 
   return clamp01((angle - bottomAngle) / range);
+}
+
+function confidenceDecayFor(window: MovementWindowSnapshot): number {
+  const first = window.validSamples[0]?.bodyState.confidence;
+  const latest = window.latestValid?.bodyState.confidence;
+
+  if (first === undefined || latest === undefined) {
+    return 0;
+  }
+
+  return Math.max(0, first - latest);
+}
+
+function fatigueScore(metrics: {
+  readonly confidenceDecay: number;
+  readonly depthDriftRatio: number;
+  readonly tempoDriftRatio: number;
+  readonly torsoCollapseRatio: number;
+  readonly leftRightImbalance: number;
+}): number {
+  return clamp01(
+    metrics.confidenceDecay * 0.18 +
+      metrics.depthDriftRatio * 0.26 +
+      metrics.tempoDriftRatio * 0.18 +
+      metrics.torsoCollapseRatio * 0.24 +
+      metrics.leftRightImbalance * 0.14,
+  );
 }
 
 const trackingLostRecognition: MovementRecognition = {

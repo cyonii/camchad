@@ -35,6 +35,8 @@ export interface SignalRhythm {
   readonly cycleCount: number;
   readonly amplitude: number;
   readonly averageCycleMs?: number;
+  readonly cycleDurationRangeMs: number;
+  readonly tempoDriftRatio: number;
   readonly rhythmScore: number;
   readonly sampleCount: number;
 }
@@ -190,6 +192,8 @@ export class MovementWindow {
       return {
         cycleCount: 0,
         amplitude: 0,
+        cycleDurationRangeMs: 0,
+        tempoDriftRatio: 0,
         rhythmScore: 0,
         sampleCount: samples.length,
       };
@@ -204,11 +208,19 @@ export class MovementWindow {
       .map((point, index) => point.timestampMs - turningPoints[index]?.timestampMs)
       .filter((duration): duration is number => duration !== undefined && duration > 0);
     const averageCycleMs = cycleDurations.length === 0 ? undefined : average(cycleDurations);
+    const cycleDurationRangeMs =
+      cycleDurations.length === 0 ? 0 : Math.max(...cycleDurations) - Math.min(...cycleDurations);
+    const tempoDriftRatio =
+      averageCycleMs === undefined || averageCycleMs <= 0
+        ? 0
+        : clamp01(cycleDurationRangeMs / averageCycleMs);
 
     return {
       cycleCount,
       amplitude,
       averageCycleMs,
+      cycleDurationRangeMs,
+      tempoDriftRatio,
       rhythmScore: clamp01((cycleCount / 2) * clamp01(amplitude / 40)),
       sampleCount: samples.length,
     };

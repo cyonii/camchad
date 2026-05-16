@@ -51,7 +51,11 @@ describe('CyclicPhaseMachine', () => {
     machine.update(sample(108, 200, true, false));
 
     expect(machine.update(sample(125, 260, false, true)).phase).toBe('bottom');
-    expect(machine.update(sample(125, 340, false, true)).phase).toBe('ascending');
+    expect(machine.update(sample(125, 340, false, true))).toEqual({
+      phase: 'ascending',
+      bottomHoldMs: 140,
+    });
+    expect(machine.lastBottomHoldMs).toBe(140);
   });
 });
 

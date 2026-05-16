@@ -18,6 +18,7 @@ import type {
 import { CyclicPhaseMachine } from './cyclic-phase-machine.js';
 import { extractBodyState, type BodyState } from './body-state.js';
 import { MovementTemporalTracker } from './movement-temporal-tracker.js';
+import type { MovementWindowSnapshot } from './movement-window.js';
 import { extractPoseMovementFeatures } from './pose-movement-features.js';
 
 export interface PushUpMovementInterpreterConfig {
@@ -141,6 +142,9 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
       this.config.bottomElbowAngle,
       this.config.topElbowAngle,
     );
+    const confidenceDecay = confidenceDecayFor(temporalSnapshot.window);
+    const depthDriftDegrees = Math.max(0, elbowStats.min - this.config.bottomElbowAngle);
+    const alignmentDegradation = clamp01(1 - alignmentScore);
 
     this.lowestElbowAngle = Math.min(this.lowestElbowAngle, elbowAngle);
     this.metrics = {
@@ -150,12 +154,17 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
       rhythmScore: elbowRhythm.rhythmScore,
       rhythmCycleCount: elbowRhythm.cycleCount,
       averageCycleMs: elbowRhythm.averageCycleMs ?? 0,
+      tempoDriftRatio: elbowRhythm.tempoDriftRatio,
+      tempoDriftMs: elbowRhythm.cycleDurationRangeMs,
       bodyLineDeviation,
       bodyLineScore: alignmentScore,
       alignmentScore,
+      alignmentDegradation,
       lockoutScore,
       rangeOfMotionScore: this.depthScore(),
       depthDeficitDegrees: Math.max(0, this.lowestElbowAngle - this.config.bottomElbowAngle),
+      depthDriftDegrees,
+      confidenceDecay,
       shoulderTravelRatio: shoulderTravelStats.range,
       hipTravelRatio: hipTravelStats.range,
       wristShoulderOffsetRatio,
@@ -171,6 +180,13 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
       temporalStabilityScore: clamp01(
         1 - temporalSnapshot.window.missingSampleRatio - bodyLineDeviation,
       ),
+      bottomHoldMs: this.phaseMachine.lastBottomHoldMs,
+      fatigueScore: fatigueScore({
+        confidenceDecay,
+        depthDriftRatio: clamp01(depthDriftDegrees / 45),
+        tempoDriftRatio: elbowRhythm.tempoDriftRatio,
+        alignmentDegradation,
+      }),
       trackingSide: trackingSide.side === 'left' ? 0 : 1,
       shoulderY: sample.shoulder.y,
       hipY: sample.hip.y,
@@ -205,6 +221,13 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
       this.recordValidRep(frame.timestampMs, alignmentScore);
     } else if (transition.completedRep === 'partial') {
       this.recordPartialRep(frame.timestampMs, alignmentScore);
+    }
+
+    if (transition.bottomHoldMs !== undefined) {
+      this.metrics = {
+        ...this.metrics,
+        bottomHoldMs: transition.bottomHoldMs,
+      };
     }
 
     this.recognition = this.buildRecognition(
@@ -456,6 +479,31 @@ function movementConfidence(
   orientationConfidence: number,
 ): number {
   return clamp01(poseConfidence * 0.46 + trackingVisibility * 0.36 + orientationConfidence * 0.18);
+}
+
+function confidenceDecayFor(window: MovementWindowSnapshot): number {
+  const first = window.validSamples[0]?.bodyState.confidence;
+  const latest = window.latestValid?.bodyState.confidence;
+
+  if (first === undefined || latest === undefined) {
+    return 0;
+  }
+
+  return Math.max(0, first - latest);
+}
+
+function fatigueScore(metrics: {
+  readonly confidenceDecay: number;
+  readonly depthDriftRatio: number;
+  readonly tempoDriftRatio: number;
+  readonly alignmentDegradation: number;
+}): number {
+  return clamp01(
+    metrics.confidenceDecay * 0.22 +
+      metrics.depthDriftRatio * 0.3 +
+      metrics.tempoDriftRatio * 0.18 +
+      metrics.alignmentDegradation * 0.3,
+  );
 }
 
 const trackingLostRecognition: MovementRecognition = {

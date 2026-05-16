@@ -126,11 +126,35 @@ describe('PushUpMovementInterpreter', () => {
     expect(state.metrics.primaryJointVelocity).toBeLessThan(0);
     expect(state.metrics.primaryJointRange).toBeGreaterThan(30);
     expect(state.metrics.rhythmScore).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.tempoDriftRatio).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.tempoDriftMs).toBeGreaterThanOrEqual(0);
     expect(state.metrics.lockoutScore).toBeGreaterThan(0);
     expect(state.metrics.depthDeficitDegrees).toBeGreaterThan(0);
+    expect(state.metrics.depthDriftDegrees).toBeGreaterThan(0);
+    expect(state.metrics.alignmentDegradation).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.confidenceDecay).toBe(0);
+    expect(state.metrics.bottomHoldMs).toBe(0);
+    expect(state.metrics.fatigueScore).toBeGreaterThanOrEqual(0);
     expect(state.metrics.handStackScore).toBeGreaterThan(0);
     expect(state.metrics.shoulderTravelRatio).toBe(0);
     expect(state.metrics.temporalStabilityScore).toBeGreaterThan(0.8);
+  });
+
+  it('surfaces fatigue telemetry from confidence and bottom-hold behavior', () => {
+    const detector = new PushUpMovementInterpreter();
+
+    detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165, visibility: 0.95 }));
+    detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 132, visibility: 0.85 }));
+    detector.processPose(makePushUpFrame({ timestampMs: 260, elbowAngle: 96, visibility: 0.75 }));
+    detector.processPose(makePushUpFrame({ timestampMs: 420, elbowAngle: 132, visibility: 0.7 }));
+    const state = detector.processPose(
+      makePushUpFrame({ timestampMs: 560, elbowAngle: 165, visibility: 0.7 }),
+    );
+
+    expect(state.validReps).toBe(1);
+    expect(state.metrics.confidenceDecay).toBeGreaterThan(0);
+    expect(state.metrics.bottomHoldMs).toBeGreaterThanOrEqual(80);
+    expect(state.metrics.fatigueScore).toBeGreaterThan(0);
   });
 
   it('does not enter a rep phase for slow top-position threshold drift', () => {

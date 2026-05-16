@@ -47,12 +47,44 @@ describe('SquatMovementInterpreter', () => {
     expect(state.metrics.primaryJointVelocity).toBeLessThan(0);
     expect(state.metrics.primaryJointRange).toBeGreaterThan(20);
     expect(state.metrics.rhythmScore).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.tempoDriftRatio).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.tempoDriftMs).toBeGreaterThanOrEqual(0);
     expect(state.metrics.depthDeficitDegrees).toBeGreaterThan(0);
+    expect(state.metrics.depthConsistencyScore).toBeGreaterThanOrEqual(0);
     expect(state.metrics.standingRecoveryScore).toBeGreaterThan(0);
+    expect(state.metrics.torsoCollapseRatio).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.leftRightImbalance).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.confidenceDecay).toBe(0);
+    expect(state.metrics.bottomHoldMs).toBe(0);
+    expect(state.metrics.fatigueScore).toBeGreaterThanOrEqual(0);
     expect(state.metrics.torsoInclinationRange).toBeGreaterThanOrEqual(0);
     expect(state.metrics.centerOfMassTravelRatio).toBeGreaterThanOrEqual(0);
     expect(state.metrics.lowerBodyCoverage).toBeGreaterThan(0.6);
     expect(state.metrics.temporalStabilityScore).toBeGreaterThan(0.7);
+  });
+
+  it('surfaces fatigue telemetry from confidence, posture, and bottom-hold behavior', () => {
+    const interpreter = new SquatMovementInterpreter();
+
+    interpreter.processPose(makeSquatFrame({ timestampMs: 0, kneeAngle: 168, visibility: 0.95 }));
+    interpreter.processPose(
+      makeSquatFrame({ timestampMs: 120, kneeAngle: 138, visibility: 0.86, torsoLeanX: 0.05 }),
+    );
+    interpreter.processPose(
+      makeSquatFrame({ timestampMs: 260, kneeAngle: 96, visibility: 0.75, torsoLeanX: 0.1 }),
+    );
+    interpreter.processPose(
+      makeSquatFrame({ timestampMs: 430, kneeAngle: 132, visibility: 0.7, torsoLeanX: 0.1 }),
+    );
+    const state = interpreter.processPose(
+      makeSquatFrame({ timestampMs: 580, kneeAngle: 166, visibility: 0.7, torsoLeanX: 0.08 }),
+    );
+
+    expect(state.validReps).toBe(1);
+    expect(state.metrics.confidenceDecay).toBeGreaterThan(0);
+    expect(state.metrics.torsoCollapseRatio).toBeGreaterThan(0);
+    expect(state.metrics.bottomHoldMs).toBeGreaterThanOrEqual(80);
+    expect(state.metrics.fatigueScore).toBeGreaterThan(0);
   });
 
   it('does not enter a rep phase for slow standing threshold drift', () => {

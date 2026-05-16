@@ -19,16 +19,22 @@ export type CompletedCyclicRep = 'valid' | 'partial';
 export interface CyclicPhaseMachineTransition {
   readonly phase: MovementPhase;
   readonly completedRep?: CompletedCyclicRep;
+  readonly bottomHoldMs?: number;
 }
 
 export class CyclicPhaseMachine {
   private currentPhase: MovementPhase = 'setup_needed';
   private bottomEnteredAt?: number;
+  private latestBottomHoldMs = 0;
 
   public constructor(private readonly config: CyclicPhaseMachineConfig) {}
 
   public get phase(): MovementPhase {
     return this.currentPhase;
+  }
+
+  public get lastBottomHoldMs(): number {
+    return this.latestBottomHoldMs;
   }
 
   public setPhase(phase: MovementPhase): void {
@@ -42,12 +48,14 @@ export class CyclicPhaseMachine {
   public reset(): void {
     this.currentPhase = 'setup_needed';
     this.bottomEnteredAt = undefined;
+    this.latestBottomHoldMs = 0;
   }
 
   public update(input: CyclicPhaseMachineInput): CyclicPhaseMachineTransition {
     const reachedBottom = input.signal <= this.config.bottomThreshold;
     const reachedTop = input.signal >= this.config.topThreshold;
     let completedRep: CompletedCyclicRep | undefined;
+    let bottomHoldMs: number | undefined;
 
     switch (this.currentPhase) {
       case 'tracking_lost':
@@ -90,6 +98,11 @@ export class CyclicPhaseMachine {
           (input.isAscendingSignal ||
             input.signal >= this.config.bottomThreshold + this.config.hysteresis)
         ) {
+          bottomHoldMs =
+            this.bottomEnteredAt === undefined
+              ? undefined
+              : input.timestampMs - this.bottomEnteredAt;
+          this.latestBottomHoldMs = bottomHoldMs ?? 0;
           this.currentPhase = 'ascending';
         }
         break;
@@ -109,6 +122,7 @@ export class CyclicPhaseMachine {
     return {
       phase: this.currentPhase,
       completedRep,
+      ...(bottomHoldMs === undefined ? {} : { bottomHoldMs }),
     };
   }
 }
