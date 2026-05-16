@@ -33,6 +33,7 @@ export interface MovementReplayResult {
   readonly repEvents: readonly NonNullable<MovementInterpreterState['lastRep']>[];
   readonly activeFrameCount: number;
   readonly trackingLostFrameCount: number;
+  readonly metrics: MovementReplayMetrics;
 }
 
 export interface RecognitionReplayResult {
@@ -40,6 +41,28 @@ export interface RecognitionReplayResult {
   readonly finalState: MovementRecognitionEngineState;
   readonly primaryTimeline: readonly MovementInterpreterState[];
   readonly primaryMovementTypes: readonly MovementInterpreterState['movementType'][];
+  readonly metrics: RecognitionReplayMetrics;
+}
+
+export interface MovementReplayMetrics {
+  readonly activeFrameRatio: number;
+  readonly phaseJitter: number;
+  readonly confidenceStability: number;
+  readonly trackingLostRatio: number;
+}
+
+export interface RecognitionReplayMetrics {
+  readonly primarySwitchCount: number;
+  readonly primaryStability: number;
+  readonly confidenceStability: number;
+  readonly trackingLostRatio: number;
+}
+
+export interface MovementReplayEvaluation {
+  readonly repCountAccuracy: number;
+  readonly falseActivationCount: number;
+  readonly confidenceStability: number;
+  readonly phaseJitter: number;
 }
 
 export function replayMovementSequence(
@@ -72,6 +95,31 @@ export function replayRecognitionSequence(
     finalState: states.at(-1) as MovementRecognitionEngineState,
     primaryTimeline,
     primaryMovementTypes: primaryTimeline.map((state) => state.movementType),
+    metrics: summarizeRecognitionMetrics(states, primaryTimeline),
+  };
+}
+
+export function evaluateMovementReplay(
+  replay: MovementReplayResult,
+  expected: {
+    readonly expectedReps: number;
+    readonly allowActiveFrames?: boolean;
+  },
+): MovementReplayEvaluation {
+  const repError = Math.abs(replay.finalState.reps - expected.expectedReps);
+
+  return {
+    repCountAccuracy:
+      expected.expectedReps === 0
+        ? repError === 0
+          ? 1
+          : 0
+        : clamp01(1 - repError / expected.expectedReps),
+    falseActivationCount: expected.allowActiveFrames
+      ? 0
+      : replay.states.filter((state) => state.recognition.status === 'active').length,
+    confidenceStability: replay.metrics.confidenceStability,
+    phaseJitter: replay.metrics.phaseJitter,
   };
 }
 
@@ -207,7 +255,60 @@ function summarizeMovementStates(
     repEvents,
     activeFrameCount: states.filter((state) => state.recognition.status === 'active').length,
     trackingLostFrameCount: states.filter((state) => state.phase === 'tracking_lost').length,
+    metrics: summarizeMovementMetrics(states, phaseChanges),
   };
+}
+
+function summarizeMovementMetrics(
+  states: readonly MovementInterpreterState[],
+  phaseChanges: readonly MovementInterpreterState[],
+): MovementReplayMetrics {
+  return {
+    activeFrameRatio:
+      states.length === 0
+        ? 0
+        : states.filter((state) => state.recognition.status === 'active').length / states.length,
+    phaseJitter: states.length <= 1 ? 0 : (phaseChanges.length - 1) / (states.length - 1),
+    confidenceStability: confidenceStability(states.map((state) => state.recognition.confidence)),
+    trackingLostRatio:
+      states.length === 0
+        ? 0
+        : states.filter((state) => state.phase === 'tracking_lost').length / states.length,
+  };
+}
+
+function summarizeRecognitionMetrics(
+  states: readonly MovementRecognitionEngineState[],
+  primaryTimeline: readonly MovementInterpreterState[],
+): RecognitionReplayMetrics {
+  const primarySwitchCount = primaryTimeline.filter(
+    (state, index) => index > 0 && state.movementType !== primaryTimeline[index - 1]?.movementType,
+  ).length;
+
+  return {
+    primarySwitchCount,
+    primaryStability:
+      primaryTimeline.length <= 1
+        ? 1
+        : clamp01(1 - primarySwitchCount / (primaryTimeline.length - 1)),
+    confidenceStability: confidenceStability(states.map((state) => state.inference.confidence)),
+    trackingLostRatio:
+      states.length === 0
+        ? 0
+        : states.filter((state) => state.inference.status === 'tracking_lost').length /
+          states.length,
+  };
+}
+
+function confidenceStability(values: readonly number[]): number {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
+
+  return clamp01(1 - Math.sqrt(variance));
 }
 
 function sideLandmarks(
@@ -273,4 +374,8 @@ function landmark(name: LandmarkName, x: number, y: number, visibility: number):
     visibility,
     presence: visibility,
   };
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
 }

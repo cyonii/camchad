@@ -10,6 +10,7 @@ import {
   makePushUpFrame,
   makePushUpRepSequence,
   makeSquatRepSequence,
+  evaluateMovementReplay,
   replayMovementSequence,
   replayRecognitionSequence,
 } from './test-fixtures.js';
@@ -35,6 +36,13 @@ describe('movement sequence replay', () => {
     ]);
     expect(replay.activeFrameCount).toBeGreaterThan(0);
     expect(replay.trackingLostFrameCount).toBe(0);
+    expect(
+      evaluateMovementReplay(replay, { expectedReps: 1, allowActiveFrames: true }),
+    ).toMatchObject({
+      repCountAccuracy: 1,
+      falseActivationCount: 0,
+    });
+    expect(replay.metrics.confidenceStability).toBeGreaterThan(0.8);
   });
 
   it('summarizes an incomplete push-up sequence as a partial rep', () => {
@@ -62,6 +70,9 @@ describe('movement sequence replay', () => {
     expect(replay.finalState.warnings.some((warning) => warning.code === 'body_alignment')).toBe(
       true,
     );
+    expect(
+      evaluateMovementReplay(replay, { expectedReps: 0 }).falseActivationCount,
+    ).toBeGreaterThan(0);
   });
 
   it('captures tracking loss and recovery inside a push-up trace', () => {
@@ -122,6 +133,8 @@ describe('movement sequence replay', () => {
 
     expect(replay.primaryMovementTypes).toContain('push_up');
     expect(replay.primaryMovementTypes).toContain('squat');
+    expect(replay.metrics.primarySwitchCount).toBeGreaterThanOrEqual(1);
+    expect(replay.metrics.primaryStability).toBeGreaterThan(0.5);
     expect(replay.finalState.primary).toMatchObject({
       movementType: 'squat',
       reps: 1,
