@@ -44,6 +44,12 @@ describe('SquatMovementInterpreter', () => {
     expect(state.metrics.sampleWindowMs).toBe(120);
     expect(state.metrics.missingSampleRatio).toBe(0);
     expect(state.metrics.primaryJointVelocity).toBeLessThan(0);
+    expect(state.metrics.primaryJointRange).toBeGreaterThan(20);
+    expect(state.metrics.depthDeficitDegrees).toBeGreaterThan(0);
+    expect(state.metrics.standingRecoveryScore).toBeGreaterThan(0);
+    expect(state.metrics.torsoInclinationRange).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.centerOfMassTravelRatio).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.lowerBodyCoverage).toBeGreaterThan(0.6);
     expect(state.metrics.temporalStabilityScore).toBeGreaterThan(0.7);
   });
 

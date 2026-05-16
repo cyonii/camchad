@@ -111,6 +111,15 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     const kneeVelocity = this.temporalTracker.signalVelocity((state) =>
       averagedDefined(state.jointAngles.leftKnee, state.jointAngles.rightKnee),
     );
+    const kneeStats = this.temporalTracker.signalStats((state) =>
+      averagedDefined(state.jointAngles.leftKnee, state.jointAngles.rightKnee),
+    );
+    const torsoInclinationStats = this.temporalTracker.signalStats(
+      (state) => state.geometry.torsoInclinationDegrees,
+    );
+    const centerOfMassTravelStats = this.temporalTracker.signalStats(
+      (state) => state.geometry.centerOfMassY,
+    );
     const kneeVelocityValue = kneeVelocity?.valuePerSecond ?? 0;
     const isDescendingSignal =
       kneeVelocity?.direction === 'decreasing' &&
@@ -118,13 +127,25 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     const isAscendingSignal =
       kneeVelocity?.direction === 'increasing' &&
       Math.abs(kneeVelocityValue) >= this.config.minPhaseVelocityDegPerSecond;
+    const primaryJointRange = kneeStats.range;
+    const standingRecoveryScore = jointLockoutScore(
+      kneeAngle,
+      this.config.bottomKneeAngle,
+      this.config.topKneeAngle,
+    );
 
     this.lowestKneeAngle = Math.min(this.lowestKneeAngle, kneeAngle);
     this.metrics = {
       primaryJointAngle: kneeAngle,
+      primaryJointRange,
       kneeAngle,
       rangeOfMotionScore: this.depthScore(),
+      depthDeficitDegrees: Math.max(0, this.lowestKneeAngle - this.config.bottomKneeAngle),
       postureScore,
+      standingRecoveryScore,
+      torsoInclinationRange: torsoInclinationStats.range,
+      centerOfMassTravelRatio: centerOfMassTravelStats.range,
+      lowerBodyCoverage: bodyState.coverage.lowerBody,
       movementConfidence: rawMovementConfidence,
       temporalMovementConfidence: temporalSnapshot.confidence.confidence,
       poseConfidence: features.poseConfidence,
@@ -280,6 +301,16 @@ function averagedDefined(a: number | undefined, b: number | undefined): number |
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
+}
+
+function jointLockoutScore(angle: number, bottomAngle: number, topAngle: number): number {
+  const range = topAngle - bottomAngle;
+
+  if (range <= 0) {
+    return 0;
+  }
+
+  return clamp01((angle - bottomAngle) / range);
 }
 
 const trackingLostRecognition: MovementRecognition = {
