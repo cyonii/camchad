@@ -8,7 +8,14 @@ import {
   type PoseLandmarkMap,
 } from '@camchad/pose-core';
 
-export type BodyOrientationKind = 'standing' | 'floor' | 'diagonal' | 'unknown';
+export type BodyOrientationKind =
+  | 'standing'
+  | 'floor'
+  | 'diagonal'
+  | 'seated'
+  | 'hanging'
+  | 'ambiguous'
+  | 'unknown';
 export type BodyViewOrientationKind = 'front' | 'side' | 'diagonal' | 'ambiguous' | 'unknown';
 
 export type BodyRegion =
@@ -111,7 +118,7 @@ export function extractBodyState(frame: PoseFrame | undefined): BodyState | unde
     landmarks: normalizedLandmarks,
     worldLandmarks: normalizedWorldLandmarks,
     coverage: computeBodyCoverage(frame),
-    orientation: estimateBodyOrientation(shoulderCenter, hipCenter),
+    orientation: estimateBodyOrientation(frame, shoulderCenter, hipCenter),
     viewOrientation: estimateViewOrientation(geometry),
     jointAngles: computeJointAngles(frame),
     geometry,
@@ -240,6 +247,7 @@ function computeGeometrySignals(
 }
 
 function estimateBodyOrientation(
+  frame: PoseFrame,
   shoulderCenter: { readonly x: number; readonly y: number },
   hipCenter: { readonly x: number; readonly y: number },
 ): BodyOrientationEstimate {
@@ -251,15 +259,69 @@ function estimateBodyOrientation(
     return { kind: 'unknown', confidence: 0 };
   }
 
-  if (dy > dx * 1.6) {
-    return { kind: 'standing', confidence: clamp01(dy / total) };
+  const hangingConfidence = hangingPostureConfidence(frame, shoulderCenter);
+
+  if (hangingConfidence > 0.62) {
+    return { kind: 'hanging', confidence: hangingConfidence };
   }
 
   if (dx > dy * 1.2) {
     return { kind: 'floor', confidence: clamp01(dx / total) };
   }
 
+  const seatedConfidence = seatedPostureConfidence(frame, hipCenter);
+
+  if (seatedConfidence > 0.62) {
+    return { kind: 'seated', confidence: seatedConfidence };
+  }
+
+  if (dy > dx * 1.6) {
+    return { kind: 'standing', confidence: clamp01(dy / total) };
+  }
+
+  if (Math.abs(dx - dy) / total < 0.08) {
+    return { kind: 'ambiguous', confidence: 0.35 };
+  }
+
   return { kind: 'diagonal', confidence: 0.58 };
+}
+
+function seatedPostureConfidence(frame: PoseFrame, hipCenter: { readonly y: number }): number {
+  const leftKnee = frame.landmarks.get('left_knee');
+  const rightKnee = frame.landmarks.get('right_knee');
+
+  if (!leftKnee && !rightKnee) {
+    return 0;
+  }
+
+  const kneeY = average(
+    [leftKnee, rightKnee]
+      .filter((landmark): landmark is PoseLandmark => landmark !== undefined)
+      .map((landmark) => landmark.y),
+  );
+  const hipKneeVerticalGap = Math.abs(kneeY - hipCenter.y);
+
+  return clamp01((0.16 - hipKneeVerticalGap) / 0.16);
+}
+
+function hangingPostureConfidence(
+  frame: PoseFrame,
+  shoulderCenter: { readonly y: number },
+): number {
+  const leftWrist = frame.landmarks.get('left_wrist');
+  const rightWrist = frame.landmarks.get('right_wrist');
+
+  if (!leftWrist && !rightWrist) {
+    return 0;
+  }
+
+  const wristY = average(
+    [leftWrist, rightWrist]
+      .filter((landmark): landmark is PoseLandmark => landmark !== undefined)
+      .map((landmark) => landmark.y),
+  );
+
+  return clamp01((shoulderCenter.y - wristY - 0.08) / 0.18);
 }
 
 function estimateViewOrientation(geometry: BodyGeometrySignals): BodyViewOrientationEstimate {

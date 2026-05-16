@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { toLandmarkMap, type PoseFrame } from '@camchad/pose-core';
+import { toLandmarkMap, type PoseFrame, type PoseLandmark } from '@camchad/pose-core';
 
 import { extractBodyState } from './body-state.js';
 import { makePushUpFrame, makeSquatFrame } from './test-fixtures.js';
@@ -51,6 +51,17 @@ describe('extractBodyState', () => {
     expect(state?.viewOrientation.confidence).toBeGreaterThan(0);
   });
 
+  it('classifies seated and hanging body orientations when posture signals are clear', () => {
+    expect(
+      extractBodyState(seatLegs(makeSquatFrame({ timestampMs: 0, kneeAngle: 160 })))?.orientation
+        .kind,
+    ).toBe('seated');
+    expect(
+      extractBodyState(raiseWrists(makeSquatFrame({ timestampMs: 0, kneeAngle: 160 })))?.orientation
+        .kind,
+    ).toBe('hanging');
+  });
+
   it('reports region coverage separately for visible and occluded sides', () => {
     const state = extractBodyState(
       makePushUpFrame({ timestampMs: 0, elbowAngle: 150, rightVisibility: 0.1 }),
@@ -90,5 +101,39 @@ function widenTorso(frame: PoseFrame): PoseFrame {
         }
       }),
     ),
+  };
+}
+
+function seatLegs(frame: PoseFrame): PoseFrame {
+  return mapLandmarks(frame, (landmark) => {
+    switch (landmark.name) {
+      case 'left_knee':
+      case 'right_knee':
+        return { ...landmark, y: 0.49 };
+      default:
+        return landmark;
+    }
+  });
+}
+
+function raiseWrists(frame: PoseFrame): PoseFrame {
+  return mapLandmarks(frame, (landmark) => {
+    switch (landmark.name) {
+      case 'left_wrist':
+      case 'right_wrist':
+        return { ...landmark, y: 0.04 };
+      default:
+        return landmark;
+    }
+  });
+}
+
+function mapLandmarks(
+  frame: PoseFrame,
+  mapper: (landmark: PoseLandmark) => PoseLandmark,
+): PoseFrame {
+  return {
+    ...frame,
+    landmarks: toLandmarkMap([...frame.landmarks.values()].map(mapper)),
   };
 }
