@@ -31,6 +31,10 @@ export class MediaPipePoseEstimator implements PoseEstimator {
       minPoseDetectionConfidence: this.options.minPoseDetectionConfidence ?? 0.55,
       minPosePresenceConfidence: this.options.minPosePresenceConfidence ?? 0.55,
       minTrackingConfidence: this.options.minTrackingConfidence ?? 0.55,
+      outputSegmentationMasks:
+        this.options.outputSegmentationMasks ??
+        this.options.capabilityFlags?.enablePoseSegmentation ??
+        false,
     });
   }
 
