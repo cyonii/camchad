@@ -10,10 +10,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@home-workout/pose-core': `${root}packages/pose-core/src/index.ts`,
-      '@home-workout/movement-core': `${root}packages/movement-core/src/index.ts`,
-      '@home-workout/workout-history': `${root}packages/workout-history/src/index.ts`,
-      '@home-workout/ui': `${root}packages/ui/src/index.ts`,
+      '@camchad/activity-history': `${root}packages/activity-history/src/index.ts`,
+      '@camchad/movement-core': `${root}packages/movement-core/src/index.ts`,
+      '@camchad/pose-core': `${root}packages/pose-core/src/index.ts`,
+      '@camchad/ui': `${root}packages/ui/src/index.ts`,
     },
   },
 });
