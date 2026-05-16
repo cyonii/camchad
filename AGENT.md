@@ -20,7 +20,7 @@ Treat this repository like software you will still own after it ships. Optimize 
 - Prefer pure helpers for geometry, recognition rules, thresholds, scoring, and history modeling. They should be testable with plain input/output assertions.
 - If testing a unit requires mocking time, media devices, storage, React lifecycle, and package internals at once, the design is too tangled. Split it before adding more behavior.
 - Do not expand already-complex functions just to finish a feature. Extract a small module, name the boundary, and leave the system easier to change than you found it.
-- Avoid compatibility shims unless they protect real local user data. Migration paths are valuable; alias-only modules and duplicated entry points are usually debt.
+- Avoid backward-compatibility shims unless they protect real local user data. When product direction changes, safely remove obsolete names, files, flows, and abstractions; restructure and refactor fully instead of preserving stale concepts out of habit. Migration paths are valuable; alias-only modules and duplicated entry points are usually debt.
 
 ## Movement Product Direction
 
