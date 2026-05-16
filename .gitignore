@@ -17,5 +17,4 @@ apps/web/public/vendor/
 videos/
 release/
 out/
-.codex-plan/
-.codex-plans/
+.dev

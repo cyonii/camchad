@@ -6,7 +6,10 @@ import { SquatMovementInterpreter } from './squat-interpreter.js';
 import {
   makeForwardLeaningSquatSequence,
   makeConfusedStandingSequence,
+  makeDeadliftLikeSequence,
+  makeHighKneesSequence,
   makeInvalidPushUpAlignmentSequence,
+  makeLungeLikeSequence,
   makePausedSquatSequence,
   makePartialPushUpSequence,
   makePushUpFrame,
@@ -153,6 +156,25 @@ describe('movement sequence replay', () => {
     });
     expect(confused.finalState.reps).toBe(0);
     expect(confused.metrics.phaseJitter).toBeLessThan(0.6);
+  });
+
+  it('does not absorb high knees, lunges, or hinge patterns into squat counting', () => {
+    const highKnees = replayMovementSequence(
+      new SquatMovementInterpreter(),
+      makeHighKneesSequence(),
+    );
+    const lunge = replayMovementSequence(new SquatMovementInterpreter(), makeLungeLikeSequence());
+    const deadlift = replayMovementSequence(
+      new SquatMovementInterpreter(),
+      makeDeadliftLikeSequence(),
+    );
+
+    expect(highKnees.finalState.reps).toBe(0);
+    expect(highKnees.finalState.recognition.evidence).toContain('knee_lift_pattern_not_squat');
+    expect(lunge.finalState.reps).toBe(0);
+    expect(lunge.finalState.recognition.evidence).toContain('split_stance_pattern_not_squat');
+    expect(deadlift.finalState.reps).toBe(0);
+    expect(deadlift.finalState.recognition.evidence).toContain('hip_hinge_pattern_not_squat');
   });
 
   it('replays exercise transitions through the recognition engine', () => {

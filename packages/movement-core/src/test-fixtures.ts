@@ -196,6 +196,31 @@ export function makeConfusedStandingSequence(startTimestampMs = 0): PoseSequence
   ];
 }
 
+export function makeHighKneesSequence(startTimestampMs = 0): PoseSequence {
+  return [
+    makeHighKneesFrame({ timestampMs: startTimestampMs, liftedSide: 'left' }),
+    makeHighKneesFrame({ timestampMs: startTimestampMs + 120, liftedSide: 'right' }),
+    makeHighKneesFrame({ timestampMs: startTimestampMs + 260, liftedSide: 'left' }),
+    makeHighKneesFrame({ timestampMs: startTimestampMs + 420, liftedSide: 'right' }),
+  ];
+}
+
+export function makeLungeLikeSequence(startTimestampMs = 0): PoseSequence {
+  return [
+    makeSplitStanceFrame({ timestampMs: startTimestampMs, frontKneeY: 0.62 }),
+    makeSplitStanceFrame({ timestampMs: startTimestampMs + 130, frontKneeY: 0.68 }),
+    makeSplitStanceFrame({ timestampMs: startTimestampMs + 280, frontKneeY: 0.62 }),
+  ];
+}
+
+export function makeDeadliftLikeSequence(startTimestampMs = 0): PoseSequence {
+  return [
+    makeHipHingeFrame({ timestampMs: startTimestampMs, torsoLeanX: 0.24, kneeY: 0.65 }),
+    makeHipHingeFrame({ timestampMs: startTimestampMs + 160, torsoLeanX: 0.25, kneeY: 0.66 }),
+    makeHipHingeFrame({ timestampMs: startTimestampMs + 340, torsoLeanX: 0.23, kneeY: 0.65 }),
+  ];
+}
+
 export function makePushUpFrame(options: PushUpFrameOptions): PoseFrame {
   const visibility = options.visibility ?? 0.95;
   const leftVisibility = options.leftVisibility ?? visibility;
@@ -242,6 +267,100 @@ export function makeSquatFrame(options: SquatFrameOptions): PoseFrame {
     y: knee.y + Math.sin(radians) * lowerLegLength,
   };
 
+  const left = standingSideLandmarks('left', shoulder, hip, knee, ankle, visibility);
+  const right = standingSideLandmarks(
+    'right',
+    { x: shoulder.x + 0.02, y: shoulder.y },
+    { x: hip.x + 0.02, y: hip.y },
+    { x: knee.x + 0.02, y: knee.y },
+    { x: ankle.x + 0.02, y: ankle.y },
+    visibility,
+  );
+
+  return {
+    timestampMs: options.timestampMs,
+    landmarks: toLandmarkMap([...left, ...right]),
+    confidence: visibility,
+  };
+}
+
+function makeHighKneesFrame(options: {
+  readonly timestampMs: number;
+  readonly liftedSide: 'left' | 'right';
+}): PoseFrame {
+  const visibility = 0.95;
+  const shoulder = { x: 0.5, y: 0.22 };
+  const hip = { x: 0.5, y: 0.45 };
+  const stanceKnee = { x: 0.5, y: 0.66 };
+  const stanceAnkle = { x: 0.5, y: 0.88 };
+  const liftedKnee = { x: 0.5, y: 0.32 };
+  const liftedAnkle = { x: 0.5, y: 0.54 };
+  const leftIsLifted = options.liftedSide === 'left';
+  const left = standingSideLandmarks(
+    'left',
+    shoulder,
+    hip,
+    leftIsLifted ? liftedKnee : stanceKnee,
+    leftIsLifted ? liftedAnkle : stanceAnkle,
+    visibility,
+  );
+  const right = standingSideLandmarks(
+    'right',
+    { x: shoulder.x + 0.02, y: shoulder.y },
+    { x: hip.x + 0.02, y: hip.y },
+    leftIsLifted ? stanceKnee : liftedKnee,
+    leftIsLifted ? stanceAnkle : liftedAnkle,
+    visibility,
+  );
+
+  return {
+    timestampMs: options.timestampMs,
+    landmarks: toLandmarkMap([...left, ...right]),
+    confidence: visibility,
+  };
+}
+
+function makeSplitStanceFrame(options: {
+  readonly timestampMs: number;
+  readonly frontKneeY: number;
+}): PoseFrame {
+  const visibility = 0.95;
+  const shoulder = { x: 0.5, y: 0.22 };
+  const hip = { x: 0.5, y: 0.45 };
+  const left = standingSideLandmarks(
+    'left',
+    shoulder,
+    hip,
+    { x: 0.42, y: options.frontKneeY },
+    { x: 0.22, y: 0.86 },
+    visibility,
+  );
+  const right = standingSideLandmarks(
+    'right',
+    { x: shoulder.x + 0.02, y: shoulder.y },
+    { x: hip.x + 0.02, y: hip.y },
+    { x: 0.58, y: 0.72 },
+    { x: 0.82, y: 0.86 },
+    visibility,
+  );
+
+  return {
+    timestampMs: options.timestampMs,
+    landmarks: toLandmarkMap([...left, ...right]),
+    confidence: visibility,
+  };
+}
+
+function makeHipHingeFrame(options: {
+  readonly timestampMs: number;
+  readonly torsoLeanX: number;
+  readonly kneeY: number;
+}): PoseFrame {
+  const visibility = 0.95;
+  const shoulder = { x: 0.5 + options.torsoLeanX, y: 0.24 };
+  const hip = { x: 0.5, y: 0.45 };
+  const knee = { x: 0.5, y: options.kneeY };
+  const ankle = { x: 0.5, y: 0.88 };
   const left = standingSideLandmarks('left', shoulder, hip, knee, ankle, visibility);
   const right = standingSideLandmarks(
     'right',

@@ -11,7 +11,10 @@ import { CyclicPhaseMachine } from './cyclic-phase-machine.js';
 import { extractBodyState } from './body-state.js';
 import { MovementTemporalTracker } from './movement-temporal-tracker.js';
 import type { MovementWindowSnapshot } from './movement-window.js';
-import { extractPoseMovementFeatures } from './pose-movement-features.js';
+import {
+  extractPoseMovementFeatures,
+  type PoseMovementFeatures,
+} from './pose-movement-features.js';
 
 export interface SquatMovementInterpreterConfig {
   readonly cameraAngle: CameraAngle;
@@ -19,6 +22,10 @@ export interface SquatMovementInterpreterConfig {
   readonly topKneeAngle: number;
   readonly bottomKneeAngle: number;
   readonly maxTorsoInclinationDegrees: number;
+  readonly maxKneeLiftRatio: number;
+  readonly maxSplitStanceRatio: number;
+  readonly maxHingeInclinationDegrees: number;
+  readonly minHingeKneeAngle: number;
   readonly minBottomHoldMs: number;
   readonly minPhaseVelocityDegPerSecond: number;
   readonly phaseHysteresisDegrees: number;
@@ -30,6 +37,10 @@ export const defaultSquatConfig: SquatMovementInterpreterConfig = {
   topKneeAngle: 154,
   bottomKneeAngle: 112,
   maxTorsoInclinationDegrees: 38,
+  maxKneeLiftRatio: 0.06,
+  maxSplitStanceRatio: 1.2,
+  maxHingeInclinationDegrees: 45,
+  minHingeKneeAngle: 142,
   minBottomHoldMs: 80,
   minPhaseVelocityDegPerSecond: 12,
   phaseHysteresisDegrees: 8,
@@ -89,6 +100,9 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
+    const kneeAngle = features.averageKneeAngle;
+    const torsoInclination = features.torsoInclinationDegrees ?? 0;
+
     if (features.bodyOrientation === 'horizontal' || bodyState.orientation.kind === 'floor') {
       this.phaseMachine.setPhase('setup_needed');
       this.warnings = [];
@@ -100,8 +114,37 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
-    const kneeAngle = features.averageKneeAngle;
-    const torsoInclination = features.torsoInclinationDegrees ?? 0;
+    const disqualifier = squatDisqualifier(features, kneeAngle, torsoInclination, this.config);
+
+    if (disqualifier) {
+      const rawMovementConfidence = movementConfidence(
+        features.movementConfidence,
+        features.bodyOrientationScore,
+        bodyState.orientation.confidence,
+      );
+      const temporalSnapshot = this.temporalTracker.add(bodyState, rawMovementConfidence * 0.35);
+
+      this.phaseMachine.setPhase('setup_needed');
+      this.metrics = {
+        kneeAngle,
+        primaryJointAngle: kneeAngle,
+        movementConfidence: rawMovementConfidence * 0.35,
+        temporalMovementConfidence: temporalSnapshot.confidence.confidence,
+        poseConfidence: features.poseConfidence,
+        torsoInclination,
+        kneeLiftRatio: features.kneeLiftRatio ?? 0,
+        maxKneeLiftRatio: features.maxKneeLiftRatio ?? 0,
+        ankleSpanRatio: features.ankleSpanRatio ?? 0,
+      };
+      this.warnings = [];
+      this.recognition = {
+        confidence: rawMovementConfidence * 0.35,
+        status: 'candidate',
+        evidence: [disqualifier],
+      };
+      return this.getState();
+    }
+
     const postureScore = clamp01(1 - torsoInclination / this.config.maxTorsoInclinationDegrees);
     const hasPostureWarning = torsoInclination > this.config.maxTorsoInclinationDegrees;
     const rawMovementConfidence = movementConfidence(
@@ -359,6 +402,30 @@ function averagedDefined(a: number | undefined, b: number | undefined): number |
   }
 
   return (a + b) / 2;
+}
+
+function squatDisqualifier(
+  features: PoseMovementFeatures,
+  kneeAngle: number,
+  torsoInclination: number,
+  config: SquatMovementInterpreterConfig,
+): string | undefined {
+  if ((features.maxKneeLiftRatio ?? features.kneeLiftRatio ?? 0) > config.maxKneeLiftRatio) {
+    return 'knee_lift_pattern_not_squat';
+  }
+
+  if ((features.ankleSpanRatio ?? 0) > config.maxSplitStanceRatio) {
+    return 'split_stance_pattern_not_squat';
+  }
+
+  if (
+    torsoInclination > config.maxHingeInclinationDegrees &&
+    kneeAngle >= config.minHingeKneeAngle
+  ) {
+    return 'hip_hinge_pattern_not_squat';
+  }
+
+  return undefined;
 }
 
 function jointImbalanceRatio(a: number | undefined, b: number | undefined): number {

@@ -28,6 +28,7 @@ export interface PoseMovementFeatures {
   readonly wristSpanRatio?: number;
   readonly wristElevationRatio?: number;
   readonly kneeLiftRatio?: number;
+  readonly maxKneeLiftRatio?: number;
 }
 
 export function extractPoseMovementFeatures(
@@ -57,6 +58,8 @@ export function extractPoseMovementFeatures(
   const rightWrist = visibleLandmark(frame, 'right_wrist', minVisibility);
   const wristCenter = centerLandmark(frame, 'left_wrist', 'right_wrist', minVisibility);
   const ankleCenter = centerLandmark(frame, 'left_ankle', 'right_ankle', minVisibility);
+  const leftKnee = visibleLandmark(frame, 'left_knee', minVisibility);
+  const rightKnee = visibleLandmark(frame, 'right_knee', minVisibility);
 
   return {
     timestampMs: frame.timestampMs,
@@ -80,6 +83,10 @@ export function extractPoseMovementFeatures(
       leftWrist && rightWrist ? Math.abs(leftWrist.x - rightWrist.x) / bodyScale : undefined,
     wristElevationRatio: wristCenter ? (shoulderCenter.y - wristCenter.y) / bodyScale : undefined,
     kneeLiftRatio: kneeCenter ? (hipCenter.y - kneeCenter.y) / bodyScale : undefined,
+    maxKneeLiftRatio: maxDefined(
+      leftKnee ? (hipCenter.y - leftKnee.y) / bodyScale : undefined,
+      rightKnee ? (hipCenter.y - rightKnee.y) / bodyScale : undefined,
+    ),
   };
 }
 
@@ -200,6 +207,18 @@ function average(values: readonly (number | undefined)[]): number | undefined {
   }
 
   return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
+}
+
+function maxDefined(a: number | undefined, b: number | undefined): number | undefined {
+  if (a === undefined) {
+    return b;
+  }
+
+  if (b === undefined) {
+    return a;
+  }
+
+  return Math.max(a, b);
 }
 
 function clamp01(value: number): number {
