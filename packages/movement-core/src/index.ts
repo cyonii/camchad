@@ -5,6 +5,7 @@ export * from './cyclic-phase-machine.js';
 export * from './hold-state-machine.js';
 export * from './movement-interpreter.js';
 export * from './movement-diagnostics.js';
+export * from './movement-profile-evaluation-context.js';
 export * from './movement-recognition-engine.js';
 export * from './movement-registry.js';
 export * from './movement-temporal-tracker.js';

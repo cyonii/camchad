@@ -38,6 +38,17 @@ export function extractPoseMovementFeatures(
 ): PoseMovementFeatures | undefined {
   const bodyState = extractBodyState(frame);
 
+  if (!bodyState) {
+    return undefined;
+  }
+
+  return poseMovementFeaturesFromBodyState(bodyState, minVisibility);
+}
+
+export function poseMovementFeaturesFromBodyState(
+  bodyState: BodyState,
+  minVisibility = 0.45,
+): PoseMovementFeatures | undefined {
   if (!bodyState || bodyState.coverage.regions.torso < minVisibility) {
     return undefined;
   }

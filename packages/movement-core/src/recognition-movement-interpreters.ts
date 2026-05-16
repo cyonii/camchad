@@ -7,10 +7,11 @@ import type {
   RepEvent,
 } from './movement-interpreter.js';
 import {
-  extractPoseMovementFeatures,
-  type BodyOrientation,
-  type PoseMovementFeatures,
-} from './pose-movement-features.js';
+  createMovementProfileWindow,
+  evaluateMovementProfileFrame,
+  type MovementProfileEvaluationContext,
+} from './movement-profile-evaluation-context.js';
+import { type BodyOrientation, type PoseMovementFeatures } from './pose-movement-features.js';
 
 export type RecognitionMovementType =
   | 'sit_up'
@@ -76,6 +77,7 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
   private warnings: FormWarning[] = [];
   private metrics: Record<string, number> = {};
   private recognition: MovementRecognition = trackingLostRecognition;
+  private readonly window = createMovementProfileWindow();
 
   public constructor(private readonly config: CycleMovementInterpreterConfig) {
     this.movementType = config.movementType;
@@ -85,15 +87,21 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
   public processPose(
     frame: Parameters<MovementInterpreter['processPose']>[0],
   ): MovementInterpreterState {
-    const features = extractPoseMovementFeatures(frame, this.config.minVisibility);
+    const context = evaluateMovementProfileFrame({
+      frame,
+      window: this.window,
+      minVisibility: this.config.minVisibility,
+      interpreterState: this.getState(),
+    });
 
-    if (!features) {
+    if (!context) {
       this.phase = 'tracking_lost';
       this.warnings = [trackingLostWarning];
       this.recognition = trackingLostRecognition;
       return this.getState();
     }
 
+    const { features } = context;
     const metric = this.config.primaryMetric(features);
 
     if (metric === undefined) {
@@ -106,7 +114,7 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
     if (!this.config.expectedOrientations.includes(features.bodyOrientation)) {
       this.phase = 'setup_needed';
       this.warnings = [];
-      this.metrics = this.metricsFor(features, metric, 0.12);
+      this.metrics = this.metricsFor(context, metric, 0.12);
       this.recognition = {
         movementType: this.movementType,
         confidence: 0.12,
@@ -124,7 +132,7 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
       this.config.direction === 'increase'
         ? Math.max(this.extremeMetric, metric)
         : Math.min(this.extremeMetric, metric);
-    this.metrics = this.metricsFor(features, metric, confidence);
+    this.metrics = this.metricsFor(context, metric, confidence);
     this.warnings = confidence < 0.42 ? [lowConfidenceWarning] : [];
 
     switch (this.phase) {
@@ -198,6 +206,7 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
     this.warnings = [];
     this.metrics = {};
     this.recognition = trackingLostRecognition;
+    this.window.reset();
   }
 
   public getState(): MovementInterpreterState {
@@ -242,10 +251,12 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
   }
 
   private metricsFor(
-    features: PoseMovementFeatures,
+    context: MovementProfileEvaluationContext,
     metric: number,
     confidence: number,
   ): Record<string, number> {
+    const { features, window } = context;
+
     return {
       [this.config.primaryMetricKey]: metric,
       primaryJointAngle: metric,
@@ -255,6 +266,8 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
       movementConfidence: confidence,
       poseConfidence: features.poseConfidence,
       bodyOrientationScore: features.bodyOrientationScore,
+      temporalConfidence: window.averageConfidence,
+      missingSampleRatio: window.missingSampleRatio,
     };
   }
 
@@ -319,6 +332,7 @@ class HoldRecognitionMovementInterpreter implements MovementInterpreter {
   private warnings: FormWarning[] = [];
   private metrics: Record<string, number> = {};
   private recognition: MovementRecognition = trackingLostRecognition;
+  private readonly window = createMovementProfileWindow();
 
   public constructor(private readonly config: HoldMovementInterpreterConfig) {
     this.movementType = config.movementType;
@@ -327,15 +341,21 @@ class HoldRecognitionMovementInterpreter implements MovementInterpreter {
   public processPose(
     frame: Parameters<MovementInterpreter['processPose']>[0],
   ): MovementInterpreterState {
-    const features = extractPoseMovementFeatures(frame, this.config.minVisibility);
+    const context = evaluateMovementProfileFrame({
+      frame,
+      window: this.window,
+      minVisibility: this.config.minVisibility,
+      interpreterState: this.getState(),
+    });
 
-    if (!features) {
+    if (!context) {
       this.phase = 'tracking_lost';
       this.warnings = [trackingLostWarning];
       this.recognition = trackingLostRecognition;
       return this.getState();
     }
 
+    const { features, window } = context;
     const metric = this.config.primaryMetric(features);
 
     if (metric === undefined) {
@@ -359,6 +379,8 @@ class HoldRecognitionMovementInterpreter implements MovementInterpreter {
       postureScore: confidence,
       movementConfidence: confidence,
       poseConfidence: features.poseConfidence,
+      temporalConfidence: window.averageConfidence,
+      missingSampleRatio: window.missingSampleRatio,
       holdSeconds:
         this.holdStartedAt === undefined
           ? 0
@@ -414,6 +436,7 @@ class HoldRecognitionMovementInterpreter implements MovementInterpreter {
     this.warnings = [];
     this.metrics = {};
     this.recognition = trackingLostRecognition;
+    this.window.reset();
   }
 
   public getState(): MovementInterpreterState {
