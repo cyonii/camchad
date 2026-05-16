@@ -684,6 +684,102 @@ button,
   border: 1px solid rgb(var(--primary-rgb) / 22%);
   border-radius: 8px;
   background: var(--surface-video);
+  --camera-frame-rgb: var(--primary-rgb);
+  --camera-frame-intensity: 0.24;
+  --camera-frame-confidence: 0;
+  --camera-frame-alpha: calc(0.22 + (var(--camera-frame-intensity) * 0.46));
+  --camera-frame-band-alpha: calc(0.04 + (var(--camera-frame-intensity) * 0.14));
+  --camera-frame-glow: calc(0.05 + (var(--camera-frame-intensity) * 0.26));
+  box-shadow:
+    inset 0 0 0 1.5px rgb(var(--camera-frame-rgb) / var(--camera-frame-alpha)),
+    0 0 0 1px rgb(var(--camera-frame-rgb) / 4%),
+    0 18px 48px rgb(0 0 0 / 18%);
+  transition:
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    background-color 220ms ease;
+}
+
+.activity-stage-panel::before,
+.activity-stage-panel::after {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  pointer-events: none;
+  content: '';
+}
+
+.activity-stage-panel::before {
+  opacity: calc(0.18 + (var(--camera-frame-intensity) * 0.48));
+  box-shadow:
+    inset 0 0 54px rgb(var(--camera-frame-rgb) / var(--camera-frame-glow)),
+    inset 0 0 0 1.5px rgb(var(--camera-frame-rgb) / 16%);
+  transition: opacity 220ms ease;
+}
+
+.activity-stage-panel::after {
+  opacity: calc(0.06 + (var(--camera-frame-confidence) * 0.16));
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0 48%,
+      rgb(var(--camera-frame-rgb) / 18%) 50%,
+      transparent 52%
+    ),
+    linear-gradient(
+      0deg,
+      transparent 0 48%,
+      rgb(var(--camera-frame-rgb) / 12%) 50%,
+      transparent 52%
+    );
+  background-size:
+    100% 100%,
+    100% 100%;
+  mix-blend-mode: screen;
+}
+
+.activity-stage-panel[data-frame-tone='standby'] {
+  --camera-frame-rgb: 115 135 125;
+}
+
+.activity-stage-panel[data-frame-tone='acquiring'] {
+  --camera-frame-rgb: 86 176 206;
+}
+
+.activity-stage-panel[data-frame-tone='candidate'] {
+  --camera-frame-rgb: 83 196 214;
+}
+
+.activity-stage-panel[data-frame-tone='locked'],
+.activity-stage-panel[data-frame-tone='success'] {
+  --camera-frame-rgb: var(--primary-rgb);
+}
+
+.activity-stage-panel[data-frame-tone='partial'] {
+  --camera-frame-rgb: var(--warning-rgb);
+}
+
+.activity-stage-panel[data-frame-tone='unstable'],
+.activity-stage-panel[data-frame-tone='warning'] {
+  --camera-frame-rgb: var(--warning-rgb);
+}
+
+.activity-stage-panel[data-frame-tone='lost'] {
+  --camera-frame-rgb: var(--danger-rgb);
+}
+
+.activity-stage-panel[data-frame-impulse='rep_valid'] {
+  animation: frame-confirmation 620ms ease-out;
+}
+
+.activity-stage-panel[data-frame-impulse='rep_partial'] {
+  animation: frame-partial 620ms ease-out;
+}
+
+.activity-stage-panel[data-frame-impulse='posture_break'],
+.activity-stage-panel[data-frame-impulse='tracking_lost'] {
+  animation: frame-interrupt 620ms ease-out;
 }
 
 .video-stage {
@@ -773,6 +869,252 @@ button,
   padding: 8px 12px;
 }
 
+.stage-frame-feedback {
+  position: absolute;
+  inset: 13px;
+  z-index: 4;
+  overflow: hidden;
+  border-radius: 5px;
+  pointer-events: none;
+}
+
+.stage-frame-feedback::before,
+.stage-frame-feedback::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  content: '';
+}
+
+.stage-frame-feedback::before {
+  opacity: calc(0.42 + (var(--camera-frame-intensity) * 0.38));
+  background:
+    linear-gradient(
+      180deg,
+      rgb(var(--camera-frame-rgb) / var(--camera-frame-band-alpha)),
+      transparent 28px
+    ),
+    linear-gradient(
+      0deg,
+      rgb(var(--camera-frame-rgb) / var(--camera-frame-band-alpha)),
+      transparent 28px
+    ),
+    linear-gradient(
+      90deg,
+      rgb(var(--camera-frame-rgb) / var(--camera-frame-band-alpha)),
+      transparent 30px
+    ),
+    linear-gradient(
+      270deg,
+      rgb(var(--camera-frame-rgb) / var(--camera-frame-band-alpha)),
+      transparent 30px
+    );
+  mix-blend-mode: screen;
+  transition:
+    opacity 220ms ease,
+    background-color 220ms ease;
+}
+
+.stage-frame-feedback::after {
+  opacity: calc(0.12 + (var(--camera-frame-intensity) * 0.3));
+  background:
+    radial-gradient(circle at 24px 24px, rgb(var(--camera-frame-rgb) / 24%), transparent 58px),
+    radial-gradient(
+      circle at calc(100% - 24px) 24px,
+      rgb(var(--camera-frame-rgb) / 24%),
+      transparent 58px
+    ),
+    radial-gradient(
+      circle at 24px calc(100% - 24px),
+      rgb(var(--camera-frame-rgb) / 24%),
+      transparent 58px
+    ),
+    radial-gradient(
+      circle at calc(100% - 24px) calc(100% - 24px),
+      rgb(var(--camera-frame-rgb) / 24%),
+      transparent 58px
+    );
+  mix-blend-mode: screen;
+  transition: opacity 220ms ease;
+}
+
+.stage-edge {
+  position: absolute;
+  display: block;
+  opacity: calc(0.28 + (var(--camera-frame-intensity) * 0.6));
+  background: rgb(var(--camera-frame-rgb) / 68%);
+  box-shadow: 0 0 22px rgb(var(--camera-frame-rgb) / 42%);
+  transition:
+    opacity 180ms ease,
+    transform 260ms ease,
+    background-color 180ms ease;
+}
+
+.stage-edge-top,
+.stage-edge-bottom {
+  right: 78px;
+  left: 78px;
+  height: 1.5px;
+  transform: scaleX(calc(0.26 + (var(--camera-frame-confidence) * 0.74)));
+}
+
+.stage-edge-top {
+  top: 0;
+  transform-origin: left center;
+}
+
+.stage-edge-bottom {
+  bottom: 0;
+  transform-origin: right center;
+}
+
+.stage-edge-right,
+.stage-edge-left {
+  top: 78px;
+  bottom: 78px;
+  width: 1.5px;
+  transform: scaleY(calc(0.26 + (var(--camera-frame-confidence) * 0.74)));
+}
+
+.stage-edge-right {
+  right: 0;
+  transform-origin: center top;
+}
+
+.stage-edge-left {
+  left: 0;
+  transform-origin: center bottom;
+}
+
+.stage-scanline {
+  position: absolute;
+  top: -16%;
+  right: 0;
+  left: 0;
+  display: block;
+  height: 12%;
+  opacity: 0;
+  background: linear-gradient(180deg, transparent, rgb(var(--camera-frame-rgb) / 14%), transparent);
+  transform: translateY(-100%);
+}
+
+.activity-stage-panel[data-frame-tone='acquiring'] .stage-scanline,
+.activity-stage-panel[data-frame-tone='candidate'] .stage-scanline {
+  opacity: calc(0.18 + (var(--camera-frame-intensity) * 0.24));
+  animation: frame-scan 2200ms linear infinite;
+}
+
+.activity-stage-panel[data-frame-tone='locked'] .stage-edge {
+  opacity: calc(0.36 + (var(--camera-frame-intensity) * 0.48));
+}
+
+.activity-stage-panel[data-frame-tone='standby'] .stage-frame-feedback::before,
+.activity-stage-panel[data-frame-tone='standby'] .stage-frame-feedback::after {
+  opacity: 0.18;
+}
+
+.activity-stage-panel[data-frame-tone='locked'] .stage-frame-feedback::before,
+.activity-stage-panel[data-frame-tone='success'] .stage-frame-feedback::before {
+  opacity: calc(0.56 + (var(--camera-frame-intensity) * 0.34));
+}
+
+.activity-stage-panel[data-frame-tone='locked'] .stage-frame-feedback::after,
+.activity-stage-panel[data-frame-tone='success'] .stage-frame-feedback::after {
+  opacity: calc(0.2 + (var(--camera-frame-intensity) * 0.38));
+}
+
+.activity-stage-panel[data-frame-tone='partial'] .stage-frame-feedback::before {
+  opacity: calc(0.52 + (var(--camera-frame-intensity) * 0.32));
+  background:
+    linear-gradient(0deg, rgb(var(--camera-frame-rgb) / 24%), transparent 42px),
+    linear-gradient(180deg, rgb(var(--camera-frame-rgb) / 8%), transparent 24px),
+    linear-gradient(90deg, rgb(var(--camera-frame-rgb) / 10%), transparent 28px),
+    linear-gradient(270deg, rgb(var(--camera-frame-rgb) / 10%), transparent 28px);
+}
+
+.activity-stage-panel[data-frame-tone='lost'] .stage-frame-feedback::before,
+.activity-stage-panel[data-frame-tone='unstable'] .stage-frame-feedback::before,
+.activity-stage-panel[data-frame-tone='warning'] .stage-frame-feedback::before {
+  opacity: calc(0.58 + (var(--camera-frame-intensity) * 0.26));
+}
+
+.activity-stage-panel[data-frame-tone='lost'] .stage-edge,
+.activity-stage-panel[data-frame-tone='unstable'] .stage-edge,
+.activity-stage-panel[data-frame-tone='warning'] .stage-edge {
+  opacity: calc(0.34 + (var(--camera-frame-intensity) * 0.5));
+  background: repeating-linear-gradient(
+    90deg,
+    rgb(var(--camera-frame-rgb) / 72%) 0 16px,
+    transparent 16px 25px
+  );
+}
+
+@keyframes frame-scan {
+  from {
+    transform: translateY(-100%);
+  }
+
+  to {
+    transform: translateY(980%);
+  }
+}
+
+@keyframes frame-confirmation {
+  0% {
+    box-shadow:
+      inset 0 0 0 1.5px rgb(var(--camera-frame-rgb) / 42%),
+      inset 0 0 22px rgb(var(--camera-frame-rgb) / 10%),
+      0 18px 48px rgb(0 0 0 / 18%);
+  }
+
+  36% {
+    box-shadow:
+      inset 0 0 0 1.5px rgb(var(--camera-frame-rgb) / 78%),
+      inset 0 0 46px rgb(var(--camera-frame-rgb) / 28%),
+      0 0 36px rgb(var(--camera-frame-rgb) / 16%),
+      0 18px 48px rgb(0 0 0 / 18%);
+  }
+
+  100% {
+    box-shadow:
+      inset 0 0 0 1.5px rgb(var(--camera-frame-rgb) / var(--camera-frame-alpha)),
+      0 0 0 1px rgb(var(--camera-frame-rgb) / 4%),
+      0 18px 48px rgb(0 0 0 / 18%);
+  }
+}
+
+@keyframes frame-partial {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1.5px rgb(var(--camera-frame-rgb) / var(--camera-frame-alpha)),
+      0 18px 48px rgb(0 0 0 / 18%);
+  }
+
+  42% {
+    box-shadow:
+      inset 0 -14px 34px rgb(var(--camera-frame-rgb) / 18%),
+      inset 0 0 0 1.5px rgb(var(--camera-frame-rgb) / 66%),
+      0 18px 48px rgb(0 0 0 / 18%);
+  }
+}
+
+@keyframes frame-interrupt {
+  0%,
+  100% {
+    filter: none;
+  }
+
+  28% {
+    filter: saturate(0.92) brightness(0.96);
+  }
+
+  54% {
+    filter: none;
+  }
+}
+
 .exercise-guide-overlay {
   position: absolute;
   bottom: 22px;
@@ -834,38 +1176,71 @@ button,
 .stage-corner {
   position: absolute;
   z-index: 4;
-  width: 48px;
-  height: 48px;
+  width: 58px;
+  height: 58px;
   pointer-events: none;
   opacity: 0.74;
+  filter: drop-shadow(0 0 8px rgb(var(--camera-frame-rgb) / 22%));
+  transition:
+    border-color 180ms ease,
+    filter 180ms ease,
+    opacity 180ms ease,
+    transform 260ms ease;
 }
 
 .stage-corner-top-left {
   top: 26px;
   left: 26px;
-  border-top: 1px solid var(--hud-line);
-  border-left: 1px solid var(--hud-line);
+  border-top: 1.5px solid rgb(var(--camera-frame-rgb) / 72%);
+  border-left: 1.5px solid rgb(var(--camera-frame-rgb) / 72%);
 }
 
 .stage-corner-top-right {
   top: 26px;
   right: 26px;
-  border-top: 1px solid var(--hud-line);
-  border-right: 1px solid var(--hud-line);
+  border-top: 1.5px solid rgb(var(--camera-frame-rgb) / 72%);
+  border-right: 1.5px solid rgb(var(--camera-frame-rgb) / 72%);
 }
 
 .stage-corner-bottom-left {
   bottom: 26px;
   left: 26px;
-  border-bottom: 1px solid var(--hud-line);
-  border-left: 1px solid var(--hud-line);
+  border-bottom: 1.5px solid rgb(var(--camera-frame-rgb) / 72%);
+  border-left: 1.5px solid rgb(var(--camera-frame-rgb) / 72%);
 }
 
 .stage-corner-bottom-right {
   right: 26px;
   bottom: 26px;
-  border-right: 1px solid var(--hud-line);
-  border-bottom: 1px solid var(--hud-line);
+  border-right: 1.5px solid rgb(var(--camera-frame-rgb) / 72%);
+  border-bottom: 1.5px solid rgb(var(--camera-frame-rgb) / 72%);
+}
+
+.activity-stage-panel[data-frame-tone='standby'] .stage-corner {
+  opacity: 0.44;
+}
+
+.activity-stage-panel[data-frame-tone='locked'] .stage-corner,
+.activity-stage-panel[data-frame-tone='success'] .stage-corner {
+  opacity: 0.88;
+  filter: drop-shadow(0 0 12px rgb(var(--camera-frame-rgb) / 28%));
+}
+
+.activity-stage-panel[data-frame-impulse='rep_valid'] .stage-corner {
+  transform: scale(1.035);
+}
+
+.activity-stage-panel[data-frame-impulse='rep_partial'] .stage-corner-bottom-left,
+.activity-stage-panel[data-frame-impulse='rep_partial'] .stage-corner-bottom-right {
+  transform: translateY(-2px);
+}
+
+.activity-stage-panel[data-frame-impulse='posture_break'] .stage-corner-top-left,
+.activity-stage-panel[data-frame-impulse='posture_break'] .stage-corner-bottom-right,
+.activity-stage-panel[data-frame-impulse='tracking_lost'] .stage-corner-top-right,
+.activity-stage-panel[data-frame-impulse='tracking_lost'] .stage-corner-bottom-left {
+  opacity: 0.98;
+  transform: scale(0.92);
 }
 
 .alert {
@@ -3580,5 +3955,18 @@ button,
 
   .exercise-definition-details {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-stage-panel,
+  .stage-corner,
+  .stage-edge {
+    transition-duration: 1ms;
+  }
+
+  .activity-stage-panel,
+  .stage-scanline {
+    animation: none !important;
   }
 }

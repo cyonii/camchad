@@ -50,6 +50,7 @@ import {
 } from '@camchad/movement-core';
 import { ExponentialPoseSmoother, MediaPipePoseEstimator } from '@camchad/pose-core';
 
+import { deriveCameraFrameFeedback, impulseForRep } from './camera-frame-feedback.js';
 import { buildHistoryChartModel } from './history-chart.js';
 
 import type {
@@ -68,6 +69,7 @@ import type {
   MovementType,
   MovementDefinition,
 } from '@camchad/movement-core';
+import type { CameraFrameFeedback, CameraFrameImpulse } from './camera-frame-feedback.js';
 import type { ActivityPlatform, HistoryStorageInfo, WindowChromeState } from './platform.js';
 const ActivityLogChart = lazy(async () => {
   const module = await import('./ActivityLogChart.js');
@@ -642,6 +644,16 @@ function ActivityView({
       detectorState.movementType,
     assets.exerciseGuideAssetBasePath,
   );
+  const frameImpulse = useCameraFrameImpulse(detectorState);
+  const cameraFrameFeedback = deriveCameraFrameFeedback({
+    isPreviewActive,
+    isStarting,
+    isTracking,
+    cameraError,
+    detectorState,
+    sessionTelemetry,
+    impulse: frameImpulse,
+  });
 
   useEffect(() => {
     detectorStateRef.current = detectorState;
@@ -997,7 +1009,17 @@ function ActivityView({
       }
     >
       <div className="activity-command-grid">
-        <div className="activity-stage-panel">
+        <div
+          className="activity-stage-panel"
+          data-frame-tone={cameraFrameFeedback.tone}
+          data-frame-impulse={cameraFrameFeedback.impulse ?? 'none'}
+          style={
+            {
+              '--camera-frame-intensity': cameraFrameFeedback.intensity.toFixed(2),
+              '--camera-frame-confidence': cameraFrameFeedback.confidence.toFixed(2),
+            } as CSSProperties
+          }
+        >
           <div className="video-stage">
             <video ref={videoRef} muted playsInline autoPlay />
             <canvas ref={canvasRef} />
@@ -1007,7 +1029,11 @@ function ActivityView({
                 <span>Camera preview appears here</span>
               </div>
             ) : null}
-            <StageTelemetryChrome status={status} isTracking={isTracking} />
+            <StageTelemetryChrome
+              status={status}
+              isTracking={isTracking}
+              feedback={cameraFrameFeedback}
+            />
             {activeGuide && detectorState.recognition.status === 'active' ? (
               <ExerciseGuideOverlay guide={activeGuide} />
             ) : null}
@@ -1098,12 +1124,57 @@ function ExerciseGuideOverlay({ guide }: { readonly guide: ExerciseGuide }): Rea
   );
 }
 
+function useCameraFrameImpulse(
+  detectorState: MovementInterpreterState,
+): CameraFrameImpulse | undefined {
+  const lastRepNumberRef = useRef<number | undefined>(undefined);
+  const previousPhaseRef = useRef(detectorState.phase);
+  const previousRecognitionStatusRef = useRef(detectorState.recognition.status);
+  const [impulse, setImpulse] = useState<CameraFrameImpulse | undefined>();
+
+  useEffect(() => {
+    const lastRep = detectorState.lastRep;
+
+    if (lastRep && lastRepNumberRef.current !== lastRep.repNumber) {
+      lastRepNumberRef.current = lastRep.repNumber;
+      setImpulse(impulseForRep(lastRep));
+    } else if (
+      detectorState.phase === 'invalid_form' &&
+      previousPhaseRef.current !== 'invalid_form'
+    ) {
+      setImpulse('posture_break');
+    } else if (
+      detectorState.recognition.status === 'tracking_lost' &&
+      previousRecognitionStatusRef.current !== 'tracking_lost'
+    ) {
+      setImpulse('tracking_lost');
+    }
+
+    previousPhaseRef.current = detectorState.phase;
+    previousRecognitionStatusRef.current = detectorState.recognition.status;
+  }, [detectorState]);
+
+  useEffect(() => {
+    if (!impulse) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => setImpulse(undefined), 620);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [impulse]);
+
+  return impulse;
+}
+
 function StageTelemetryChrome({
   status,
   isTracking,
+  feedback,
 }: {
   readonly status: string;
   readonly isTracking: boolean;
+  readonly feedback: CameraFrameFeedback;
 }): ReactElement {
   return (
     <>
@@ -1114,6 +1185,16 @@ function StageTelemetryChrome({
       <div className="stage-resolution-label">1280p / 30 FPS</div>
       <div className="stage-status-rail">
         <span>{status}</span>
+      </div>
+      <div className="stage-frame-feedback" aria-hidden="true">
+        <span className="stage-edge stage-edge-top" />
+        <span className="stage-edge stage-edge-right" />
+        <span className="stage-edge stage-edge-bottom" />
+        <span className="stage-edge stage-edge-left" />
+        <span className="stage-scanline" />
+      </div>
+      <div className="stage-feedback-label visually-hidden" aria-live="polite">
+        {feedback.label}
       </div>
       <div className="stage-corner stage-corner-top-left" />
       <div className="stage-corner stage-corner-top-right" />
