@@ -12,6 +12,7 @@
     "dev": "npm run dev -w @camchad/desktop",
     "dev:web": "npm run dev -w @camchad/web",
     "generate:exercise-guides": "node scripts/generate-exercise-guides.mjs",
+    "report:perception": "node scripts/write-perception-evaluation-report.mjs",
     "sync:mediapipe-assets": "node scripts/sync-mediapipe-assets.mjs",
     "build": "npm run build:packages && npm run build -w @camchad/web && npm run build -w @camchad/desktop",
     "build:packages": "tsc -b packages/pose-core packages/movement-core packages/activity-history packages/ui",
