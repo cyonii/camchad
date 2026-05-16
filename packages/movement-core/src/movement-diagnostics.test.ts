@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { extractBodyState } from './body-state.js';
 import { diagnoseMovement } from './movement-diagnostics.js';
+import { makePushUpFrame } from './test-fixtures.js';
+
+import type { MovementWindowSnapshot } from './movement-window.js';
 
 describe('diagnoseMovement', () => {
   it('reports tracking loss as the primary guidance event', () => {
@@ -91,4 +95,47 @@ describe('diagnoseMovement', () => {
       severity: 'info',
     });
   });
+
+  it('surfaces low-confidence body regions as environmental guidance', () => {
+    const bodyState = extractBodyState(
+      makePushUpFrame({ timestampMs: 0, elbowAngle: 150, rightVisibility: 0.1 }),
+    );
+
+    if (!bodyState) {
+      throw new Error('Expected fixture to produce body state.');
+    }
+
+    const diagnostics = diagnoseMovement({
+      activityState: {
+        state: 'idle',
+        confidence: 0.82,
+        motionMagnitude: 0.01,
+        evidence: ['stable_body'],
+      },
+      window: snapshotWithBodyState(bodyState),
+    });
+
+    expect(diagnostics.events.some((event) => event.code === 'hands_missing')).toBe(true);
+    expect(diagnostics.events.some((event) => event.code === 'feet_missing')).toBe(true);
+  });
 });
+
+function snapshotWithBodyState(
+  bodyState: NonNullable<ReturnType<typeof extractBodyState>>,
+): MovementWindowSnapshot {
+  const sample = {
+    timestampMs: bodyState.timestampMs,
+    bodyState,
+  };
+
+  return {
+    samples: [sample],
+    validSamples: [sample],
+    latest: sample,
+    latestValid: sample,
+    durationMs: 0,
+    averageConfidence: bodyState.confidence,
+    missingSampleCount: 0,
+    missingSampleRatio: 0,
+  };
+}

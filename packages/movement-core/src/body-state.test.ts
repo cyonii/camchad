@@ -69,6 +69,8 @@ describe('extractBodyState', () => {
 
     expect(state?.coverage.regions.leftArm).toBeGreaterThan(0.9);
     expect(state?.coverage.regions.rightArm).toBeLessThan(0.2);
+    expect(state?.environment.lowConfidenceRegions).toContain('rightArm');
+    expect(state?.environment.occlusionRisk).toBeGreaterThan(0);
     expect(state?.coverage.upperBody).toBeLessThan(0.75);
   });
 

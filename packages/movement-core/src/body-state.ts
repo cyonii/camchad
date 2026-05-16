@@ -53,6 +53,12 @@ export interface BodyCoverage {
   readonly lowerBody: number;
 }
 
+export interface BodyEnvironmentQuality {
+  readonly fullBodyVisible: boolean;
+  readonly occlusionRisk: number;
+  readonly lowConfidenceRegions: readonly BodyRegion[];
+}
+
 export interface BodyJointAngles {
   readonly leftElbow?: number;
   readonly rightElbow?: number;
@@ -82,6 +88,7 @@ export interface BodyState {
   readonly landmarks: ReadonlyMap<LandmarkName, NormalizedBodyLandmark>;
   readonly worldLandmarks?: ReadonlyMap<LandmarkName, NormalizedBodyLandmark>;
   readonly coverage: BodyCoverage;
+  readonly environment: BodyEnvironmentQuality;
   readonly orientation: BodyOrientationEstimate;
   readonly viewOrientation: BodyViewOrientationEstimate;
   readonly jointAngles: BodyJointAngles;
@@ -108,6 +115,7 @@ export function extractBodyState(frame: PoseFrame | undefined): BodyState | unde
   const scale = Math.max(0.001, distance(shoulderCenter, hipCenter));
   const normalizedLandmarks = normalizeLandmarks(frame, center, scale);
   const normalizedWorldLandmarks = normalizeWorldLandmarks(frame);
+  const coverage = computeBodyCoverage(frame);
   const geometry = computeGeometrySignals(frame, shoulderCenter, hipCenter, scale);
 
   return {
@@ -117,7 +125,8 @@ export function extractBodyState(frame: PoseFrame | undefined): BodyState | unde
     scale,
     landmarks: normalizedLandmarks,
     worldLandmarks: normalizedWorldLandmarks,
-    coverage: computeBodyCoverage(frame),
+    coverage,
+    environment: computeEnvironmentQuality(coverage),
     orientation: estimateBodyOrientation(frame, shoulderCenter, hipCenter),
     viewOrientation: estimateViewOrientation(geometry),
     jointAngles: computeJointAngles(frame),
@@ -181,6 +190,18 @@ function computeBodyCoverage(frame: PoseFrame): BodyCoverage {
     fullBody: average(Object.values(regions)),
     upperBody: average([regions.head, regions.torso, regions.leftArm, regions.rightArm]),
     lowerBody: average([regions.leftLeg, regions.rightLeg, regions.leftFoot, regions.rightFoot]),
+  };
+}
+
+function computeEnvironmentQuality(coverage: BodyCoverage): BodyEnvironmentQuality {
+  const lowConfidenceRegions = Object.entries(coverage.regions)
+    .filter(([, score]) => score < 0.45)
+    .map(([region]) => region as BodyRegion);
+
+  return {
+    fullBodyVisible: coverage.fullBody >= 0.72,
+    occlusionRisk: clamp01(lowConfidenceRegions.length / Object.keys(coverage.regions).length),
+    lowConfidenceRegions,
   };
 }
 

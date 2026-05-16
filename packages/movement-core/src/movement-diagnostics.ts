@@ -5,6 +5,9 @@ import type { MovementWindowSnapshot } from './movement-window.js';
 export type MovementGuidanceCode =
   | 'tracking_lost'
   | 'full_body_not_visible'
+  | 'torso_occluded'
+  | 'hands_missing'
+  | 'feet_missing'
   | 'low_confidence'
   | 'recent_tracking_gap'
   | 'orientation_mismatch'
@@ -64,6 +67,52 @@ function trackingEvents(input: MovementDiagnosticsInput): readonly MovementGuida
       title: 'Full body not visible',
       message: 'Step back or adjust the camera so the required joints stay in view.',
       confidence: 1 - latestBody.coverage.fullBody,
+    });
+  }
+
+  if (latestBody && latestBody.environment.lowConfidenceRegions.includes('torso')) {
+    events.push({
+      code: 'torso_occluded',
+      severity: 'warning',
+      title: 'Torso partially occluded',
+      message: 'Keep shoulders and hips visible so posture and body orientation stay reliable.',
+      confidence: 1 - latestBody.coverage.regions.torso,
+    });
+  }
+
+  if (
+    latestBody &&
+    (latestBody.environment.lowConfidenceRegions.includes('leftHand') ||
+      latestBody.environment.lowConfidenceRegions.includes('rightHand'))
+  ) {
+    events.push({
+      code: 'hands_missing',
+      severity: 'info',
+      title: 'Hands not clearly visible',
+      message:
+        'Hand visibility is limited. Large-body movements still work, but hand-aware analysis will be less reliable.',
+      confidence: Math.max(
+        1 - latestBody.coverage.regions.leftHand,
+        1 - latestBody.coverage.regions.rightHand,
+      ),
+    });
+  }
+
+  if (
+    latestBody &&
+    (latestBody.environment.lowConfidenceRegions.includes('leftFoot') ||
+      latestBody.environment.lowConfidenceRegions.includes('rightFoot'))
+  ) {
+    events.push({
+      code: 'feet_missing',
+      severity: 'info',
+      title: 'Feet not clearly visible',
+      message:
+        'Step back if the movement requires foot placement, stance width, or lower-body stability.',
+      confidence: Math.max(
+        1 - latestBody.coverage.regions.leftFoot,
+        1 - latestBody.coverage.regions.rightFoot,
+      ),
     });
   }
 
