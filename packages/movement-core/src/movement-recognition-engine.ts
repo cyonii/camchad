@@ -15,7 +15,21 @@ import { TemporalConfidenceAccumulator } from './temporal-confidence.js';
 export interface MovementRecognitionEngineState {
   readonly primary: MovementInterpreterState;
   readonly candidates: readonly MovementInterpreterState[];
+  readonly inference: MovementInferenceState;
 }
+
+export type MovementInferenceStatus = 'tracking_lost' | 'unknown' | 'ambiguous' | 'recognized';
+
+export interface MovementInferenceState {
+  readonly status: MovementInferenceStatus;
+  readonly confidence: number;
+  readonly primaryMovementType?: MovementType;
+  readonly competingMovementTypes: readonly MovementType[];
+  readonly evidence: readonly string[];
+}
+
+const unknownConfidenceThreshold = 0.32;
+const ambiguityConfidenceGap = 0.08;
 
 export class MovementRecognitionEngine {
   private lastState: MovementRecognitionEngineState;
@@ -65,6 +79,7 @@ export class MovementRecognitionEngine {
     return {
       primary,
       candidates,
+      inference: inferMovementState(primary, candidates),
     };
   }
 
@@ -116,6 +131,60 @@ export class MovementRecognitionEngine {
     this.candidateConfidence.set(movementType, created);
     return created;
   }
+}
+
+function inferMovementState(
+  primary: MovementInterpreterState,
+  candidates: readonly MovementInterpreterState[],
+): MovementInferenceState {
+  const rankedCandidates = [...candidates].sort(compareMovementCandidates);
+  const runnerUp = rankedCandidates.find(
+    (candidate) => candidate.movementType !== primary.movementType,
+  );
+
+  if (primary.recognition.status === 'tracking_lost') {
+    return {
+      status: 'tracking_lost',
+      confidence: 0,
+      competingMovementTypes: [],
+      evidence: ['tracking_lost'],
+    };
+  }
+
+  if (primary.recognition.confidence < unknownConfidenceThreshold) {
+    return {
+      status: 'unknown',
+      confidence: primary.recognition.confidence,
+      competingMovementTypes: rankedCandidates
+        .filter((candidate) => candidate.recognition.confidence > 0)
+        .slice(0, 3)
+        .map((candidate) => candidate.movementType),
+      evidence: ['insufficient_temporal_confidence'],
+    };
+  }
+
+  if (
+    runnerUp &&
+    runnerUp.recognition.status !== 'tracking_lost' &&
+    Math.abs(primary.recognition.confidence - runnerUp.recognition.confidence) <=
+      ambiguityConfidenceGap
+  ) {
+    return {
+      status: 'ambiguous',
+      confidence: primary.recognition.confidence,
+      primaryMovementType: primary.movementType,
+      competingMovementTypes: [primary.movementType, runnerUp.movementType],
+      evidence: ['similar_candidate_confidence'],
+    };
+  }
+
+  return {
+    status: 'recognized',
+    confidence: primary.recognition.confidence,
+    primaryMovementType: primary.movementType,
+    competingMovementTypes: runnerUp ? [runnerUp.movementType] : [],
+    evidence: primary.recognition.evidence,
+  };
 }
 
 export function createMovementRecognitionEngine(

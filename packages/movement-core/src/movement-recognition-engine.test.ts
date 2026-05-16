@@ -142,6 +142,72 @@ describe('MovementRecognitionEngine', () => {
         .status,
     ).toBe('candidate');
   });
+
+  it('marks inference as unknown when no candidate has enough confidence', () => {
+    const engine = new MovementRecognitionEngine([
+      fakeInterpreter(
+        movementState({
+          recognition: {
+            movementType: 'push_up',
+            confidence: 0.2,
+            status: 'candidate',
+            evidence: ['weak'],
+          },
+        }),
+      ),
+      fakeInterpreter(
+        movementState({
+          movementType: 'squat',
+          recognition: {
+            movementType: 'squat',
+            confidence: 0.1,
+            status: 'candidate',
+            evidence: ['weak'],
+          },
+        }),
+      ),
+    ]);
+
+    const state = engine.processPose(undefined);
+
+    expect(state.inference).toMatchObject({
+      status: 'unknown',
+      evidence: ['insufficient_temporal_confidence'],
+    });
+  });
+
+  it('marks inference as ambiguous when top candidates remain too close', () => {
+    const engine = new MovementRecognitionEngine([
+      fakeInterpreter(
+        movementState({
+          movementType: 'push_up',
+          recognition: {
+            movementType: 'push_up',
+            confidence: 0.8,
+            status: 'active',
+            evidence: ['push'],
+          },
+        }),
+      ),
+      fakeInterpreter(
+        movementState({
+          movementType: 'squat',
+          recognition: {
+            movementType: 'squat',
+            confidence: 0.78,
+            status: 'active',
+            evidence: ['squat'],
+          },
+        }),
+      ),
+    ]);
+
+    engine.processPose(undefined);
+    const state = engine.processPose(undefined);
+
+    expect(state.inference.status).toBe('ambiguous');
+    expect(state.inference.competingMovementTypes).toEqual(['push_up', 'squat']);
+  });
 });
 
 function fakeInterpreter(
