@@ -11,6 +11,7 @@ describe('movementRegistry profiles', () => {
       expect(movement.profile.primaryJoints.length).toBeGreaterThan(0);
       expect(movement.profile.phaseModel.length).toBeGreaterThan(0);
       expect(movement.profile.telemetrySignals.length).toBeGreaterThan(0);
+      expect(movement.profile.telemetryExtractors.length).toBeGreaterThan(0);
       expect(movement.profile.failureCriteria.length).toBeGreaterThan(0);
     }
   });
@@ -29,6 +30,21 @@ describe('movementRegistry profiles', () => {
     expect(movementDefinitionFor('crunch').profile.validationReadiness).toBe('profile_pending');
   });
 
+  it('defines first-class telemetry extractors for validation-ready profiles', () => {
+    expect(movementDefinitionFor('push_up').profile.telemetryExtractors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'primaryJointAngle', source: 'metric' }),
+        expect.objectContaining({ key: 'rhythmScore', source: 'metric' }),
+      ]),
+    );
+    expect(movementDefinitionFor('squat').profile.telemetryExtractors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'postureScore', source: 'metric' }),
+        expect.objectContaining({ key: 'primaryJointRange', source: 'metric' }),
+      ]),
+    );
+  });
+
   it('keeps planned profiles descriptive without pretending they are implemented', () => {
     const planned = movementRegistry.filter((movement) => movement.supportLevel === 'planned');
 
@@ -39,5 +55,10 @@ describe('movementRegistry profiles', () => {
       ),
     ).toBe(true);
     expect(planned.every((movement) => movement.createInterpreter === undefined)).toBe(true);
+    expect(
+      planned.every((movement) =>
+        movement.profile.telemetryExtractors.every((extractor) => extractor.source === 'planned'),
+      ),
+    ).toBe(true);
   });
 });

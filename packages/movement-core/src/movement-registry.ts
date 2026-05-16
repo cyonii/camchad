@@ -52,7 +52,17 @@ export interface MovementProfileMetadata {
   readonly validationReadiness: MovementValidationReadiness;
   readonly cameraSensitivity: MovementCameraSensitivity;
   readonly telemetrySignals: readonly string[];
+  readonly telemetryExtractors: readonly MovementTelemetryExtractorDefinition[];
   readonly failureCriteria: readonly string[];
+}
+
+export type MovementTelemetryExtractorSource = 'metric' | 'derived' | 'planned';
+
+export interface MovementTelemetryExtractorDefinition {
+  readonly key: string;
+  readonly label: string;
+  readonly source: MovementTelemetryExtractorSource;
+  readonly description: string;
 }
 
 export interface MovementInterpreterFactoryOptions {
@@ -127,6 +137,27 @@ export const movementRegistry: readonly MovementDefinition[] = [
         'range of motion',
         'temporal confidence',
       ],
+      telemetryExtractors: [
+        telemetryExtractor('primaryJointAngle', 'Elbow angle', 'metric', 'Current elbow angle.'),
+        telemetryExtractor(
+          'primaryJointRange',
+          'Elbow range',
+          'metric',
+          'Observed elbow-angle range across the rolling movement window.',
+        ),
+        telemetryExtractor(
+          'bodyLineScore',
+          'Body-line score',
+          'metric',
+          'Shoulder-hip-ankle alignment quality.',
+        ),
+        telemetryExtractor(
+          'rhythmScore',
+          'Rhythm score',
+          'metric',
+          'Cyclic consistency of the elbow-flexion signal.',
+        ),
+      ],
       failureCriteria: ['tracking loss', 'severe body-line drift', 'partial depth'],
     },
     createInterpreter: (options) =>
@@ -180,6 +211,27 @@ export const movementRegistry: readonly MovementDefinition[] = [
         'torso inclination',
         'range of motion',
         'temporal confidence',
+      ],
+      telemetryExtractors: [
+        telemetryExtractor('primaryJointAngle', 'Knee angle', 'metric', 'Current knee angle.'),
+        telemetryExtractor(
+          'primaryJointRange',
+          'Knee range',
+          'metric',
+          'Observed knee-angle range across the rolling movement window.',
+        ),
+        telemetryExtractor(
+          'postureScore',
+          'Torso control',
+          'metric',
+          'Torso posture quality during the squat pattern.',
+        ),
+        telemetryExtractor(
+          'rhythmScore',
+          'Rhythm score',
+          'metric',
+          'Cyclic consistency of the knee-flexion signal.',
+        ),
       ],
       failureCriteria: ['tracking loss', 'forward torso collapse', 'partial depth'],
     },
@@ -431,10 +483,37 @@ function profileFor(options: {
           : 'profile_pending',
     cameraSensitivity: options.supportLevel === 'planned' ? 'high' : 'medium',
     telemetrySignals: options.analysisSignals,
+    telemetryExtractors: options.analysisSignals.map((signal) =>
+      telemetryExtractor(
+        signal
+          .toLowerCase()
+          .replaceAll(/[^a-z0-9]+/g, '_')
+          .replaceAll(/^_|_$/g, ''),
+        signal,
+        options.supportLevel === 'planned' ? 'planned' : 'derived',
+        options.supportLevel === 'planned'
+          ? `${signal} is planned and not yet computed.`
+          : `${signal} contributes to recognition confidence.`,
+      ),
+    ),
     failureCriteria:
       options.supportLevel === 'planned'
         ? ['movement profile not implemented']
         : ['tracking loss', 'low confidence', 'incomplete movement evidence'],
+  };
+}
+
+function telemetryExtractor(
+  key: string,
+  label: string,
+  source: MovementTelemetryExtractorSource,
+  description: string,
+): MovementTelemetryExtractorDefinition {
+  return {
+    key,
+    label,
+    source,
+    description,
   };
 }
 
