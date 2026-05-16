@@ -2562,6 +2562,89 @@ button,
   font-size: 0.82rem;
 }
 
+.fatigue-timeline {
+  display: grid;
+  gap: 10px;
+}
+
+.fatigue-timeline-row {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) 112px;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border-radius: 7px;
+  background: rgb(var(--surface-rgb) / 30%);
+}
+
+.fatigue-timeline-row strong,
+.fatigue-timeline-row span {
+  display: block;
+}
+
+.fatigue-timeline-row strong {
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.82rem;
+}
+
+.fatigue-timeline-row span {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.fatigue-bars {
+  display: grid;
+  gap: 5px;
+}
+
+.fatigue-bars i {
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(var(--primary-rgb) / 10%);
+}
+
+.fatigue-bars i::before {
+  display: block;
+  width: var(--bar-value);
+  height: 100%;
+  border-radius: inherit;
+  content: '';
+}
+
+.fatigue-bar-load::before {
+  --bar-value: var(--fatigue);
+  background: linear-gradient(90deg, var(--primary), var(--warning));
+}
+
+.fatigue-bar-signal::before {
+  --bar-value: var(--signal);
+  background: rgb(var(--primary-rgb) / 72%);
+}
+
+.fatigue-timeline-row dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.fatigue-timeline-row dt {
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.56rem;
+  text-transform: uppercase;
+}
+
+.fatigue-timeline-row dd {
+  margin: 2px 0 0;
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+}
+
 .compact-breakdown {
   grid-template-columns: 1fr;
 }

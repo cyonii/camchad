@@ -52,6 +52,7 @@ import { ExponentialPoseSmoother, MediaPipePoseEstimator } from '@camchad/pose-c
 
 import { deriveCameraFrameFeedback, impulseForRep } from './camera-frame-feedback.js';
 import { buildHistoryChartModel } from './history-chart.js';
+import { buildSessionFatigueModel } from './history-fatigue.js';
 import { selectedHistorySession } from './history-session-selection.js';
 import { liveTelemetryStateFor } from './live-telemetry-state.js';
 
@@ -1450,6 +1451,9 @@ function HistoryView({
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
   const chartModel = buildHistoryChartModel(sessions);
   const selectedSession = selectedHistorySession(sessions, selectedSessionId);
+  const selectedSessionFatigue = selectedSession
+    ? buildSessionFatigueModel(selectedSession)
+    : undefined;
   const overview = historyOverviewFor(sessions);
 
   return (
@@ -1623,6 +1627,67 @@ function HistoryView({
                 <Metric label="Warnings" value={String(sessionWarningCount(selectedSession))} />
                 <Metric label="Guidance" value={String(sessionGuidanceCount(selectedSession))} />
               </div>
+            </section>
+
+            <section className="history-detail-card">
+              <div className="history-section-heading">
+                <div>
+                  <span>Fatigue trend</span>
+                  <h2>Session degradation</h2>
+                </div>
+                <small>
+                  {selectedSessionFatigue
+                    ? `${formatMetric(selectedSessionFatigue.sessionFatigueScore, '%')} load / ${selectedSessionFatigue.confidenceTrend}`
+                    : 'n/a'}
+                </small>
+              </div>
+
+              {!selectedSessionFatigue || selectedSessionFatigue.points.length === 0 ? (
+                <div className="history-empty-line">No fatigue telemetry recorded.</div>
+              ) : (
+                <div className="fatigue-timeline">
+                  {selectedSessionFatigue.points.map((point) => (
+                    <div key={point.id} className="fatigue-timeline-row">
+                      <div>
+                        <strong>{point.label}</strong>
+                        <span>{point.movementLabel}</span>
+                      </div>
+                      <div className="fatigue-bars" aria-hidden="true">
+                        <i
+                          className="fatigue-bar-load"
+                          style={
+                            {
+                              '--fatigue': `${Math.round(point.fatigueScore * 100)}%`,
+                            } as CSSProperties
+                          }
+                        />
+                        <i
+                          className="fatigue-bar-signal"
+                          style={
+                            {
+                              '--signal': `${Math.round((point.confidenceScore ?? 0) * 100)}%`,
+                            } as CSSProperties
+                          }
+                        />
+                      </div>
+                      <dl>
+                        <div>
+                          <dt>load</dt>
+                          <dd>{formatMetric(point.fatigueScore, '%')}</dd>
+                        </div>
+                        <div>
+                          <dt>signal</dt>
+                          <dd>{formatMetric(point.confidenceScore, '%')}</dd>
+                        </div>
+                        <div>
+                          <dt>alerts</dt>
+                          <dd>{point.warningCount + point.guidanceCount}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
 
             <section className="history-detail-card">
