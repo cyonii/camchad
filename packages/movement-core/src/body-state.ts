@@ -5,9 +5,11 @@ import {
   type LandmarkName,
   type PoseFrame,
   type PoseLandmark,
+  type PoseLandmarkMap,
 } from '@camchad/pose-core';
 
 export type BodyOrientationKind = 'standing' | 'floor' | 'diagonal' | 'unknown';
+export type BodyViewOrientationKind = 'front' | 'side' | 'diagonal' | 'ambiguous' | 'unknown';
 
 export type BodyRegion =
   | 'head'
@@ -29,6 +31,11 @@ export interface NormalizedBodyLandmark extends PoseLandmark {
 
 export interface BodyOrientationEstimate {
   readonly kind: BodyOrientationKind;
+  readonly confidence: number;
+}
+
+export interface BodyViewOrientationEstimate {
+  readonly kind: BodyViewOrientationKind;
   readonly confidence: number;
 }
 
@@ -66,8 +73,10 @@ export interface BodyState {
   readonly center: { readonly x: number; readonly y: number; readonly z?: number };
   readonly scale: number;
   readonly landmarks: ReadonlyMap<LandmarkName, NormalizedBodyLandmark>;
+  readonly worldLandmarks?: ReadonlyMap<LandmarkName, NormalizedBodyLandmark>;
   readonly coverage: BodyCoverage;
   readonly orientation: BodyOrientationEstimate;
+  readonly viewOrientation: BodyViewOrientationEstimate;
   readonly jointAngles: BodyJointAngles;
   readonly geometry: BodyGeometrySignals;
 }
@@ -91,6 +100,8 @@ export function extractBodyState(frame: PoseFrame | undefined): BodyState | unde
   const center = midpoint3D(shoulderCenter, hipCenter);
   const scale = Math.max(0.001, distance(shoulderCenter, hipCenter));
   const normalizedLandmarks = normalizeLandmarks(frame, center, scale);
+  const normalizedWorldLandmarks = normalizeWorldLandmarks(frame);
+  const geometry = computeGeometrySignals(frame, shoulderCenter, hipCenter, scale);
 
   return {
     timestampMs: frame.timestampMs,
@@ -98,10 +109,12 @@ export function extractBodyState(frame: PoseFrame | undefined): BodyState | unde
     center,
     scale,
     landmarks: normalizedLandmarks,
+    worldLandmarks: normalizedWorldLandmarks,
     coverage: computeBodyCoverage(frame),
     orientation: estimateBodyOrientation(shoulderCenter, hipCenter),
+    viewOrientation: estimateViewOrientation(geometry),
     jointAngles: computeJointAngles(frame),
-    geometry: computeGeometrySignals(frame, shoulderCenter, hipCenter, scale),
+    geometry,
   };
 }
 
@@ -110,20 +123,31 @@ function normalizeLandmarks(
   center: { readonly x: number; readonly y: number; readonly z?: number },
   scale: number,
 ): ReadonlyMap<LandmarkName, NormalizedBodyLandmark> {
-  return new Map(
-    [...frame.landmarks.entries()].map(([name, landmark]) => [
-      name,
-      {
-        ...landmark,
-        normalizedX: (landmark.x - center.x) / scale,
-        normalizedY: (landmark.y - center.y) / scale,
-        normalizedZ:
-          landmark.z === undefined || center.z === undefined
-            ? landmark.z
-            : (landmark.z - center.z) / scale,
-      },
-    ]),
-  );
+  return normalizeLandmarkMap(frame.landmarks, center, scale);
+}
+
+function normalizeWorldLandmarks(
+  frame: PoseFrame,
+): ReadonlyMap<LandmarkName, NormalizedBodyLandmark> | undefined {
+  if (!frame.worldLandmarks) {
+    return undefined;
+  }
+
+  const leftShoulder = frame.worldLandmarks.get('left_shoulder');
+  const rightShoulder = frame.worldLandmarks.get('right_shoulder');
+  const leftHip = frame.worldLandmarks.get('left_hip');
+  const rightHip = frame.worldLandmarks.get('right_hip');
+
+  if (!leftShoulder || !rightShoulder || !leftHip || !rightHip) {
+    return undefined;
+  }
+
+  const shoulderCenter = midpoint3D(leftShoulder, rightShoulder);
+  const hipCenter = midpoint3D(leftHip, rightHip);
+  const center = midpoint3D(shoulderCenter, hipCenter);
+  const scale = Math.max(0.001, distance(shoulderCenter, hipCenter));
+
+  return normalizeLandmarkMap(frame.worldLandmarks, center, scale);
 }
 
 function computeBodyCoverage(frame: PoseFrame): BodyCoverage {
@@ -151,6 +175,27 @@ function computeBodyCoverage(frame: PoseFrame): BodyCoverage {
     upperBody: average([regions.head, regions.torso, regions.leftArm, regions.rightArm]),
     lowerBody: average([regions.leftLeg, regions.rightLeg, regions.leftFoot, regions.rightFoot]),
   };
+}
+
+function normalizeLandmarkMap(
+  landmarks: PoseLandmarkMap,
+  center: { readonly x: number; readonly y: number; readonly z?: number },
+  scale: number,
+): ReadonlyMap<LandmarkName, NormalizedBodyLandmark> {
+  return new Map(
+    [...landmarks.entries()].map(([name, landmark]) => [
+      name,
+      {
+        ...landmark,
+        normalizedX: (landmark.x - center.x) / scale,
+        normalizedY: (landmark.y - center.y) / scale,
+        normalizedZ:
+          landmark.z === undefined || center.z === undefined
+            ? landmark.z
+            : (landmark.z - center.z) / scale,
+      },
+    ]),
+  );
 }
 
 function computeJointAngles(frame: PoseFrame): BodyJointAngles {
@@ -212,6 +257,31 @@ function estimateBodyOrientation(
 
   if (dx > dy * 1.2) {
     return { kind: 'floor', confidence: clamp01(dx / total) };
+  }
+
+  return { kind: 'diagonal', confidence: 0.58 };
+}
+
+function estimateViewOrientation(geometry: BodyGeometrySignals): BodyViewOrientationEstimate {
+  const shoulderSpan = geometry.shoulderSpanRatio;
+  const hipSpan = geometry.hipSpanRatio;
+
+  if (shoulderSpan === undefined || hipSpan === undefined) {
+    return { kind: 'unknown', confidence: 0 };
+  }
+
+  const averageSpan = (shoulderSpan + hipSpan) / 2;
+
+  if (averageSpan <= 0.18) {
+    return { kind: 'side', confidence: clamp01((0.18 - averageSpan) / 0.18) };
+  }
+
+  if (averageSpan >= 0.72) {
+    return { kind: 'front', confidence: clamp01((averageSpan - 0.72) / 0.5) };
+  }
+
+  if (averageSpan >= 0.42 && averageSpan <= 0.58) {
+    return { kind: 'ambiguous', confidence: 0.42 };
   }
 
   return { kind: 'diagonal', confidence: 0.58 };

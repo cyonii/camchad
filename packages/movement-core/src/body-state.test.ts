@@ -11,6 +11,7 @@ describe('extractBodyState', () => {
 
     expect(state).toBeDefined();
     expect(state?.orientation.kind).toBe('standing');
+    expect(state?.viewOrientation.kind).toBe('side');
     expect(state?.orientation.confidence).toBeGreaterThan(0.8);
     expect(state?.scale).toBeGreaterThan(0);
     expect(state?.landmarks.get('left_knee')?.normalizedY).toBeGreaterThan(0);
@@ -23,6 +24,31 @@ describe('extractBodyState', () => {
     expect(state?.orientation.kind).toBe('floor');
     expect(state?.jointAngles.leftElbow).toBeCloseTo(150);
     expect(state?.geometry.torsoInclinationDegrees).toBeGreaterThan(80);
+  });
+
+  it('preserves normalized world landmarks when estimator depth data is available', () => {
+    const frame = makeSquatFrame({ timestampMs: 120, kneeAngle: 140 });
+    const state = extractBodyState({
+      ...frame,
+      worldLandmarks: toLandmarkMap(
+        [...frame.landmarks.values()].map((landmark) => ({
+          ...landmark,
+          x: landmark.x - 0.5,
+          y: landmark.y - 0.5,
+          z: (landmark.z ?? 0) + 0.1,
+        })),
+      ),
+    });
+
+    expect(state?.worldLandmarks?.get('left_knee')?.normalizedY).toBeGreaterThan(0);
+    expect(state?.worldLandmarks?.get('left_knee')?.normalizedZ).toBeDefined();
+  });
+
+  it('classifies broad shoulder and hip spans as front-facing camera orientation', () => {
+    const state = extractBodyState(widenTorso(makeSquatFrame({ timestampMs: 0, kneeAngle: 160 })));
+
+    expect(state?.viewOrientation.kind).toBe('front');
+    expect(state?.viewOrientation.confidence).toBeGreaterThan(0);
   });
 
   it('reports region coverage separately for visible and occluded sides', () => {
@@ -46,3 +72,23 @@ describe('extractBodyState', () => {
     expect(extractBodyState(undefined)).toBeUndefined();
   });
 });
+
+function widenTorso(frame: PoseFrame): PoseFrame {
+  return {
+    ...frame,
+    landmarks: toLandmarkMap(
+      [...frame.landmarks.values()].map((landmark) => {
+        switch (landmark.name) {
+          case 'left_shoulder':
+          case 'left_hip':
+            return { ...landmark, x: 0.34 };
+          case 'right_shoulder':
+          case 'right_hip':
+            return { ...landmark, x: 0.66 };
+          default:
+            return landmark;
+        }
+      }),
+    ),
+  };
+}
