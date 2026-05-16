@@ -1,6 +1,7 @@
 import type { MovementInterpreterState } from './movement-interpreter.js';
 import type { ActivityStateSnapshot } from './activity-state-segmenter.js';
 import type { MovementWindowSnapshot } from './movement-window.js';
+import { movementDefinitionFor } from './movement-registry.js';
 
 export type MovementGuidanceCode =
   | 'tracking_lost'
@@ -8,6 +9,9 @@ export type MovementGuidanceCode =
   | 'torso_occluded'
   | 'hands_missing'
   | 'feet_missing'
+  | 'camera_too_low'
+  | 'side_angle_recommended'
+  | 'front_angle_recommended'
   | 'low_confidence'
   | 'recent_tracking_gap'
   | 'orientation_mismatch'
@@ -98,6 +102,16 @@ function trackingEvents(input: MovementDiagnosticsInput): readonly MovementGuida
     });
   }
 
+  if (latestBody && latestBody.coverage.upperBody >= 0.65 && latestBody.coverage.lowerBody < 0.45) {
+    events.push({
+      code: 'camera_too_low',
+      severity: 'warning',
+      title: 'Lower-body framing limited',
+      message: 'Step back or raise the camera until hips, knees, ankles, and feet remain visible.',
+      confidence: 1 - latestBody.coverage.lowerBody,
+    });
+  }
+
   if (
     latestBody &&
     (latestBody.environment.lowConfidenceRegions.includes('leftFoot') ||
@@ -160,7 +174,20 @@ function interpreterEvents(
   }
 
   if (state.recognition.evidence.includes('body_orientation_mismatch')) {
+    const recommendedAngle = movementDefinitionFor(state.movementType).cameraGuidance
+      .recommendedAngle;
+
     return [
+      {
+        code: recommendedAngle === 'front' ? 'front_angle_recommended' : 'side_angle_recommended',
+        severity: 'warning',
+        title: recommendedAngle === 'front' ? 'Front angle recommended' : 'Side angle recommended',
+        message:
+          recommendedAngle === 'front'
+            ? 'Move the camera toward a front view for this movement pattern.'
+            : 'Move the camera toward a side view for this movement pattern.',
+        confidence: 1 - state.recognition.confidence,
+      },
       {
         code: 'orientation_mismatch',
         severity: 'warning',

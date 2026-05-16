@@ -70,6 +70,7 @@ describe('diagnoseMovement', () => {
     });
 
     expect(diagnostics.events.some((event) => event.code === 'orientation_mismatch')).toBe(true);
+    expect(diagnostics.events.some((event) => event.code === 'side_angle_recommended')).toBe(true);
   });
 
   it('emits a usable-conditions event when signal quality is stable', () => {
@@ -117,6 +118,35 @@ describe('diagnoseMovement', () => {
 
     expect(diagnostics.events.some((event) => event.code === 'hands_missing')).toBe(true);
     expect(diagnostics.events.some((event) => event.code === 'feet_missing')).toBe(true);
+  });
+
+  it('reports lower-body framing risk when upper body is visible but legs are missing', () => {
+    const bodyState = extractBodyState(
+      makePushUpFrame({ timestampMs: 0, elbowAngle: 150, rightVisibility: 0.95 }),
+    );
+
+    if (!bodyState) {
+      throw new Error('Expected fixture to produce body state.');
+    }
+
+    const diagnostics = diagnoseMovement({
+      activityState: {
+        state: 'idle',
+        confidence: 0.82,
+        motionMagnitude: 0.01,
+        evidence: ['stable_body'],
+      },
+      window: snapshotWithBodyState({
+        ...bodyState,
+        coverage: {
+          ...bodyState.coverage,
+          upperBody: 0.8,
+          lowerBody: 0.3,
+        },
+      }),
+    });
+
+    expect(diagnostics.events.some((event) => event.code === 'camera_too_low')).toBe(true);
   });
 });
 
