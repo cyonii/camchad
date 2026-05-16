@@ -13,7 +13,24 @@ export interface ActivitySession {
   readonly endedAt?: string;
   readonly durationSeconds?: number;
   readonly movements: readonly MovementSegment[];
+  readonly timeline: readonly ActivityTimelineEvent[];
   readonly notes?: string;
+}
+
+export type ActivityTimelineEventKind =
+  | 'session_start'
+  | 'movement_start'
+  | 'movement_end'
+  | 'rest';
+
+export interface ActivityTimelineEvent {
+  readonly id: string;
+  readonly kind: ActivityTimelineEventKind;
+  readonly timestamp: string;
+  readonly movementType?: MovementType;
+  readonly movementSegmentId?: string;
+  readonly activityState?: ActivityStateKind;
+  readonly recognitionConfidence?: number;
 }
 
 export interface MovementSegment {

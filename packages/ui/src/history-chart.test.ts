@@ -93,6 +93,7 @@ function session(
     id,
     startedAt,
     durationSeconds: 60,
+    timeline: [],
     movements: [
       {
         id: `set-${id}`,

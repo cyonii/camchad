@@ -10,6 +10,15 @@ describe('activity history normalization', () => {
           id: 'session_1',
           startedAt: '2026-05-12T07:00:00.000Z',
           durationSeconds: 45,
+          timeline: [
+            {
+              id: 'event_1',
+              kind: 'rest',
+              timestamp: '2026-05-12T07:00:30.000Z',
+              activityState: 'resting',
+              recognitionConfidence: 0.4,
+            },
+          ],
           exercises: [
             {
               id: 'set_1',
@@ -71,6 +80,17 @@ describe('activity history normalization', () => {
         },
       ],
     });
+    expect(history.sessions[0]?.timeline).toEqual([
+      {
+        id: 'event_1',
+        kind: 'rest',
+        timestamp: '2026-05-12T07:00:30.000Z',
+        movementType: undefined,
+        movementSegmentId: undefined,
+        activityState: 'resting',
+        recognitionConfidence: 0.4,
+      },
+    ]);
   });
 
   it('drops malformed sessions and unsupported movement records', () => {
@@ -80,6 +100,7 @@ describe('activity history normalization', () => {
         {
           id: 'session_2',
           startedAt: '2026-05-12T07:00:00.000Z',
+          timeline: [{ id: 'bad', kind: 'dance', timestamp: '2026-05-12T07:00:01.000Z' }],
           movements: [
             {
               id: 'unknown',
@@ -97,6 +118,7 @@ describe('activity history normalization', () => {
         endedAt: undefined,
         durationSeconds: undefined,
         movements: [],
+        timeline: [],
         notes: undefined,
       },
     ]);

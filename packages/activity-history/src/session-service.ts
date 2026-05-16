@@ -52,10 +52,18 @@ export class ActivitySessionService {
       throw new Error('An activity session is already active.');
     }
 
+    const startedAt = this.clock.now().toISOString();
     this.activeSession = {
       id: this.ids.createId('session'),
-      startedAt: this.clock.now().toISOString(),
+      startedAt,
       movements: [],
+      timeline: [
+        {
+          id: this.ids.createId('event'),
+          kind: 'session_start',
+          timestamp: startedAt,
+        },
+      ],
     };
 
     return this.activeSession;
@@ -81,6 +89,19 @@ export class ActivitySessionService {
       partialReps: 0,
       formWarnings: [],
       repEvents: [],
+    };
+    this.activeSession = {
+      ...this.activeSession,
+      timeline: [
+        ...this.activeSession.timeline,
+        {
+          id: this.ids.createId('event'),
+          kind: 'movement_start',
+          timestamp: this.activeSegment.startedAt,
+          movementType,
+          movementSegmentId: this.activeSegment.id,
+        },
+      ],
     };
 
     return this.activeSegment;
@@ -129,18 +150,51 @@ export class ActivitySessionService {
       throw new Error('Cannot end movement because no movement segment is active.');
     }
 
+    const endedAt = this.clock.now().toISOString();
     const completedSet: MovementSegment = {
       ...this.activeSegment,
-      endedAt: this.clock.now().toISOString(),
+      endedAt,
     };
 
     this.activeSession = {
       ...this.activeSession,
       movements: [...this.activeSession.movements, completedSet],
+      timeline: [
+        ...this.activeSession.timeline,
+        {
+          id: this.ids.createId('event'),
+          kind: 'movement_end',
+          timestamp: endedAt,
+          movementType: completedSet.movementType,
+          movementSegmentId: completedSet.id,
+          activityState: completedSet.activityState,
+          recognitionConfidence: completedSet.recognitionConfidence,
+        },
+      ],
     };
     this.activeSegment = undefined;
 
     return completedSet;
+  }
+
+  public recordRest(telemetry: MovementTelemetryUpdate = {}): void {
+    if (!this.activeSession) {
+      throw new Error('Cannot record rest because no activity session is active.');
+    }
+
+    this.activeSession = {
+      ...this.activeSession,
+      timeline: [
+        ...this.activeSession.timeline,
+        {
+          id: this.ids.createId('event'),
+          kind: 'rest',
+          timestamp: this.clock.now().toISOString(),
+          activityState: telemetry.activityState,
+          recognitionConfidence: telemetry.recognitionConfidence,
+        },
+      ],
+    };
   }
 
   public async endSession(notes?: string): Promise<ActivitySession> {

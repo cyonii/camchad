@@ -7,7 +7,7 @@ import type {
   RepEvent,
 } from '@camchad/movement-core';
 
-import type { ActivitySession, MovementSegment } from './models.js';
+import type { ActivitySession, ActivityTimelineEvent, MovementSegment } from './models.js';
 
 export interface PersistedActivityHistory {
   readonly sessions: readonly ActivitySession[];
@@ -50,7 +50,37 @@ export function normalizeActivitySession(value: unknown): readonly ActivitySessi
       durationSeconds:
         typeof value.durationSeconds === 'number' ? value.durationSeconds : undefined,
       movements: movements.flatMap((movement) => normalizeMovementSegment(movement)),
+      timeline: Array.isArray(value.timeline)
+        ? value.timeline.flatMap((event) => normalizeTimelineEvent(event))
+        : [],
       notes: typeof value.notes === 'string' ? value.notes : undefined,
+    },
+  ];
+}
+
+function normalizeTimelineEvent(value: unknown): readonly ActivityTimelineEvent[] {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    !isTimelineEventKind(value.kind) ||
+    typeof value.timestamp !== 'string'
+  ) {
+    return [];
+  }
+
+  return [
+    {
+      id: value.id,
+      kind: value.kind,
+      timestamp: value.timestamp,
+      movementType: isMovementType(value.movementType) ? value.movementType : undefined,
+      movementSegmentId:
+        typeof value.movementSegmentId === 'string' ? value.movementSegmentId : undefined,
+      activityState: isActivityState(value.activityState) ? value.activityState : undefined,
+      recognitionConfidence:
+        typeof value.recognitionConfidence === 'number'
+          ? clamp01(value.recognitionConfidence)
+          : undefined,
     },
   ];
 }
@@ -171,6 +201,15 @@ function isActivityState(value: unknown): value is ActivityStateKind {
     value === 'resting' ||
     value === 'tracking_lost' ||
     value === 'unknown'
+  );
+}
+
+function isTimelineEventKind(value: unknown): value is ActivityTimelineEvent['kind'] {
+  return (
+    value === 'session_start' ||
+    value === 'movement_start' ||
+    value === 'movement_end' ||
+    value === 'rest'
   );
 }
 

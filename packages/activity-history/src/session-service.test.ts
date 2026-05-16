@@ -68,6 +68,16 @@ describe('ActivitySessionService', () => {
     expect(session.id).toBe('session_1');
     expect(session.durationSeconds).toBe(125);
     expect(session.movements).toHaveLength(1);
+    expect(session.timeline.map((event) => event.kind)).toEqual([
+      'session_start',
+      'movement_start',
+      'movement_end',
+    ]);
+    expect(session.timeline[2]).toMatchObject({
+      movementType: 'push_up',
+      activityState: 'moving',
+      recognitionConfidence: 0.91,
+    });
     expect(session.movements[0]?.repEvents).toHaveLength(1);
     expect(session.movements[0]).toMatchObject({
       activityState: 'moving',
@@ -158,6 +168,28 @@ describe('ActivitySessionService', () => {
 
     expect(set.guidanceEvents).toHaveLength(1);
     expect(set.guidanceEvents?.[0]?.message).toBe('Improve lighting and contrast.');
+  });
+
+  it('records rest timeline events while a session is active', async () => {
+    const service = new ActivitySessionService(
+      new InMemoryActivityRepository(),
+      new FixedClock([
+        new Date('2026-05-12T07:00:00.000Z'),
+        new Date('2026-05-12T07:00:30.000Z'),
+        new Date('2026-05-12T07:01:00.000Z'),
+      ]),
+      new SequentialIds(),
+    );
+
+    service.startSession();
+    service.recordRest({ activityState: 'resting', recognitionConfidence: 0.2 });
+    const session = await service.endSession();
+
+    expect(session.timeline.map((event) => event.kind)).toEqual(['session_start', 'rest']);
+    expect(session.timeline[1]).toMatchObject({
+      activityState: 'resting',
+      recognitionConfidence: 0.2,
+    });
   });
 });
 

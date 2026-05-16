@@ -619,6 +619,7 @@ function ActivityView({
   const sessionRef = useRef<ActivitySession | undefined>(undefined);
   const sessionServiceRef = useRef<ActivitySessionService | undefined>(undefined);
   const activeMovementTypeRef = useRef<MovementType | undefined>(undefined);
+  const hasRecordedRestRef = useRef(false);
   const hasRecordableActivityRef = useRef(false);
   const startTokenRef = useRef(0);
   const startInFlightRef = useRef(false);
@@ -718,12 +719,27 @@ function ActivityView({
 
       if (telemetry.mode === 'resting' || telemetry.mode === 'idle') {
         endActiveMovement();
+
+        if (telemetry.mode === 'resting' && !hasRecordedRestRef.current) {
+          service.recordRest({
+            activityState: telemetry.activityState,
+            recognitionConfidence: telemetry.recognitionConfidence,
+          });
+          hasRecordedRestRef.current = true;
+        }
+
+        if (telemetry.mode === 'idle') {
+          hasRecordedRestRef.current = false;
+        }
+
         return;
       }
 
       if (telemetry.mode !== 'moving' || !telemetry.movementType) {
         return;
       }
+
+      hasRecordedRestRef.current = false;
 
       if (
         activeMovementTypeRef.current &&
@@ -871,6 +887,7 @@ function ActivityView({
       lastInferenceAtRef.current = 0;
       smootherRef.current.reset();
       activeMovementTypeRef.current = undefined;
+      hasRecordedRestRef.current = false;
       hasRecordableActivityRef.current = false;
       sessionServiceRef.current = new ActivitySessionService(
         createSessionRepository(onSessionSaved),
@@ -955,6 +972,7 @@ function ActivityView({
     sessionRef.current = undefined;
     sessionServiceRef.current = undefined;
     activeMovementTypeRef.current = undefined;
+    hasRecordedRestRef.current = false;
     hasRecordableActivityRef.current = false;
     activityWindowRef.current.reset();
     activityStateSegmenterRef.current.reset();
