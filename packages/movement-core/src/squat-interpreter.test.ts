@@ -16,6 +16,7 @@ describe('SquatMovementInterpreter', () => {
     expect(state.movementType).toBe('squat');
     expect(state.reps).toBe(1);
     expect(state.validReps).toBe(1);
+    expect(state.stateKind).toBe('setup');
     expect(state.recognition).toMatchObject({
       movementType: 'squat',
       status: 'active',

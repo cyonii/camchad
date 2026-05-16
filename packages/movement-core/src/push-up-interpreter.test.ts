@@ -17,6 +17,7 @@ describe('PushUpMovementInterpreter', () => {
     expect(state.validReps).toBe(1);
     expect(state.partialReps).toBe(0);
     expect(state.phase).toBe('top');
+    expect(state.stateKind).toBe('setup');
     expect(state.lastRep?.depthScore).toBe(1);
   });
 
@@ -71,6 +72,7 @@ describe('PushUpMovementInterpreter', () => {
     expect(state.reps).toBe(1);
     expect(state.validReps).toBe(0);
     expect(state.partialReps).toBe(1);
+    expect(state.stateKind).toBe('partial_rep');
     expect(state.lastRep?.warnings.some((warning) => warning.code === 'partial_depth')).toBe(true);
   });
 
@@ -97,6 +99,7 @@ describe('PushUpMovementInterpreter', () => {
     );
 
     expect(state.phase).toBe('invalid_form');
+    expect(state.stateKind).toBe('failed_rep');
     expect(state.reps).toBe(0);
   });
 
@@ -106,6 +109,7 @@ describe('PushUpMovementInterpreter', () => {
     const state = detector.processPose(undefined);
 
     expect(state.phase).toBe('tracking_lost');
+    expect(state.stateKind).toBe('tracking_lost');
     expect(state.recognition.status).toBe('tracking_lost');
     expect(state.warnings[0]?.code).toBe('tracking_lost');
   });

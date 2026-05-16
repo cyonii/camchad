@@ -42,6 +42,14 @@ export type MovementPhase =
   | 'ascending'
   | 'invalid_form';
 
+export type MovementStateKind =
+  | 'setup'
+  | 'active_rep'
+  | 'partial_rep'
+  | 'failed_rep'
+  | 'rest'
+  | 'tracking_lost';
+
 export interface FormWarning {
   readonly code:
     | 'tracking_lost'
@@ -76,6 +84,7 @@ export interface MovementInterpreterState {
   readonly movementType: MovementType;
   readonly recognition: MovementRecognition;
   readonly phase: MovementPhase;
+  readonly stateKind?: MovementStateKind;
   readonly reps: number;
   readonly validReps: number;
   readonly partialReps: number;

@@ -4,6 +4,7 @@ import type {
   MovementInterpreter,
   MovementInterpreterState,
   MovementRecognition,
+  MovementStateKind,
   RepEvent,
 } from './movement-interpreter.js';
 import { CyclicPhaseMachine } from './cyclic-phase-machine.js';
@@ -207,6 +208,7 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       movementType: this.movementType,
       recognition: this.recognition,
       phase: this.phaseMachine.phase,
+      stateKind: stateKindFor(this.phaseMachine.phase, this.lastRep),
       reps: this.reps,
       validReps: this.validReps,
       partialReps: this.partialReps,
@@ -281,6 +283,29 @@ export class SquatMovementInterpreter implements MovementInterpreter {
 
     return clamp01((this.config.topKneeAngle - this.lowestKneeAngle) / depthRange);
   }
+}
+
+function stateKindFor(
+  phase: MovementInterpreterState['phase'],
+  lastRep: RepEvent | undefined,
+): MovementStateKind {
+  if (phase === 'tracking_lost') {
+    return 'tracking_lost';
+  }
+
+  if (phase === 'invalid_form') {
+    return 'failed_rep';
+  }
+
+  if (phase === 'top' && lastRep?.warnings.some((warning) => warning.code === 'range_of_motion')) {
+    return 'partial_rep';
+  }
+
+  if (phase === 'descending' || phase === 'bottom' || phase === 'ascending') {
+    return 'active_rep';
+  }
+
+  return 'setup';
 }
 
 function movementConfidence(
