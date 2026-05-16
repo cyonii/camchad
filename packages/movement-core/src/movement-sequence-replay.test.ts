@@ -5,10 +5,13 @@ import { PushUpMovementInterpreter } from './push-up-interpreter.js';
 import { SquatMovementInterpreter } from './squat-interpreter.js';
 import {
   makeForwardLeaningSquatSequence,
+  makeConfusedStandingSequence,
   makeInvalidPushUpAlignmentSequence,
+  makePausedSquatSequence,
   makePartialPushUpSequence,
   makePushUpFrame,
   makePushUpRepSequence,
+  makeShallowSquatSequence,
   makeSquatRepSequence,
   evaluateMovementReplay,
   replayMovementSequence,
@@ -122,6 +125,34 @@ describe('movement sequence replay', () => {
     expect(replay.finalState.warnings.some((warning) => warning.code === 'posture_alignment')).toBe(
       true,
     );
+  });
+
+  it('distinguishes shallow, paused, and confused squat traces', () => {
+    const shallow = replayMovementSequence(
+      new SquatMovementInterpreter(),
+      makeShallowSquatSequence(),
+    );
+    const paused = replayMovementSequence(
+      new SquatMovementInterpreter(),
+      makePausedSquatSequence(),
+    );
+    const confused = replayMovementSequence(
+      new SquatMovementInterpreter(),
+      makeConfusedStandingSequence(),
+    );
+
+    expect(shallow.finalState).toMatchObject({
+      reps: 1,
+      validReps: 0,
+      partialReps: 1,
+    });
+    expect(paused.finalState).toMatchObject({
+      reps: 1,
+      validReps: 1,
+      partialReps: 0,
+    });
+    expect(confused.finalState.reps).toBe(0);
+    expect(confused.metrics.phaseJitter).toBeLessThan(0.6);
   });
 
   it('replays exercise transitions through the recognition engine', () => {

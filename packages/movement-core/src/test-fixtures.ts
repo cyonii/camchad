@@ -169,6 +169,33 @@ export function makeForwardLeaningSquatSequence(startTimestampMs = 0): PoseSeque
   ];
 }
 
+export function makeShallowSquatSequence(startTimestampMs = 0): PoseSequence {
+  return [
+    makeSquatFrame({ timestampMs: startTimestampMs, kneeAngle: 168 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 140, kneeAngle: 136 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 300, kneeAngle: 166 }),
+  ];
+}
+
+export function makePausedSquatSequence(startTimestampMs = 0): PoseSequence {
+  return [
+    makeSquatFrame({ timestampMs: startTimestampMs, kneeAngle: 168 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 120, kneeAngle: 138 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 260, kneeAngle: 98 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 520, kneeAngle: 98 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 680, kneeAngle: 132 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 820, kneeAngle: 166 }),
+  ];
+}
+
+export function makeConfusedStandingSequence(startTimestampMs = 0): PoseSequence {
+  return [
+    makeSquatFrame({ timestampMs: startTimestampMs, kneeAngle: 168, torsoLeanX: 0 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 900, kneeAngle: 158, torsoLeanX: 0.03 }),
+    makeSquatFrame({ timestampMs: startTimestampMs + 1800, kneeAngle: 166, torsoLeanX: -0.02 }),
+  ];
+}
+
 export function makePushUpFrame(options: PushUpFrameOptions): PoseFrame {
   const visibility = options.visibility ?? 0.95;
   const leftVisibility = options.leftVisibility ?? visibility;
