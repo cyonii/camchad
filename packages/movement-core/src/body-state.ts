@@ -1,6 +1,7 @@
 import {
   angleDegrees,
   distance,
+  lineDeviationRatio,
   midpoint,
   type LandmarkName,
   type PoseFrame,
@@ -72,6 +73,7 @@ export interface BodyGeometrySignals {
   readonly torsoInclinationDegrees: number;
   readonly shoulderTiltDegrees: number;
   readonly hipTiltDegrees: number;
+  readonly bodyLineDeviation?: number;
   readonly shoulderSpanRatio?: number;
   readonly hipSpanRatio?: number;
   readonly wristSpanRatio?: number;
@@ -251,12 +253,21 @@ function computeGeometrySignals(
   const rightWrist = frame.landmarks.get('right_wrist');
   const leftAnkle = frame.landmarks.get('left_ankle');
   const rightAnkle = frame.landmarks.get('right_ankle');
+  const leftBodyLineDeviation =
+    leftShoulder && leftHip && leftAnkle
+      ? lineDeviationRatio(leftShoulder, leftHip, leftAnkle)
+      : undefined;
+  const rightBodyLineDeviation =
+    rightShoulder && rightHip && rightAnkle
+      ? lineDeviationRatio(rightShoulder, rightHip, rightAnkle)
+      : undefined;
 
   return {
     torsoInclinationDegrees: angleFromVertical(shoulderCenter, hipCenter),
     shoulderTiltDegrees:
       leftShoulder && rightShoulder ? angleFromHorizontal(leftShoulder, rightShoulder) : 0,
     hipTiltDegrees: leftHip && rightHip ? angleFromHorizontal(leftHip, rightHip) : 0,
+    bodyLineDeviation: averageDefined(leftBodyLineDeviation, rightBodyLineDeviation),
     shoulderSpanRatio:
       leftShoulder && rightShoulder ? distance(leftShoulder, rightShoulder) / scale : undefined,
     hipSpanRatio: leftHip && rightHip ? distance(leftHip, rightHip) / scale : undefined,
@@ -429,6 +440,18 @@ function average(values: readonly number[]): number {
   }
 
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function averageDefined(a: number | undefined, b: number | undefined): number | undefined {
+  if (a === undefined) {
+    return b;
+  }
+
+  if (b === undefined) {
+    return a;
+  }
+
+  return (a + b) / 2;
 }
 
 function clamp01(value: number): number {

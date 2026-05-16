@@ -85,7 +85,7 @@ function makeStandingKneeLiftFrame({
     confidence: 0.95,
     landmarks: toLandmarkMap([
       ...standingSide('left', 0.49, kneeY),
-      ...standingSide('right', 0.51, kneeY),
+      ...standingSide('right', 0.51, 0.66),
     ]),
   };
 }
