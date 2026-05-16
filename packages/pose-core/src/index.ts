@@ -6,4 +6,5 @@ export * from './perception-evaluation.js';
 export * from './pose-benchmark.js';
 export * from './pose-estimator.js';
 export * from './pose-models.js';
+export * from './pose-trace.js';
 export * from './smoothing.js';
