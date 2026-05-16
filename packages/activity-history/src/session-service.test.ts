@@ -87,6 +87,11 @@ describe('ActivitySessionService', () => {
         sampleWindowMs: 320,
       },
     });
+    expect(session.summary).toMatchObject({
+      movementMix: [{ movementType: 'push_up', reps: 1, validReps: 1, durationSeconds: 110 }],
+      restPeriods: 0,
+      confidenceTrend: 'unknown',
+    });
     expect(await repository.summary()).toEqual({
       totalSessions: 1,
       totalReps: 1,

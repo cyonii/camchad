@@ -14,6 +14,7 @@ export interface ActivitySession {
   readonly durationSeconds?: number;
   readonly movements: readonly MovementSegment[];
   readonly timeline: readonly ActivityTimelineEvent[];
+  readonly summary?: ActivitySessionAnalysisSummary;
   readonly notes?: string;
 }
 
@@ -31,6 +32,21 @@ export interface ActivityTimelineEvent {
   readonly movementSegmentId?: string;
   readonly activityState?: ActivityStateKind;
   readonly recognitionConfidence?: number;
+}
+
+export interface ActivitySessionAnalysisSummary {
+  readonly movementMix: readonly ActivitySessionMovementMix[];
+  readonly restPeriods: number;
+  readonly confidenceTrend: 'improving' | 'declining' | 'stable' | 'unknown';
+  readonly fatigueScore: number;
+  readonly commonFailureModes: readonly string[];
+}
+
+export interface ActivitySessionMovementMix {
+  readonly movementType: MovementType;
+  readonly reps: number;
+  readonly validReps: number;
+  readonly durationSeconds: number;
 }
 
 export interface MovementSegment {

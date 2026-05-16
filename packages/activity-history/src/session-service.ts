@@ -9,6 +9,7 @@ import type {
 
 import type { MovementSegment, ActivitySession } from './models.js';
 import type { ActivityRepository } from './activity-repository.js';
+import { summarizeActivitySession } from './session-summary.js';
 
 export interface Clock {
   now(): Date;
@@ -214,11 +215,15 @@ export class ActivitySessionService {
       durationSeconds: Math.max(0, Math.round((endedAt.getTime() - startedAt.getTime()) / 1000)),
       notes,
     };
+    const summarizedSession: ActivitySession = {
+      ...completedSession,
+      summary: summarizeActivitySession(completedSession),
+    };
 
-    await this.repository.saveSession(completedSession);
+    await this.repository.saveSession(summarizedSession);
     this.activeSession = undefined;
 
-    return completedSession;
+    return summarizedSession;
   }
 
   public getActiveSession(): ActivitySession | undefined {
