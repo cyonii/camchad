@@ -1640,7 +1640,7 @@ button,
 
 .bottom-command-deck {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(280px, auto);
+  grid-template-columns: minmax(260px, 1fr) auto minmax(280px, auto);
   gap: 10px;
   align-items: center;
   padding: 8px;
@@ -1687,6 +1687,25 @@ button,
 
 .command-module-guidance {
   width: min(560px, 100%);
+}
+
+.command-module-trace {
+  width: min(320px, 100%);
+}
+
+.developer-trace-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.developer-trace-panel small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .camera-guidance {
@@ -1776,6 +1795,12 @@ button,
   flex: 1;
   min-height: 38px;
   padding: 0 13px;
+}
+
+.compact-action {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 10px;
 }
 
 .primary-action {

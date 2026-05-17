@@ -3,6 +3,7 @@ import {
   type ActivitySession,
   type ActivitySummary,
 } from '@camchad/activity-history';
+import type { PoseTrace } from '@camchad/pose-core';
 
 export interface CameraPermissionResult {
   readonly granted: boolean;
@@ -59,6 +60,15 @@ export interface WindowControlsClient {
   subscribe?(listener: (state: WindowChromeState) => void): () => void;
 }
 
+export interface PoseTraceSaveResult {
+  readonly filename: string;
+  readonly path?: string;
+}
+
+export interface DeveloperToolsClient {
+  savePoseTrace(trace: PoseTrace): Promise<PoseTraceSaveResult>;
+}
+
 export interface ActivityPlatform {
   readonly history: HistoryClient;
   readonly settings?: SettingsClient;
@@ -66,6 +76,7 @@ export interface ActivityPlatform {
   readonly cameraPermission?: CameraPermissionClient;
   readonly appLifecycle?: AppLifecycleClient;
   readonly windowControls?: WindowControlsClient;
+  readonly developerTools?: DeveloperToolsClient;
 }
 
 export const localBrowserHistoryClient: HistoryClient = {

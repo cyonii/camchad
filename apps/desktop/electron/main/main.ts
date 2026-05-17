@@ -35,6 +35,11 @@ interface HistoryStorageInfo {
   readonly lastActivityAt?: string;
 }
 
+interface PoseTraceSaveResult {
+  readonly filename: string;
+  readonly path: string;
+}
+
 let mainWindow: BrowserWindow | undefined;
 
 function windowChromePlatform(): 'macos' | 'windows' | 'linux' {
@@ -140,6 +145,12 @@ async function createWindow(): Promise<void> {
 
 function historyPath(): string {
   return join(app.getPath('userData'), 'activity-history.json');
+}
+
+function developerTraceDirectory(): string {
+  return app.isPackaged
+    ? join(app.getPath('userData'), 'pose-traces')
+    : join(process.cwd(), '.dev', 'traces');
 }
 
 async function readHistory(): Promise<PersistedActivityHistory> {
@@ -272,6 +283,26 @@ ipcMain.handle('app:exit', (): void => {
   app.quit();
 });
 
+ipcMain.handle(
+  'developer:save-pose-trace',
+  async (_event, trace: unknown): Promise<PoseTraceSaveResult> => {
+    if (!isPoseTraceRecord(trace)) {
+      throw new Error('Cannot save malformed pose trace.');
+    }
+
+    const directory = developerTraceDirectory();
+    await mkdir(directory, { recursive: true });
+    const filename = poseTraceFilename(trace.createdAt);
+    const target = join(directory, filename);
+    await writeFile(target, `${JSON.stringify(trace, null, 2)}\n`, 'utf8');
+
+    return {
+      filename,
+      path: target,
+    };
+  },
+);
+
 ipcMain.handle('window:get-state', (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
 
@@ -334,3 +365,24 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+function isPoseTraceRecord(value: unknown): value is {
+  readonly schemaVersion: 1;
+  readonly createdAt: string;
+  readonly samples: readonly unknown[];
+} {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'schemaVersion' in value &&
+    value.schemaVersion === 1 &&
+    'createdAt' in value &&
+    typeof value.createdAt === 'string' &&
+    'samples' in value &&
+    Array.isArray(value.samples)
+  );
+}
+
+function poseTraceFilename(createdAt: string): string {
+  return `pose-trace-${createdAt.replaceAll(/[:.]/g, '-')}.json`;
+}

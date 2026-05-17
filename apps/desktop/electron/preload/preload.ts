@@ -39,6 +39,10 @@ const api = {
       return () => ipcRenderer.removeListener('window:state-changed', wrappedListener);
     },
   },
+  developerTools: {
+    savePoseTrace: (trace: unknown): Promise<unknown> =>
+      ipcRenderer.invoke('developer:save-pose-trace', trace),
+  },
 };
 
 contextBridge.exposeInMainWorld('camChad', api);

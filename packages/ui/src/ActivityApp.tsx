@@ -48,7 +48,12 @@ import {
   movementRegistry,
   MovementWindow,
 } from '@camchad/movement-core';
-import { ExponentialPoseSmoother, MediaPipePoseEstimator } from '@camchad/pose-core';
+import {
+  ExponentialPoseSmoother,
+  MediaPipePoseEstimator,
+  PoseTraceRecorder,
+  serializePoseTrace,
+} from '@camchad/pose-core';
 
 import { deriveCameraFrameFeedback, impulseForRep } from './camera-frame-feedback.js';
 import { buildHistoryChartModel } from './history-chart.js';
@@ -62,7 +67,7 @@ import type {
   ActivitySummary,
   MovementSegment,
 } from '@camchad/activity-history';
-import type { LandmarkName, PoseEstimator, PoseFrame } from '@camchad/pose-core';
+import type { LandmarkName, PoseEstimator, PoseFrame, PoseTrace } from '@camchad/pose-core';
 import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
 
 import type {
@@ -137,6 +142,7 @@ export interface ActivityAppProps {
 const themePreferenceStorageKey = 'camchad:theme-preference';
 const telemetryModeStorageKey = 'camchad:telemetry-mode';
 const settingsPreferencesStorageKey = 'camchad:settings-preferences';
+const developerTraceFlagStorageKey = 'camchad:developer-pose-trace';
 const poseInferenceIntervalMs = 80;
 const defaultSettingsPreferences: AppSettingsPreferences = {
   cameraSource: 'system',
@@ -628,6 +634,9 @@ function ActivityView({
   const startInFlightRef = useRef(false);
   const lastInferenceAtRef = useRef(0);
   const detectorStateRef = useRef<MovementInterpreterState>(initialDetectorState);
+  const developerTraceEnabledRef = useRef(readDeveloperTraceEnabled());
+  const poseTraceRecorderRef = useRef<PoseTraceRecorder | undefined>(undefined);
+  const poseTraceMovementLabelsRef = useRef(new Set<string>());
 
   const [isStarting, setIsStarting] = useState(false);
   const [isPreviewActive, setIsPreviewActive] = useState(false);
@@ -639,6 +648,9 @@ function ActivityView({
   const [detectorState, setDetectorState] =
     useState<MovementInterpreterState>(initialDetectorState);
   const [cameraError, setCameraError] = useState<string | undefined>();
+  const [developerTraceStatus, setDeveloperTraceStatus] = useState<string | undefined>(() =>
+    developerTraceEnabledRef.current ? 'Pose trace capture armed' : undefined,
+  );
   const activeGuide = exerciseGuideFor(
     sessionTelemetry.movementType ??
       detectorState.recognition.movementType ??
@@ -803,12 +815,22 @@ function ActivityView({
       }
 
       const smoothed = poseFrame ? smootherRef.current.smooth(poseFrame) : undefined;
+      if (developerTraceEnabledRef.current) {
+        if (smoothed) {
+          poseTraceRecorderRef.current?.addFrame(smoothed);
+        } else {
+          poseTraceRecorderRef.current?.addMissingFrame(timestampMs);
+        }
+      }
       const bodyState = extractBodyState(smoothed);
       const activityWindowSnapshot = bodyState
         ? activityWindowRef.current.add(bodyState)
         : activityWindowRef.current.addMissing(timestampMs);
       const activityState = activityStateSegmenterRef.current.process(activityWindowSnapshot);
       const nextState = recognitionEngineRef.current.processPose(smoothed).primary;
+      if (nextState.recognition.movementType) {
+        poseTraceMovementLabelsRef.current.add(nextState.recognition.movementType);
+      }
       const diagnostics = diagnoseMovement({
         activityState,
         window: activityWindowSnapshot,
@@ -906,6 +928,20 @@ function ActivityView({
         createSessionRepository(onSessionSaved),
       );
       sessionRef.current = sessionServiceRef.current.startSession();
+      poseTraceMovementLabelsRef.current.clear();
+
+      if (developerTraceEnabledRef.current) {
+        poseTraceRecorderRef.current = new PoseTraceRecorder({
+          source: 'camera',
+          notes: 'Developer pose trace capture. No raw video frames are included.',
+          metadata: {
+            sessionId: sessionRef.current.id,
+            cameraAngle: defaultCameraAngle,
+            captureNotes: 'Captured from the live activity loop.',
+          },
+        });
+        setDeveloperTraceStatus('Recording pose trace');
+      }
 
       const estimator = new MediaPipePoseEstimator({
         modelAssetPath: assets.modelAssetPath,
@@ -920,6 +956,7 @@ function ActivityView({
 
       if (startTokenRef.current !== startToken) {
         void estimator.dispose();
+        poseTraceRecorderRef.current = undefined;
         return;
       }
 
@@ -933,6 +970,7 @@ function ActivityView({
       }
 
       stopCamera(videoRef.current);
+      poseTraceRecorderRef.current = undefined;
       setIsPreviewActive(false);
       const message = describeCameraStartupError(error);
       setCameraError(message);
@@ -953,6 +991,43 @@ function ActivityView({
     settingsPreferences.cameraFrameRate,
     settingsPreferences.cameraResolution,
   ]);
+
+  const exportDeveloperPoseTrace = useCallback(async (): Promise<void> => {
+    const recorder = poseTraceRecorderRef.current;
+
+    if (!recorder) {
+      setDeveloperTraceStatus('No pose trace is currently buffered.');
+      return;
+    }
+
+    const snapshot = recorder.snapshot();
+
+    if (snapshot.samples.length === 0) {
+      setDeveloperTraceStatus('No pose samples have been captured yet.');
+      return;
+    }
+
+    const trace: PoseTrace = {
+      ...snapshot,
+      metadata: {
+        ...snapshot.metadata,
+        sessionId: snapshot.metadata?.sessionId ?? sessionRef.current?.id,
+        movementLabels: [...poseTraceMovementLabelsRef.current].sort(),
+        cameraAngle: snapshot.metadata?.cameraAngle ?? defaultCameraAngle,
+      },
+    };
+
+    if (platform.developerTools) {
+      const result = await platform.developerTools.savePoseTrace(trace);
+      setDeveloperTraceStatus(
+        `Saved ${trace.samples.length} samples to ${result.path ?? result.filename}.`,
+      );
+      return;
+    }
+
+    const filename = downloadPoseTrace(trace);
+    setDeveloperTraceStatus(`Downloaded ${trace.samples.length} pose samples as ${filename}.`);
+  }, [platform.developerTools]);
 
   const stopActivity = useCallback(async () => {
     startTokenRef.current += 1;
@@ -982,6 +1057,11 @@ function ActivityView({
       }
     }
 
+    if (developerTraceEnabledRef.current && poseTraceRecorderRef.current) {
+      await exportDeveloperPoseTrace();
+      poseTraceRecorderRef.current = undefined;
+    }
+
     sessionRef.current = undefined;
     sessionServiceRef.current = undefined;
     activeMovementTypeRef.current = undefined;
@@ -995,7 +1075,7 @@ function ActivityView({
     detectorStateRef.current = initialDetectorState;
     setDetectorState(initialDetectorState);
     setStatus('Ready');
-  }, [endActiveMovement, settingsPreferences.autoSaveSessions]);
+  }, [endActiveMovement, exportDeveloperPoseTrace, settingsPreferences.autoSaveSessions]);
 
   return (
     <section
@@ -1085,6 +1165,23 @@ function ActivityView({
             </small>
           </div>
         </div>
+
+        {developerTraceEnabledRef.current ? (
+          <div className="command-module command-module-trace">
+            <span>Pose trace</span>
+            <div className="developer-trace-panel">
+              <small>{developerTraceStatus ?? 'Developer capture enabled'}</small>
+              <button
+                className="secondary-action compact-action"
+                type="button"
+                onClick={() => void exportDeveloperPoseTrace()}
+              >
+                <Download size={16} aria-hidden="true" />
+                Export
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div className="command-module command-module-session">
           <span>Session</span>
@@ -3160,6 +3257,45 @@ function writeSettingsPreferences(preferences: AppSettingsPreferences): void {
   } catch {
     // Settings persistence must never block camera startup or local tracking.
   }
+}
+
+function readDeveloperTraceEnabled(): boolean {
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+
+    if (searchParams.get('dev-trace') === '1' || searchParams.get('trace') === 'pose') {
+      localStorage.setItem(developerTraceFlagStorageKey, '1');
+      return true;
+    }
+
+    if (searchParams.get('dev-trace') === '0') {
+      localStorage.removeItem(developerTraceFlagStorageKey);
+      return false;
+    }
+
+    return localStorage.getItem(developerTraceFlagStorageKey) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function downloadPoseTrace(trace: PoseTrace): string {
+  const filename = poseTraceFilename(trace.createdAt);
+  const blob = new Blob([serializePoseTrace(trace)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  return filename;
+}
+
+function poseTraceFilename(createdAt: string): string {
+  return `pose-trace-${createdAt.replaceAll(/[:.]/g, '-')}.json`;
 }
 
 function cameraResolutionConstraints(

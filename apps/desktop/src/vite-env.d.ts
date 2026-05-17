@@ -31,6 +31,9 @@ declare global {
         close(): Promise<void>;
         subscribe(listener: (state: unknown) => void): () => void;
       };
+      developerTools: {
+        savePoseTrace(trace: unknown): Promise<unknown>;
+      };
     };
   }
 }

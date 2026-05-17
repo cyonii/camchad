@@ -14,6 +14,11 @@ describe('PoseTraceRecorder', () => {
       source: 'synthetic',
       createdAt: '2026-05-16T12:00:00.000Z',
       notes: 'fixture',
+      metadata: {
+        sessionId: 'session_1',
+        movementLabels: ['push_up'],
+        cameraAngle: 'side',
+      },
     });
 
     recorder.addFrame(frame(100));
@@ -24,6 +29,11 @@ describe('PoseTraceRecorder', () => {
       createdAt: '2026-05-16T12:00:00.000Z',
       source: 'synthetic',
       notes: 'fixture',
+      metadata: {
+        sessionId: 'session_1',
+        movementLabels: ['push_up'],
+        cameraAngle: 'side',
+      },
       samples: [
         expect.objectContaining({
           timestampMs: 100,

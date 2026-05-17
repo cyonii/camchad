@@ -5,11 +5,13 @@ import type {
   CameraPermissionResult,
   ActivityPlatform,
   HistoryStorageInfo,
+  PoseTraceSaveResult,
   WindowChromeState,
 } from '@camchad/ui';
 import { ActivityApp } from '@camchad/ui';
 import '@camchad/ui/styles.css';
 import type { ActivitySession, ActivitySummary } from '@camchad/activity-history';
+import type { PoseTrace } from '@camchad/pose-core';
 
 const desktopApi = window.camChad;
 
@@ -58,6 +60,11 @@ const platform: ActivityPlatform = {
       desktopApi.windowControls.subscribe((state) => {
         listener(state as WindowChromeState);
       }),
+  },
+  developerTools: {
+    async savePoseTrace(trace: PoseTrace): Promise<PoseTraceSaveResult> {
+      return (await desktopApi.developerTools.savePoseTrace(trace)) as PoseTraceSaveResult;
+    },
   },
 };
 

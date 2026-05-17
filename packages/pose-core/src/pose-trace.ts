@@ -19,7 +19,16 @@ export interface PoseTrace {
   readonly createdAt: string;
   readonly source: 'camera' | 'video' | 'synthetic' | 'unknown';
   readonly notes?: string;
+  readonly metadata?: PoseTraceMetadata;
   readonly samples: readonly PoseTraceSample[];
+}
+
+export interface PoseTraceMetadata {
+  readonly sessionId?: string;
+  readonly movementLabels?: readonly string[];
+  readonly cameraAngle?: string;
+  readonly lightingNotes?: string;
+  readonly captureNotes?: string;
 }
 
 export class PoseTraceRecorder {
@@ -29,6 +38,7 @@ export class PoseTraceRecorder {
     private readonly options: {
       readonly source?: PoseTrace['source'];
       readonly notes?: string;
+      readonly metadata?: PoseTraceMetadata;
       readonly createdAt?: string;
     } = {},
   ) {}
@@ -51,6 +61,7 @@ export class PoseTraceRecorder {
       createdAt: this.options.createdAt ?? new Date().toISOString(),
       source: this.options.source ?? 'unknown',
       notes: this.options.notes,
+      metadata: this.options.metadata,
       samples: [...this.samples],
     };
   }
