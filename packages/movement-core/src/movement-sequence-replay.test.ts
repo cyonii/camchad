@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createMovementRecognitionEngine } from './movement-recognition-engine.js';
-import { PushUpMovementInterpreter } from './push-up-interpreter.js';
-import { SquatMovementInterpreter } from './squat-interpreter.js';
+import { createRepValidatingMovementInterpreter } from './rep-validating-movement-interpreter.js';
 import {
   makeForwardLeaningSquatSequence,
   makeConfusedStandingSequence,
@@ -23,7 +22,10 @@ import {
 
 describe('movement sequence replay', () => {
   it('summarizes a full push-up sequence with phase changes and one valid rep', () => {
-    const replay = replayMovementSequence(new PushUpMovementInterpreter(), makePushUpRepSequence());
+    const replay = replayMovementSequence(
+      createRepValidatingMovementInterpreter('push_up'),
+      makePushUpRepSequence(),
+    );
 
     expect(replay.finalState).toMatchObject({
       movementType: 'push_up',
@@ -53,7 +55,7 @@ describe('movement sequence replay', () => {
 
   it('summarizes an incomplete push-up sequence as a partial rep', () => {
     const replay = replayMovementSequence(
-      new PushUpMovementInterpreter(),
+      createRepValidatingMovementInterpreter('push_up'),
       makePartialPushUpSequence(),
     );
 
@@ -67,7 +69,7 @@ describe('movement sequence replay', () => {
 
   it('summarizes invalid push-up alignment without counting a rep', () => {
     const replay = replayMovementSequence(
-      new PushUpMovementInterpreter(),
+      createRepValidatingMovementInterpreter('push_up'),
       makeInvalidPushUpAlignmentSequence(),
     );
 
@@ -82,7 +84,7 @@ describe('movement sequence replay', () => {
   });
 
   it('captures tracking loss and recovery inside a push-up trace', () => {
-    const replay = replayMovementSequence(new PushUpMovementInterpreter(), [
+    const replay = replayMovementSequence(createRepValidatingMovementInterpreter('push_up'), [
       makePushUpFrame({ timestampMs: 0, elbowAngle: 166 }),
       undefined,
       makePushUpFrame({ timestampMs: 220, elbowAngle: 164 }),
@@ -98,7 +100,10 @@ describe('movement sequence replay', () => {
   });
 
   it('summarizes a full squat sequence with one valid rep', () => {
-    const replay = replayMovementSequence(new SquatMovementInterpreter(), makeSquatRepSequence());
+    const replay = replayMovementSequence(
+      createRepValidatingMovementInterpreter('squat'),
+      makeSquatRepSequence(),
+    );
 
     expect(replay.finalState).toMatchObject({
       movementType: 'squat',
@@ -119,7 +124,7 @@ describe('movement sequence replay', () => {
 
   it('summarizes squat posture warnings without losing the valid rep', () => {
     const replay = replayMovementSequence(
-      new SquatMovementInterpreter(),
+      createRepValidatingMovementInterpreter('squat'),
       makeForwardLeaningSquatSequence(),
     );
 
@@ -132,15 +137,15 @@ describe('movement sequence replay', () => {
 
   it('distinguishes shallow, paused, and confused squat traces', () => {
     const shallow = replayMovementSequence(
-      new SquatMovementInterpreter(),
+      createRepValidatingMovementInterpreter('squat'),
       makeShallowSquatSequence(),
     );
     const paused = replayMovementSequence(
-      new SquatMovementInterpreter(),
+      createRepValidatingMovementInterpreter('squat'),
       makePausedSquatSequence(),
     );
     const confused = replayMovementSequence(
-      new SquatMovementInterpreter(),
+      createRepValidatingMovementInterpreter('squat'),
       makeConfusedStandingSequence(),
     );
 
@@ -160,12 +165,15 @@ describe('movement sequence replay', () => {
 
   it('does not absorb high knees, lunges, or hinge patterns into squat counting', () => {
     const highKnees = replayMovementSequence(
-      new SquatMovementInterpreter(),
+      createRepValidatingMovementInterpreter('squat'),
       makeHighKneesSequence(),
     );
-    const lunge = replayMovementSequence(new SquatMovementInterpreter(), makeLungeLikeSequence());
+    const lunge = replayMovementSequence(
+      createRepValidatingMovementInterpreter('squat'),
+      makeLungeLikeSequence(),
+    );
     const deadlift = replayMovementSequence(
-      new SquatMovementInterpreter(),
+      createRepValidatingMovementInterpreter('squat'),
       makeDeadliftLikeSequence(),
     );
 

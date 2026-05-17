@@ -44,7 +44,7 @@ export interface MovementProfileMetadata {
   readonly failureCriteria: readonly string[];
 }
 
-export type MovementProfileCriterionSource = 'declarative' | 'definition_module' | 'planned';
+export type MovementProfileCriterionSource = 'declarative' | 'validation_profile' | 'planned';
 
 export interface MovementProfileCriterion {
   readonly key: string;
@@ -131,7 +131,7 @@ export const movementRegistry: readonly MovementDefinition[] = [
         profileCriterion(
           'push_up_phase_machine',
           'Top-bottom-top phase validation',
-          'definition_module',
+          'validation_profile',
         ),
         profileCriterion('push_up_depth', 'Elbow depth threshold', 'declarative'),
         profileCriterion('body_line_quality', 'Shoulder-hip-ankle line quality', 'declarative'),
@@ -215,7 +215,7 @@ export const movementRegistry: readonly MovementDefinition[] = [
         profileCriterion(
           'squat_phase_machine',
           'Standing-bottom-standing phase validation',
-          'definition_module',
+          'validation_profile',
         ),
         profileCriterion('squat_depth', 'Knee depth threshold', 'declarative'),
         profileCriterion('torso_control', 'Torso control threshold', 'declarative'),

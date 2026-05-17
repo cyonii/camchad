@@ -55,7 +55,7 @@ describe('movementRegistry profiles', () => {
     );
     expect(movementDefinitionFor('push_up').profile.validationCriteria).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ key: 'push_up_phase_machine', source: 'definition_module' }),
+        expect.objectContaining({ key: 'push_up_phase_machine', source: 'validation_profile' }),
       ]),
     );
     expect(movementDefinitionFor('sit_up').profile.validationCriteria).toEqual(

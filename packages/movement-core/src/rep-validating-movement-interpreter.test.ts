@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { PushUpMovementInterpreter } from './push-up-interpreter.js';
-import { makePushUpFrame } from './test-fixtures.js';
+import { createRepValidatingMovementInterpreter } from './rep-validating-movement-interpreter.js';
+import { makePushUpFrame, makeSquatFrame } from './test-fixtures.js';
 
-describe('PushUpMovementInterpreter', () => {
+describe('rep-validating movement interpreter', () => {
   it('counts a complete top-bottom-top push-up once', () => {
-    const detector = new PushUpMovementInterpreter();
+    const detector = createRepValidatingMovementInterpreter('push_up');
 
     detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
     detector.processPose(makePushUpFrame({ timestampMs: 100, elbowAngle: 130 }));
@@ -22,7 +22,7 @@ describe('PushUpMovementInterpreter', () => {
   });
 
   it('recognizes push-up movement before validating a complete rep', () => {
-    const interpreter = new PushUpMovementInterpreter();
+    const interpreter = createRepValidatingMovementInterpreter('push_up');
 
     interpreter.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
     const state = interpreter.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 132 }));
@@ -36,7 +36,7 @@ describe('PushUpMovementInterpreter', () => {
   });
 
   it('counts from the visible side when the far side is obscured', () => {
-    const detector = new PushUpMovementInterpreter();
+    const detector = createRepValidatingMovementInterpreter('push_up');
 
     detector.processPose(
       makePushUpFrame({ timestampMs: 0, elbowAngle: 158, rightVisibility: 0.1 }),
@@ -63,7 +63,7 @@ describe('PushUpMovementInterpreter', () => {
   });
 
   it('records a partial rep when top returns before bottom depth', () => {
-    const detector = new PushUpMovementInterpreter();
+    const detector = createRepValidatingMovementInterpreter('push_up');
 
     detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
     detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 130 }));
@@ -77,7 +77,7 @@ describe('PushUpMovementInterpreter', () => {
   });
 
   it('warns on mild body alignment drift without blocking the rep', () => {
-    const detector = new PushUpMovementInterpreter();
+    const detector = createRepValidatingMovementInterpreter('push_up');
 
     detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165, hipOffsetY: 0.34 }));
     detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 94, hipOffsetY: 0.34 }));
@@ -90,7 +90,7 @@ describe('PushUpMovementInterpreter', () => {
   });
 
   it('does not count while body alignment is severely invalid', () => {
-    const detector = new PushUpMovementInterpreter();
+    const detector = createRepValidatingMovementInterpreter('push_up');
 
     detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165, hipOffsetY: 0.8 }));
     detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 110, hipOffsetY: 0.8 }));
@@ -104,7 +104,7 @@ describe('PushUpMovementInterpreter', () => {
   });
 
   it('enters tracking lost state when landmarks are unavailable', () => {
-    const detector = new PushUpMovementInterpreter();
+    const detector = createRepValidatingMovementInterpreter('push_up');
 
     const state = detector.processPose(undefined);
 
@@ -115,7 +115,7 @@ describe('PushUpMovementInterpreter', () => {
   });
 
   it('reports temporal movement telemetry while interpreting push-ups', () => {
-    const detector = new PushUpMovementInterpreter();
+    const detector = createRepValidatingMovementInterpreter('push_up');
 
     detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
     const state = detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 132 }));
@@ -141,7 +141,7 @@ describe('PushUpMovementInterpreter', () => {
   });
 
   it('surfaces fatigue telemetry from confidence and bottom-hold behavior', () => {
-    const detector = new PushUpMovementInterpreter();
+    const detector = createRepValidatingMovementInterpreter('push_up');
 
     detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165, visibility: 0.95 }));
     detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 132, visibility: 0.85 }));
@@ -158,10 +158,106 @@ describe('PushUpMovementInterpreter', () => {
   });
 
   it('does not enter a rep phase for slow top-position threshold drift', () => {
-    const detector = new PushUpMovementInterpreter();
+    const detector = createRepValidatingMovementInterpreter('push_up');
 
     detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
     const state = detector.processPose(makePushUpFrame({ timestampMs: 6000, elbowAngle: 146 }));
+
+    expect(state.phase).toBe('top');
+    expect(state.reps).toBe(0);
+    expect(Math.abs(state.metrics.phaseVelocity ?? 0)).toBeLessThan(12);
+  });
+});
+
+describe('rep-validating standing knee-bend profile', () => {
+  it('counts a complete standing-bottom-standing squat once', () => {
+    const interpreter = createRepValidatingMovementInterpreter('squat');
+
+    interpreter.processPose(makeSquatFrame({ timestampMs: 0, kneeAngle: 168 }));
+    interpreter.processPose(makeSquatFrame({ timestampMs: 120, kneeAngle: 138 }));
+    interpreter.processPose(makeSquatFrame({ timestampMs: 260, kneeAngle: 96 }));
+    interpreter.processPose(makeSquatFrame({ timestampMs: 390, kneeAngle: 132 }));
+    const state = interpreter.processPose(makeSquatFrame({ timestampMs: 540, kneeAngle: 166 }));
+
+    expect(state.movementType).toBe('squat');
+    expect(state.reps).toBe(1);
+    expect(state.validReps).toBe(1);
+    expect(state.stateKind).toBe('setup');
+    expect(state.recognition).toMatchObject({
+      movementType: 'squat',
+      status: 'active',
+    });
+  });
+
+  it('does not classify floor-oriented push-up motion as a squat', () => {
+    const interpreter = createRepValidatingMovementInterpreter('squat');
+
+    const state = interpreter.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 150 }));
+
+    expect(state.recognition).toMatchObject({
+      confidence: 0.12,
+      status: 'candidate',
+    });
+    expect(state.reps).toBe(0);
+  });
+
+  it('reports temporal movement telemetry while interpreting squats', () => {
+    const interpreter = createRepValidatingMovementInterpreter('squat');
+
+    interpreter.processPose(makeSquatFrame({ timestampMs: 0, kneeAngle: 168 }));
+    const state = interpreter.processPose(makeSquatFrame({ timestampMs: 120, kneeAngle: 138 }));
+
+    expect(state.metrics.temporalMovementConfidence).toBeGreaterThan(0.7);
+    expect(state.metrics.sampleWindowMs).toBe(120);
+    expect(state.metrics.missingSampleRatio).toBe(0);
+    expect(state.metrics.primaryJointVelocity).toBeLessThan(0);
+    expect(state.metrics.primaryJointRange).toBeGreaterThan(20);
+    expect(state.metrics.rhythmScore).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.tempoDriftRatio).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.tempoDriftMs).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.depthDeficitDegrees).toBeGreaterThan(0);
+    expect(state.metrics.depthConsistencyScore).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.standingRecoveryScore).toBeGreaterThan(0);
+    expect(state.metrics.torsoCollapseRatio).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.leftRightImbalance).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.confidenceDecay).toBe(0);
+    expect(state.metrics.bottomHoldMs).toBe(0);
+    expect(state.metrics.fatigueScore).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.torsoInclinationRange).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.centerOfMassTravelRatio).toBeGreaterThanOrEqual(0);
+    expect(state.metrics.lowerBodyCoverage).toBeGreaterThan(0.6);
+    expect(state.metrics.temporalStabilityScore).toBeGreaterThan(0.7);
+  });
+
+  it('surfaces fatigue telemetry from confidence, posture, and bottom-hold behavior', () => {
+    const interpreter = createRepValidatingMovementInterpreter('squat');
+
+    interpreter.processPose(makeSquatFrame({ timestampMs: 0, kneeAngle: 168, visibility: 0.95 }));
+    interpreter.processPose(
+      makeSquatFrame({ timestampMs: 120, kneeAngle: 138, visibility: 0.86, torsoLeanX: 0.05 }),
+    );
+    interpreter.processPose(
+      makeSquatFrame({ timestampMs: 260, kneeAngle: 96, visibility: 0.75, torsoLeanX: 0.1 }),
+    );
+    interpreter.processPose(
+      makeSquatFrame({ timestampMs: 430, kneeAngle: 132, visibility: 0.7, torsoLeanX: 0.1 }),
+    );
+    const state = interpreter.processPose(
+      makeSquatFrame({ timestampMs: 580, kneeAngle: 166, visibility: 0.7, torsoLeanX: 0.08 }),
+    );
+
+    expect(state.validReps).toBe(1);
+    expect(state.metrics.confidenceDecay).toBeGreaterThan(0);
+    expect(state.metrics.torsoCollapseRatio).toBeGreaterThan(0);
+    expect(state.metrics.bottomHoldMs).toBeGreaterThanOrEqual(80);
+    expect(state.metrics.fatigueScore).toBeGreaterThan(0);
+  });
+
+  it('does not enter a rep phase for slow standing threshold drift', () => {
+    const interpreter = createRepValidatingMovementInterpreter('squat');
+
+    interpreter.processPose(makeSquatFrame({ timestampMs: 0, kneeAngle: 168 }));
+    const state = interpreter.processPose(makeSquatFrame({ timestampMs: 6000, kneeAngle: 152 }));
 
     expect(state.phase).toBe('top');
     expect(state.reps).toBe(0);
