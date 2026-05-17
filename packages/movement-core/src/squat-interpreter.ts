@@ -11,10 +11,7 @@ import { CyclicPhaseMachine } from './cyclic-phase-machine.js';
 import { extractBodyState } from './body-state.js';
 import { MovementTemporalTracker } from './movement-temporal-tracker.js';
 import type { MovementWindowSnapshot } from './movement-window.js';
-import {
-  extractPoseMovementFeatures,
-  type PoseMovementFeatures,
-} from './pose-movement-features.js';
+import { bodyKneeLiftRatio, bodyMaxKneeLiftRatio } from './movement-profile-signals.js';
 
 export interface SquatMovementInterpreterConfig {
   readonly cameraAngle: CameraAngle;
@@ -90,9 +87,11 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     }
 
     const bodyState = extractBodyState(frame);
-    const features = extractPoseMovementFeatures(frame, this.config.minVisibility);
+    const kneeAngle = bodyState
+      ? averagedDefined(bodyState.jointAngles.leftKnee, bodyState.jointAngles.rightKnee)
+      : undefined;
 
-    if (!bodyState || !features || features.averageKneeAngle === undefined) {
+    if (!bodyState || kneeAngle === undefined) {
       this.temporalTracker.addMissing(frame.timestampMs);
       this.phaseMachine.setPhase('tracking_lost');
       this.warnings = [trackingLostWarning];
@@ -100,10 +99,9 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
-    const kneeAngle = features.averageKneeAngle;
-    const torsoInclination = features.torsoInclinationDegrees ?? 0;
+    const torsoInclination = bodyState.geometry.torsoInclinationDegrees;
 
-    if (features.bodyOrientation === 'horizontal' || bodyState.orientation.kind === 'floor') {
+    if (bodyState.orientation.kind === 'floor') {
       this.phaseMachine.setPhase('setup_needed');
       this.warnings = [];
       this.recognition = {
@@ -114,12 +112,24 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
-    const disqualifier = squatDisqualifier(features, kneeAngle, torsoInclination, this.config);
+    const kneeLift = bodyKneeLiftRatio(bodyState, this.config.minVisibility);
+    const maxKneeLift = bodyMaxKneeLiftRatio(bodyState, this.config.minVisibility);
+    const ankleSpan = bodyState.geometry.ankleSpanRatio;
+    const disqualifier = squatDisqualifier(
+      {
+        ankleSpanRatio: ankleSpan,
+        kneeLiftRatio: kneeLift,
+        maxKneeLiftRatio: maxKneeLift,
+      },
+      kneeAngle,
+      torsoInclination,
+      this.config,
+    );
 
     if (disqualifier) {
       const rawMovementConfidence = movementConfidence(
-        features.movementConfidence,
-        features.bodyOrientationScore,
+        bodyState.confidence,
+        bodyState.orientation.confidence,
         bodyState.orientation.confidence,
       );
       const temporalSnapshot = this.temporalTracker.add(bodyState, rawMovementConfidence * 0.35);
@@ -130,11 +140,11 @@ export class SquatMovementInterpreter implements MovementInterpreter {
         primaryJointAngle: kneeAngle,
         movementConfidence: rawMovementConfidence * 0.35,
         temporalMovementConfidence: temporalSnapshot.confidence.confidence,
-        poseConfidence: features.poseConfidence,
+        poseConfidence: bodyState.confidence,
         torsoInclination,
-        kneeLiftRatio: features.kneeLiftRatio ?? 0,
-        maxKneeLiftRatio: features.maxKneeLiftRatio ?? 0,
-        ankleSpanRatio: features.ankleSpanRatio ?? 0,
+        kneeLiftRatio: kneeLift ?? 0,
+        maxKneeLiftRatio: maxKneeLift ?? 0,
+        ankleSpanRatio: ankleSpan ?? 0,
       };
       this.warnings = [];
       this.recognition = {
@@ -148,8 +158,8 @@ export class SquatMovementInterpreter implements MovementInterpreter {
     const postureScore = clamp01(1 - torsoInclination / this.config.maxTorsoInclinationDegrees);
     const hasPostureWarning = torsoInclination > this.config.maxTorsoInclinationDegrees;
     const rawMovementConfidence = movementConfidence(
-      features.movementConfidence,
-      features.bodyOrientationScore,
+      bodyState.confidence,
+      bodyState.orientation.confidence,
       bodyState.orientation.confidence,
     );
     const temporalSnapshot = this.temporalTracker.add(bodyState, rawMovementConfidence);
@@ -220,9 +230,9 @@ export class SquatMovementInterpreter implements MovementInterpreter {
       movementConfidence: rawMovementConfidence,
       temporalMovementConfidence: temporalSnapshot.confidence.confidence,
       confidenceDecay,
-      poseConfidence: features.poseConfidence,
+      poseConfidence: bodyState.confidence,
       torsoInclination,
-      kneeLiftRatio: features.kneeLiftRatio ?? 0,
+      kneeLiftRatio: kneeLift ?? 0,
       sampleWindowMs: temporalSnapshot.window.durationMs,
       missingSampleRatio: temporalSnapshot.window.missingSampleRatio,
       primaryJointVelocity: kneeVelocityValue,
@@ -237,15 +247,15 @@ export class SquatMovementInterpreter implements MovementInterpreter {
 
     const transition = this.phaseMachine.update({
       signal: kneeAngle,
-      timestampMs: features.timestampMs,
+      timestampMs: bodyState.timestampMs,
       isDescendingSignal,
       isAscendingSignal,
     });
 
     if (transition.completedRep === 'valid') {
-      this.recordValidRep(features.timestampMs, postureScore);
+      this.recordValidRep(bodyState.timestampMs, postureScore);
     } else if (transition.completedRep === 'partial') {
-      this.recordPartialRep(features.timestampMs, postureScore);
+      this.recordPartialRep(bodyState.timestampMs, postureScore);
     }
 
     if (transition.bottomHoldMs !== undefined) {
@@ -404,17 +414,23 @@ function averagedDefined(a: number | undefined, b: number | undefined): number |
   return (a + b) / 2;
 }
 
+interface SquatPatternSignals {
+  readonly ankleSpanRatio?: number;
+  readonly kneeLiftRatio?: number;
+  readonly maxKneeLiftRatio?: number;
+}
+
 function squatDisqualifier(
-  features: PoseMovementFeatures,
+  signals: SquatPatternSignals,
   kneeAngle: number,
   torsoInclination: number,
   config: SquatMovementInterpreterConfig,
 ): string | undefined {
-  if ((features.maxKneeLiftRatio ?? features.kneeLiftRatio ?? 0) > config.maxKneeLiftRatio) {
+  if ((signals.maxKneeLiftRatio ?? signals.kneeLiftRatio ?? 0) > config.maxKneeLiftRatio) {
     return 'knee_lift_pattern_not_squat';
   }
 
-  if ((features.ankleSpanRatio ?? 0) > config.maxSplitStanceRatio) {
+  if ((signals.ankleSpanRatio ?? 0) > config.maxSplitStanceRatio) {
     return 'split_stance_pattern_not_squat';
   }
 

@@ -11,7 +11,21 @@ import {
   evaluateMovementProfileFrame,
   type MovementProfileEvaluationContext,
 } from './movement-profile-evaluation-context.js';
-import { type BodyOrientation, type PoseMovementFeatures } from './pose-movement-features.js';
+import {
+  ankleSpanRatio,
+  averageElbowAngle,
+  averageHipAngle,
+  averageKneeAngle,
+  bodyLineDeviation,
+  bodyOrientationScore,
+  bodyOrientationSignal,
+  type BodyOrientationSignal,
+  kneeLiftRatio,
+  maxKneeLiftRatio,
+  movementConfidence,
+  wristElevationRatio,
+  wristSpanRatio,
+} from './movement-profile-signals.js';
 
 export type RecognitionMovementType =
   | 'sit_up'
@@ -30,25 +44,25 @@ type MovementDirection = 'increase' | 'decrease';
 interface CycleMovementInterpreterConfig {
   readonly movementType: RecognitionMovementType;
   readonly minVisibility: number;
-  readonly expectedOrientations: readonly BodyOrientation[];
+  readonly expectedOrientations: readonly BodyOrientationSignal[];
   readonly restThreshold: number;
   readonly peakThreshold: number;
   readonly direction: MovementDirection;
   readonly minPeakHoldMs: number;
   readonly primaryMetricKey: string;
-  readonly primaryMetric: (features: PoseMovementFeatures) => number | undefined;
-  readonly recognitionScore: (features: PoseMovementFeatures, metric: number) => number;
+  readonly primaryMetric: (context: MovementProfileEvaluationContext) => number | undefined;
+  readonly recognitionScore: (context: MovementProfileEvaluationContext, metric: number) => number;
   readonly evidence: readonly string[];
 }
 
 interface HoldMovementInterpreterConfig {
   readonly movementType: RecognitionMovementType;
   readonly minVisibility: number;
-  readonly expectedOrientations: readonly BodyOrientation[];
+  readonly expectedOrientations: readonly BodyOrientationSignal[];
   readonly minHoldMs: number;
   readonly primaryMetricKey: string;
-  readonly primaryMetric: (features: PoseMovementFeatures) => number | undefined;
-  readonly recognitionScore: (features: PoseMovementFeatures, metric: number) => number;
+  readonly primaryMetric: (context: MovementProfileEvaluationContext) => number | undefined;
+  readonly recognitionScore: (context: MovementProfileEvaluationContext, metric: number) => number;
   readonly evidence: readonly string[];
 }
 
@@ -101,8 +115,9 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
-    const { features } = context;
-    const metric = this.config.primaryMetric(features);
+    const timestampMs = context.bodyState.timestampMs;
+    const orientation = bodyOrientationSignal(context.bodyState.orientation.kind);
+    const metric = this.config.primaryMetric(context);
 
     if (metric === undefined) {
       this.phase = 'tracking_lost';
@@ -111,7 +126,7 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
-    if (!this.config.expectedOrientations.includes(features.bodyOrientation)) {
+    if (!this.config.expectedOrientations.includes(orientation)) {
       this.phase = 'setup_needed';
       this.warnings = [];
       this.metrics = this.metricsFor(context, metric, 0.12);
@@ -124,7 +139,7 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
-    const confidence = clamp01(this.config.recognitionScore(features, metric));
+    const confidence = clamp01(this.config.recognitionScore(context, metric));
     const reachedRest = this.reachedRest(metric);
     const reachedPeak = this.reachedPeak(metric);
 
@@ -145,7 +160,7 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
       case 'top':
         if (reachedPeak) {
           this.phase = 'bottom';
-          this.peakEnteredAt = features.timestampMs;
+          this.peakEnteredAt = timestampMs;
         } else if (!reachedRest) {
           this.phase = 'descending';
         }
@@ -154,9 +169,9 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
       case 'descending':
         if (reachedPeak) {
           this.phase = 'bottom';
-          this.peakEnteredAt = features.timestampMs;
+          this.peakEnteredAt = timestampMs;
         } else if (reachedRest) {
-          this.recordPartialRep(features.timestampMs);
+          this.recordPartialRep(timestampMs);
           this.phase = 'top';
         }
         break;
@@ -164,7 +179,7 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
       case 'bottom':
         if (
           this.peakEnteredAt !== undefined &&
-          features.timestampMs - this.peakEnteredAt < this.config.minPeakHoldMs
+          timestampMs - this.peakEnteredAt < this.config.minPeakHoldMs
         ) {
           break;
         }
@@ -176,11 +191,11 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
 
       case 'ascending':
         if (reachedRest) {
-          this.recordValidRep(features.timestampMs);
+          this.recordValidRep(timestampMs);
           this.phase = 'top';
         } else if (reachedPeak) {
           this.phase = 'bottom';
-          this.peakEnteredAt = features.timestampMs;
+          this.peakEnteredAt = timestampMs;
         }
         break;
     }
@@ -255,7 +270,7 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
     metric: number,
     confidence: number,
   ): Record<string, number> {
-    const { features, window } = context;
+    const { bodyState, window } = context;
 
     return {
       [this.config.primaryMetricKey]: metric,
@@ -264,8 +279,8 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
       alignmentScore: confidence,
       postureScore: confidence,
       movementConfidence: confidence,
-      poseConfidence: features.poseConfidence,
-      bodyOrientationScore: features.bodyOrientationScore,
+      poseConfidence: bodyState.confidence,
+      bodyOrientationScore: bodyOrientationScore(context),
       temporalConfidence: window.averageConfidence,
       missingSampleRatio: window.missingSampleRatio,
     };
@@ -355,8 +370,10 @@ class HoldRecognitionMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
-    const { features, window } = context;
-    const metric = this.config.primaryMetric(features);
+    const { bodyState, window } = context;
+    const timestampMs = bodyState.timestampMs;
+    const orientation = bodyOrientationSignal(bodyState.orientation.kind);
+    const metric = this.config.primaryMetric(context);
 
     if (metric === undefined) {
       this.phase = 'tracking_lost';
@@ -365,9 +382,9 @@ class HoldRecognitionMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
-    const orientationMatches = this.config.expectedOrientations.includes(features.bodyOrientation);
+    const orientationMatches = this.config.expectedOrientations.includes(orientation);
     const confidence = orientationMatches
-      ? clamp01(this.config.recognitionScore(features, metric))
+      ? clamp01(this.config.recognitionScore(context, metric))
       : 0.12;
     const isHeld = confidence >= 0.58;
 
@@ -378,13 +395,13 @@ class HoldRecognitionMovementInterpreter implements MovementInterpreter {
       alignmentScore: confidence,
       postureScore: confidence,
       movementConfidence: confidence,
-      poseConfidence: features.poseConfidence,
+      poseConfidence: bodyState.confidence,
       temporalConfidence: window.averageConfidence,
       missingSampleRatio: window.missingSampleRatio,
       holdSeconds:
         this.holdStartedAt === undefined
           ? 0
-          : Math.max(0, (features.timestampMs - this.holdStartedAt) / 1000),
+          : Math.max(0, (timestampMs - this.holdStartedAt) / 1000),
     };
     this.warnings = confidence < 0.42 ? [lowConfidenceWarning] : [];
 
@@ -400,16 +417,16 @@ class HoldRecognitionMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
-    this.holdStartedAt ??= features.timestampMs;
+    this.holdStartedAt ??= timestampMs;
     this.phase = 'bottom';
-    const hasSatisfiedHold = features.timestampMs - this.holdStartedAt >= this.config.minHoldMs;
+    const hasSatisfiedHold = timestampMs - this.holdStartedAt >= this.config.minHoldMs;
 
     if (this.validReps === 0 && hasSatisfiedHold) {
       this.reps = 1;
       this.validReps = 1;
       this.lastRep = {
         repNumber: 1,
-        timestampMs: features.timestampMs,
+        timestampMs,
         qualityScore: Math.round(confidence * 100),
         depthScore: confidence,
         alignmentScore: confidence,
@@ -469,9 +486,9 @@ const recognitionMovementConfigs: Record<
     direction: 'decrease',
     minPeakHoldMs: 80,
     primaryMetricKey: 'hipAngle',
-    primaryMetric: (features) => features.averageHipAngle,
-    recognitionScore: (features, metric) =>
-      confidenceBlend(features, metric <= 132 ? 0.78 : 0.48, features.bodyOrientationScore),
+    primaryMetric: averageHipAngle,
+    recognitionScore: (context, metric) =>
+      confidenceBlend(context, metric <= 132 ? 0.78 : 0.48, bodyOrientationScore(context)),
     evidence: ['floor_body_orientation', 'torso_curl_signal', 'hip_flexion_range'],
   },
   lunge: {
@@ -484,12 +501,12 @@ const recognitionMovementConfigs: Record<
     direction: 'decrease',
     minPeakHoldMs: 80,
     primaryMetricKey: 'kneeAngle',
-    primaryMetric: (features) => features.averageKneeAngle,
-    recognitionScore: (features, metric) =>
+    primaryMetric: averageKneeAngle,
+    recognitionScore: (context, metric) =>
       confidenceBlend(
-        features,
+        context,
         metric <= 150 ? 0.72 : 0.42,
-        spanScore(features.ankleSpanRatio, 0.52),
+        spanScore(ankleSpanRatio(context), 0.52),
       ),
     evidence: ['split_stance_signal', 'single_leg_knee_flexion', 'hip_drop_range'],
   },
@@ -503,12 +520,14 @@ const recognitionMovementConfigs: Record<
     direction: 'increase',
     minPeakHoldMs: 40,
     primaryMetricKey: 'limbSpanRatio',
-    primaryMetric: (features) =>
-      features.wristSpanRatio === undefined || features.ankleSpanRatio === undefined
-        ? undefined
-        : features.wristSpanRatio + features.ankleSpanRatio,
-    recognitionScore: (features, metric) =>
-      confidenceBlend(features, metric >= 1.35 ? 0.76 : 0.46, features.bodyOrientationScore),
+    primaryMetric: (context) => {
+      const wristSpan = wristSpanRatio(context);
+      const ankleSpan = ankleSpanRatio(context);
+
+      return wristSpan === undefined || ankleSpan === undefined ? undefined : wristSpan + ankleSpan;
+    },
+    recognitionScore: (context, metric) =>
+      confidenceBlend(context, metric >= 1.35 ? 0.76 : 0.46, bodyOrientationScore(context)),
     evidence: ['standing_body_orientation', 'arm_leg_abduction', 'span_oscillation'],
   },
   plank: {
@@ -518,9 +537,9 @@ const recognitionMovementConfigs: Record<
     expectedOrientations: ['horizontal'],
     minHoldMs: 1200,
     primaryMetricKey: 'bodyLineDeviation',
-    primaryMetric: (features) => features.bodyLineDeviation,
-    recognitionScore: (features, metric) =>
-      confidenceBlend(features, clamp01(1 - metric / 0.22), features.bodyOrientationScore),
+    primaryMetric: bodyLineDeviation,
+    recognitionScore: (context, metric) =>
+      confidenceBlend(context, clamp01(1 - metric / 0.22), bodyOrientationScore(context)),
     evidence: ['horizontal_body_orientation', 'body_line_stability', 'static_hold_signal'],
   },
   pull_up: {
@@ -533,12 +552,12 @@ const recognitionMovementConfigs: Record<
     direction: 'decrease',
     minPeakHoldMs: 80,
     primaryMetricKey: 'elbowAngle',
-    primaryMetric: (features) => features.averageElbowAngle,
-    recognitionScore: (features, metric) =>
+    primaryMetric: averageElbowAngle,
+    recognitionScore: (context, metric) =>
       confidenceBlend(
-        features,
+        context,
         metric <= 150 ? 0.72 : 0.42,
-        elevationScore(features.wristElevationRatio, 0.24),
+        elevationScore(wristElevationRatio(context), 0.24),
       ),
     evidence: ['vertical_hanging_posture', 'wrist_over_shoulder_position', 'elbow_flexion_range'],
   },
@@ -552,14 +571,14 @@ const recognitionMovementConfigs: Record<
     direction: 'increase',
     minPeakHoldMs: 80,
     primaryMetricKey: 'orientationTransitionScore',
-    primaryMetric: (features) =>
-      features.bodyOrientation === 'horizontal'
+    primaryMetric: (context) =>
+      bodyOrientationSignal(context.bodyState.orientation.kind) === 'horizontal'
         ? 1
-        : features.bodyOrientation === 'diagonal'
+        : bodyOrientationSignal(context.bodyState.orientation.kind) === 'diagonal'
           ? 0.62
           : 0.12,
-    recognitionScore: (features, metric) =>
-      confidenceBlend(features, metric >= 0.62 ? 0.74 : 0.42, features.bodyOrientationScore),
+    recognitionScore: (context, metric) =>
+      confidenceBlend(context, metric >= 0.62 ? 0.74 : 0.42, bodyOrientationScore(context)),
     evidence: ['standing_floor_transition', 'compound_body_orientation_change', 'whole_body_cycle'],
   },
   mountain_climber: {
@@ -572,9 +591,9 @@ const recognitionMovementConfigs: Record<
     direction: 'increase',
     minPeakHoldMs: 40,
     primaryMetricKey: 'kneeLiftRatio',
-    primaryMetric: (features) => features.maxKneeLiftRatio ?? features.kneeLiftRatio,
-    recognitionScore: (features, metric) =>
-      confidenceBlend(features, metric >= 0.16 ? 0.72 : 0.4, features.bodyOrientationScore),
+    primaryMetric: (context) => maxKneeLiftRatio(context) ?? kneeLiftRatio(context),
+    recognitionScore: (context, metric) =>
+      confidenceBlend(context, metric >= 0.16 ? 0.72 : 0.4, bodyOrientationScore(context)),
     evidence: ['plank_base_orientation', 'alternating_knee_drive', 'knee_lift_rhythm'],
   },
   high_knees: {
@@ -587,9 +606,9 @@ const recognitionMovementConfigs: Record<
     direction: 'increase',
     minPeakHoldMs: 40,
     primaryMetricKey: 'kneeLiftRatio',
-    primaryMetric: (features) => features.maxKneeLiftRatio ?? features.kneeLiftRatio,
-    recognitionScore: (features, metric) =>
-      confidenceBlend(features, metric >= 0.18 ? 0.76 : 0.42, features.bodyOrientationScore),
+    primaryMetric: (context) => maxKneeLiftRatio(context) ?? kneeLiftRatio(context),
+    recognitionScore: (context, metric) =>
+      confidenceBlend(context, metric >= 0.18 ? 0.76 : 0.42, bodyOrientationScore(context)),
     evidence: ['standing_body_orientation', 'knee_lift_height', 'alternating_cadence'],
   },
   lateral_raise: {
@@ -602,12 +621,12 @@ const recognitionMovementConfigs: Record<
     direction: 'increase',
     minPeakHoldMs: 80,
     primaryMetricKey: 'wristSpanRatio',
-    primaryMetric: (features) => features.wristSpanRatio,
-    recognitionScore: (features, metric) =>
+    primaryMetric: wristSpanRatio,
+    recognitionScore: (context, metric) =>
       confidenceBlend(
-        features,
+        context,
         metric >= 1.15 ? 0.7 : 0.42,
-        shoulderHeightScore(features.wristElevationRatio),
+        shoulderHeightScore(wristElevationRatio(context)),
       ),
     evidence: ['standing_body_orientation', 'arm_abduction_range', 'wrist_span_change'],
   },
@@ -618,21 +637,21 @@ const recognitionMovementConfigs: Record<
     expectedOrientations: ['vertical', 'diagonal', 'horizontal'],
     minHoldMs: 1500,
     primaryMetricKey: 'poseStabilityScore',
-    primaryMetric: (features) => features.movementConfidence,
-    recognitionScore: (features, metric) =>
-      confidenceBlend(features, metric, features.bodyOrientationScore),
+    primaryMetric: movementConfidence,
+    recognitionScore: (context, metric) =>
+      confidenceBlend(context, metric, bodyOrientationScore(context)),
     evidence: ['static_pose_geometry', 'body_orientation_stability', 'hold_consistency'],
   },
 };
 
 function confidenceBlend(
-  features: PoseMovementFeatures,
+  context: MovementProfileEvaluationContext,
   patternScore: number,
   secondaryScore: number | undefined,
 ): number {
   return clamp01(
-    features.poseConfidence * 0.34 +
-      features.bodyOrientationScore * 0.24 +
+    context.bodyState.confidence * 0.34 +
+      bodyOrientationScore(context) * 0.24 +
       patternScore * 0.3 +
       (secondaryScore ?? 0) * 0.12,
   );

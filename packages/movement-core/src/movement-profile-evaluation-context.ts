@@ -9,15 +9,11 @@ import {
   type MovementWindowSnapshot,
   type MovementWindowOptions,
 } from './movement-window.js';
-import {
-  poseMovementFeaturesFromBodyState,
-  type PoseMovementFeatures,
-} from './pose-movement-features.js';
 
 export interface MovementProfileEvaluationContext {
   readonly bodyState: BodyState;
   readonly window: MovementWindowSnapshot;
-  readonly features: PoseMovementFeatures;
+  readonly minVisibility: number;
   readonly diagnostics?: MovementDiagnosticsSnapshot;
 }
 
@@ -38,6 +34,7 @@ export function createMovementProfileWindow(
 export function evaluateMovementProfileFrame(
   input: MovementProfileEvaluationInput,
 ): MovementProfileEvaluationContext | undefined {
+  const minVisibility = input.minVisibility ?? 0.45;
   const bodyState = extractBodyState(input.frame);
   const window = bodyState
     ? input.window.add(bodyState)
@@ -49,16 +46,14 @@ export function evaluateMovementProfileFrame(
     return undefined;
   }
 
-  const features = poseMovementFeaturesFromBodyState(bodyState, input.minVisibility);
-
-  if (!features) {
+  if (bodyState.coverage.regions.torso < minVisibility) {
     return undefined;
   }
 
   return {
     bodyState,
     window,
-    features,
+    minVisibility,
     diagnostics:
       input.activityState && input.interpreterState
         ? diagnoseMovement({

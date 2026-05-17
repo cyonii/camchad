@@ -7,7 +7,7 @@ import {
 import { makeSquatFrame } from './test-fixtures.js';
 
 describe('movement profile evaluation context', () => {
-  it('bundles body state, movement window, and legacy feature adapter output', () => {
+  it('bundles body state, movement window, and profile visibility settings', () => {
     const window = createMovementProfileWindow({ maxAgeMs: 1000 });
     const context = evaluateMovementProfileFrame({
       frame: makeSquatFrame({ timestampMs: 100, kneeAngle: 168 }),
@@ -28,10 +28,7 @@ describe('movement profile evaluation context', () => {
           }),
         ]),
       },
-      features: {
-        timestampMs: 100,
-        bodyOrientation: 'vertical',
-      },
+      minVisibility: 0.45,
     });
   });
 

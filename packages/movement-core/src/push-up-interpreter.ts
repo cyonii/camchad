@@ -19,7 +19,6 @@ import { CyclicPhaseMachine } from './cyclic-phase-machine.js';
 import { extractBodyState, type BodyState } from './body-state.js';
 import { MovementTemporalTracker } from './movement-temporal-tracker.js';
 import type { MovementWindowSnapshot } from './movement-window.js';
-import { extractPoseMovementFeatures } from './pose-movement-features.js';
 
 export interface PushUpMovementInterpreterConfig {
   readonly cameraAngle: CameraAngle;
@@ -89,7 +88,6 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
     }
 
     const bodyState = extractBodyState(frame);
-    const features = extractPoseMovementFeatures(frame, this.config.minVisibility);
 
     const trackingSide = selectTrackingSide(frame, this.config.minVisibility);
 
@@ -199,7 +197,7 @@ export class PushUpMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
-    if (features?.bodyOrientation === 'vertical' || bodyState.orientation.kind === 'standing') {
+    if (bodyState.orientation.kind === 'standing' || bodyState.orientation.kind === 'hanging') {
       this.phaseMachine.setPhase('setup_needed');
       this.warnings = [];
       this.recognition = {

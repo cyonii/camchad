@@ -6,6 +6,7 @@ import type {
   MovementRegion,
 } from './movement-registry.js';
 import type { MovementProfileEvaluationContext } from './movement-profile-evaluation-context.js';
+import { ankleSpanRatio, bodyLineDeviation, wristSpanRatio } from './movement-profile-signals.js';
 
 export interface MovementCriterionEvaluation {
   readonly key: string;
@@ -112,7 +113,6 @@ function evaluateCriterion(
 ): MovementCriterionEvaluation {
   const key = criterion.key;
   const bodyState = context.bodyState;
-  const features = context.features;
   const window = context.window;
   let score = bodyState.confidence;
 
@@ -126,12 +126,13 @@ function evaluateCriterion(
       bodyState.coverage.regions.torso,
     );
   } else if (key.includes('body_line') || key.includes('stability')) {
+    const deviation = bodyLineDeviation(context);
     score =
-      features.bodyLineDeviation === undefined
+      deviation === undefined
         ? bodyState.orientation.confidence
-        : 1 - Math.min(1, features.bodyLineDeviation / 0.35);
+        : 1 - Math.min(1, deviation / 0.35);
   } else if (key.includes('span') || key.includes('abduction')) {
-    score = features.wristSpanRatio !== undefined || features.ankleSpanRatio !== undefined ? 1 : 0;
+    score = wristSpanRatio(context) !== undefined || ankleSpanRatio(context) !== undefined ? 1 : 0;
   } else if (key.includes('hold') || key.includes('static')) {
     score = Math.max(0, 1 - window.missingSampleRatio);
   } else if (key.includes('orientation')) {
