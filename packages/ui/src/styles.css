@@ -2247,7 +2247,7 @@ button,
 .history-command-center {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 14px;
+  gap: 22px;
   height: calc(100vh - 60px);
   min-height: 0;
   overflow: hidden;
@@ -2262,7 +2262,7 @@ button,
 .history-primary-column {
   display: grid;
   align-content: start;
-  gap: 14px;
+  gap: 22px;
   padding-right: 2px;
 }
 
@@ -2280,8 +2280,8 @@ button,
 .history-detail-panel {
   display: grid;
   align-content: start;
-  gap: 12px;
-  padding-left: 14px;
+  gap: 18px;
+  padding-left: 20px;
   padding-right: 2px;
   border-left: 1px solid rgb(var(--primary-rgb) / 10%);
 }
@@ -2293,7 +2293,7 @@ button,
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 22px;
 }
 
 .history-page-heading p,
@@ -2324,7 +2324,7 @@ button,
 .history-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
 }
 
 .history-stat-card,
@@ -2338,10 +2338,10 @@ button,
 .history-stat-card {
   position: relative;
   display: grid;
-  min-height: 118px;
-  gap: 8px;
+  min-height: 126px;
+  gap: 10px;
   overflow: hidden;
-  padding: 16px;
+  padding: 18px;
 }
 
 .history-stat-card > span,
@@ -2391,11 +2391,11 @@ button,
 
 .history-table-panel,
 .history-detail-card {
-  padding: 16px;
+  padding: 20px;
 }
 
 .history-section-heading {
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
 .history-section-heading h2 {
@@ -2420,8 +2420,8 @@ button,
   grid-template-columns: minmax(150px, 1.35fr) 0.75fr minmax(150px, 1.2fr) 0.55fr 0.7fr 0.6fr;
   align-items: center;
   gap: 14px;
-  min-height: 56px;
-  padding: 11px 14px;
+  min-height: 62px;
+  padding: 13px 16px;
   border-bottom: 1px solid var(--border-soft);
 }
 
@@ -2521,8 +2521,8 @@ button,
   grid-template-columns: minmax(0, 1fr) 52px 62px 72px;
   align-items: center;
   gap: 10px;
-  min-height: 66px;
-  padding: 10px 12px;
+  min-height: 72px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--border-soft);
 }
 
@@ -2548,7 +2548,7 @@ button,
 .detail-metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .detail-metric-grid .metric {
@@ -2560,13 +2560,13 @@ button,
 
 .segment-telemetry-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .segment-telemetry-list > div {
   display: grid;
-  gap: 8px;
-  padding: 12px;
+  gap: 10px;
+  padding: 14px;
   border: 1px solid rgb(var(--primary-rgb) / 10%);
   border-radius: 7px;
   background: rgb(var(--surface-rgb) / 30%);
@@ -2699,7 +2699,7 @@ button,
 .exercise-observatory {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 14px;
+  gap: 22px;
   height: calc(100vh - 60px);
   min-height: 0;
   overflow: hidden;
@@ -2714,7 +2714,7 @@ button,
 .exercise-library-column {
   display: grid;
   align-content: start;
-  gap: 14px;
+  gap: 22px;
   padding-right: 2px;
 }
 
@@ -2831,13 +2831,13 @@ button,
 .exercise-engine-summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
 }
 
 .engine-stat-card,
 .engine-confidence-card {
-  min-height: 126px;
-  padding: 16px;
+  min-height: 136px;
+  padding: 18px;
   border: 1px solid rgb(var(--primary-rgb) / 12%);
   border-radius: 8px;
   background: rgb(var(--surface-rgb) / 52%);
@@ -2919,15 +2919,15 @@ button,
 
 .movement-family-panel,
 .exercise-definition-panel {
-  padding: 16px;
+  padding: 20px;
 }
 
 .exercise-panel-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 14px;
+  gap: 22px;
+  margin-bottom: 18px;
 }
 
 .exercise-panel-heading h2,
@@ -2947,16 +2947,16 @@ button,
 .movement-family-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
 }
 
 .movement-family-grid > div {
   position: relative;
   display: grid;
   gap: 5px;
-  min-height: 92px;
+  min-height: 102px;
   overflow: hidden;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid rgb(var(--primary-rgb) / 11%);
   border-radius: 7px;
   background: rgb(0 0 0 / 14%);
@@ -2989,14 +2989,14 @@ button,
   display: flex;
   align-items: end;
   justify-content: space-between;
-  gap: 16px;
+  gap: 22px;
 }
 
 .exercise-filter-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .exercise-filter-pills button,
@@ -3054,10 +3054,10 @@ button,
 .engine-definition-row {
   display: grid;
   grid-template-columns: 170px minmax(260px, 1fr) 118px 150px;
-  gap: 16px;
+  gap: 22px;
   align-items: center;
   width: 100%;
-  padding: 14px 8px;
+  padding: 18px 8px;
   border: 0;
   border-bottom: 1px solid rgb(var(--primary-rgb) / 9%);
   color: var(--text);
@@ -3142,7 +3142,7 @@ button,
 
 .engine-definition-copy {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -3194,7 +3194,7 @@ button,
 .engine-definition-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 8px;
 }
 
 .engine-definition-tags span {
@@ -3246,8 +3246,8 @@ button,
 .movement-inspector {
   display: grid;
   align-content: start;
-  gap: 14px;
-  padding: 18px;
+  gap: 18px;
+  padding: 20px;
 }
 
 .movement-inspector-heading h2 {
@@ -3256,7 +3256,7 @@ button,
 }
 
 .movement-inspector-card {
-  padding: 14px;
+  padding: 18px;
 }
 
 .movement-inspector-card .movement-preview-frame {
@@ -3369,7 +3369,7 @@ button,
 .settings-command-center {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 370px;
-  gap: 14px;
+  gap: 24px;
   height: calc(100vh - 60px);
   min-height: 0;
   overflow: hidden;
@@ -3384,15 +3384,15 @@ button,
 .settings-primary-column {
   display: grid;
   align-content: start;
-  gap: 14px;
+  gap: 34px;
   padding-right: 2px;
 }
 
 .settings-preview-column {
   display: grid;
   align-content: start;
-  gap: 14px;
-  padding-left: 4px;
+  gap: 20px;
+  padding-left: 8px;
 }
 
 .settings-primary-column::-webkit-scrollbar,
@@ -3431,7 +3431,6 @@ button,
   line-height: 1.5;
 }
 
-.settings-section,
 .settings-preview-card {
   border: 1px solid rgb(var(--primary-rgb) / 12%);
   border-radius: 8px;
@@ -3439,13 +3438,17 @@ button,
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 2%);
 }
 
+.settings-section {
+  display: grid;
+  gap: 18px;
+}
+
 .settings-section-header {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
-  gap: 14px;
+  gap: 16px;
   align-items: start;
-  padding: 20px 22px 16px;
-  border-bottom: 1px solid rgb(var(--primary-rgb) / 9%);
+  padding: 0 2px 2px;
 }
 
 .settings-section-icon {
@@ -3467,25 +3470,28 @@ button,
 
 .settings-section-body {
   display: grid;
+  gap: 10px;
 }
 
 .settings-control-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(190px, 276px);
-  gap: 18px;
+  gap: 24px;
   align-items: center;
-  min-height: 68px;
-  padding: 14px 22px;
-  border-bottom: 1px solid rgb(var(--primary-rgb) / 8%);
+  min-height: 76px;
+  padding: 16px 18px;
+  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border-radius: 8px;
+  background: rgb(var(--surface-rgb) / 42%);
 }
 
 .settings-control-row:last-child {
-  border-bottom: 0;
+  border-bottom: 1px solid rgb(var(--primary-rgb) / 10%);
 }
 
 .settings-control-copy {
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .settings-control-copy strong {
@@ -3624,8 +3630,8 @@ button,
 
 .settings-preview-card {
   display: grid;
-  gap: 16px;
-  padding: 20px;
+  gap: 18px;
+  padding: 22px;
 }
 
 .settings-preview-heading {
