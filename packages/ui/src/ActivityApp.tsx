@@ -10,10 +10,8 @@ import {
   Dumbbell,
   Filter,
   Gauge,
-  Grid2X2,
   History,
   Layers3,
-  List,
   Lock,
   Maximize2,
   Minus,
@@ -1881,18 +1879,33 @@ function HistoryView({
                     );
 
                     return (
-                      <div key={movement.id}>
-                        <div>
-                          <strong>{definition.label}</strong>
-                          <small>
-                            {formatCameraAngle(movement.cameraAngle)} /{' '}
-                            {formatMovementSegmentState(movement)}
-                          </small>
-                          {primaryGuidance ? <small>{primaryGuidance.title}</small> : null}
+                      <div className="movement-breakdown-item" key={movement.id}>
+                        <div className="movement-breakdown-summary">
+                          <div>
+                            <strong>{definition.label}</strong>
+                            <small>{formatCameraAngle(movement.cameraAngle)}</small>
+                          </div>
+                          <span>{formatMovementSegmentState(movement)}</span>
                         </div>
-                        <span>{movement.validReps}</span>
-                        <span>{movement.partialReps}</span>
-                        <span>{formatQualityScore(averageMovementQuality(movement))}</span>
+
+                        {primaryGuidance ? (
+                          <p className="movement-breakdown-guidance">{primaryGuidance.title}</p>
+                        ) : null}
+
+                        <div className="movement-breakdown-metrics" aria-label="Movement totals">
+                          <div>
+                            <small>Valid</small>
+                            <span>{movement.validReps}</span>
+                          </div>
+                          <div>
+                            <small>Partial</small>
+                            <span>{movement.partialReps}</span>
+                          </div>
+                          <div>
+                            <small>Quality</small>
+                            <span>{formatQualityScore(averageMovementQuality(movement))}</span>
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -2792,9 +2805,9 @@ function SettingsInterfacePreview({
   readonly telemetryMode: TelemetryMode;
   readonly themePreference: ThemePreference;
 }): ReactElement {
-  const skeletonClass = preferences.skeletonVisible
-    ? `settings-skeleton-preview settings-skeleton-${preferences.skeletonStyle}`
-    : 'settings-skeleton-preview is-hidden';
+  const bodyPreviewClass = preferences.skeletonVisible
+    ? `settings-body-preview settings-body-${preferences.skeletonStyle}`
+    : 'settings-body-preview is-hidden';
 
   return (
     <div
@@ -2815,23 +2828,8 @@ function SettingsInterfacePreview({
       </div>
       <div className="settings-preview-stage">
         <span>Live feed</span>
-        <div className={skeletonClass}>
-          <i className="joint head" />
-          <i className="joint chest" />
-          <i className="joint hip" />
-          <i className="bone torso" />
-          <i className="bone arm-left" />
-          <i className="bone arm-right" />
-          <i className="bone leg-left" />
-          <i className="bone leg-right" />
-          {preferences.skeletonJointsVisible ? (
-            <>
-              <i className="joint hand-left" />
-              <i className="joint hand-right" />
-              <i className="joint foot-left" />
-              <i className="joint foot-right" />
-            </>
-          ) : null}
+        <div className={bodyPreviewClass}>
+          <img src="/settings/human-body-preview.webp" alt="" aria-hidden="true" />
         </div>
       </div>
       <div className={`settings-preview-telemetry mode-${telemetryMode}`}>
@@ -2879,7 +2877,14 @@ function SupportedExercisesView({
 
     return matchesFilter && matchesQuery;
   });
-  const familyBreakdown = movementFamilyBreakdown(movementRegistry);
+  const filterCount = (catalogFilter: ExerciseCatalogFilter): number =>
+    movementRegistry.filter(
+      (definition) =>
+        catalogFilter === 'all' ||
+        definition.maturity === catalogFilter ||
+        definition.category === catalogFilter,
+    ).length;
+  const activeCoverage = Math.round((activeDefinitionCount / movementRegistry.length) * 100);
 
   return (
     <section className="exercise-observatory">
@@ -2887,165 +2892,136 @@ function SupportedExercisesView({
         <div className="exercise-heading-row">
           <div className="page-heading exercise-page-heading">
             <div>
-              <span>Movement engine library</span>
-              <h1>Capability Registry</h1>
+              <span>Exercise library</span>
+              <h1>Movement Profiles</h1>
               <p>
-                A local map of movement definitions the engine can validate, recognize, or has
-                queued as dormant profiles for future analysis.
+                Browse the local movement profiles CamChad can validate today, recognize as
+                patterns, or keep as planned definitions for future tracking.
               </p>
             </div>
           </div>
 
           <div className="history-window-badge exercise-header-badge">
             <Cpu size={16} aria-hidden="true" />
-            <span>{activeDefinitionCount} active profiles</span>
+            <span>{activeCoverage}% active coverage</span>
           </div>
         </div>
 
-        <div className="exercise-search-row">
+        <section className="exercise-system-strip" aria-label="Movement engine status">
           <div>
-            <span>Catalog search</span>
+            <span>Rep-validating</span>
+            <strong>{repValidatingDefinitions.length}</strong>
+            <small>Full rep counting and quality checks</small>
           </div>
-          <div className="exercise-search-cluster">
-            <label className="exercise-search">
-              <Search size={17} aria-hidden="true" />
-              <input
-                type="search"
-                value={query}
-                placeholder="Search definitions..."
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
-            <button
-              className="exercise-filter-button"
-              type="button"
-              disabled={filter === 'all' && query.length === 0}
-              onClick={() => {
-                setFilter('all');
-                setQuery('');
-              }}
-            >
-              <Filter size={16} aria-hidden="true" />
-              Reset
-            </button>
+          <div>
+            <span>Recognizable</span>
+            <strong>{recognizableDefinitions.length}</strong>
+            <small>Detected as movement patterns</small>
           </div>
-        </div>
-
-        <div className="exercise-engine-summary">
-          <EngineStatCard
-            label="Known definitions"
-            value={String(movementRegistry.length)}
-            detail="Movement profiles"
-            tone="neutral"
-            points={movementRegistry.map((definition) => definition.analysisSignals.length)}
-          />
-          <EngineStatCard
-            label="Rep-validating"
-            value={String(repValidatingDefinitions.length)}
-            detail="Rep and quality logic"
-            tone="rep_validating"
-            points={repValidatingDefinitions.map(movementMaturityScore)}
-          />
-          <EngineStatCard
-            label="Recognizable"
-            value={String(recognizableDefinitions.length)}
-            detail="Pattern inference"
-            tone="recognizable"
-            points={recognizableDefinitions.map(movementMaturityScore)}
-          />
-          <EngineStatCard
-            label="Planned profiles"
-            value={String(plannedDefinitions.length)}
-            detail="Definition backlog"
-            tone="planned"
-            points={plannedDefinitions.map((definition) => definition.analysisSignals.length)}
-          />
-          <div className="engine-confidence-card">
-            <SignalDial
-              value={activeDefinitionCount / Math.max(1, movementRegistry.length)}
-              phase="engine coverage"
-            />
-            <div>
-              <span>Engine coverage</span>
-              <strong>
-                {Math.round((activeDefinitionCount / movementRegistry.length) * 100)}%
-              </strong>
-              <small>Active recognition surface</small>
-            </div>
-          </div>
-        </div>
-
-        <section className="movement-family-panel" aria-label="Movement family coverage">
-          <div className="exercise-panel-heading">
-            <div>
-              <span>Coverage map</span>
-              <h2>Movement families</h2>
-            </div>
-            <small>{familyBreakdown.length} orientation groups</small>
-          </div>
-          <div className="movement-family-grid">
-            {familyBreakdown.map((family) => (
-              <div key={family.orientation}>
-                <span>{formatBodyOrientation(family.orientation)}</span>
-                <strong>{family.total}</strong>
-                <small>
-                  {family.active} active / {family.planned} planned
-                </small>
-                <i style={{ inlineSize: `${Math.max(8, family.coverage * 100)}%` }} />
-              </div>
-            ))}
+          <div>
+            <span>Planned</span>
+            <strong>{plannedDefinitions.length}</strong>
+            <small>Registered but not yet active</small>
           </div>
         </section>
 
-        <div className="exercise-catalog-toolbar">
-          <div>
-            <span>Browse by capability</span>
-            <div className="exercise-filter-pills">
-              <ExerciseFilterPill value="all" activeFilter={filter} onChange={setFilter}>
-                All
-              </ExerciseFilterPill>
-              <ExerciseFilterPill value="rep_validating" activeFilter={filter} onChange={setFilter}>
-                Rep-validating
-              </ExerciseFilterPill>
-              <ExerciseFilterPill value="recognizable" activeFilter={filter} onChange={setFilter}>
-                Recognizable
-              </ExerciseFilterPill>
-              <ExerciseFilterPill value="planned" activeFilter={filter} onChange={setFilter}>
-                Planned
-              </ExerciseFilterPill>
-              <ExerciseFilterPill value="repetition" activeFilter={filter} onChange={setFilter}>
-                Repetition
-              </ExerciseFilterPill>
-              <ExerciseFilterPill value="hold" activeFilter={filter} onChange={setFilter}>
-                Static holds
-              </ExerciseFilterPill>
-              <ExerciseFilterPill value="compound" activeFilter={filter} onChange={setFilter}>
-                Compound
-              </ExerciseFilterPill>
-            </div>
-          </div>
-          <div className="exercise-view-toggle" aria-label="Catalog view">
-            <button type="button" aria-pressed="true">
-              <List size={15} aria-hidden="true" />
-            </button>
-            <button type="button" aria-pressed="false">
-              <Grid2X2 size={15} aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-
         <section className="exercise-definition-panel" aria-labelledby="exercise-catalog-title">
-          <div className="exercise-panel-heading">
-            <div>
-              <span>Movement definitions</span>
-              <h2 id="exercise-catalog-title">Engine profiles</h2>
+          <div className="exercise-catalog-header">
+            <div className="exercise-panel-heading">
+              <div>
+                <span>Exercise catalog</span>
+                <h2 id="exercise-catalog-title">Available profiles</h2>
+              </div>
+              <small>
+                Showing {filteredDefinitions.length} of {movementRegistry.length}
+              </small>
             </div>
-            <small>
-              Showing {filteredDefinitions.length} of {movementRegistry.length}
-            </small>
+
+            <div className="exercise-search-cluster">
+              <label className="exercise-search">
+                <Search size={17} aria-hidden="true" />
+                <input
+                  type="search"
+                  value={query}
+                  placeholder="Search name, signal, or orientation..."
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </label>
+              <button
+                className="exercise-filter-button"
+                type="button"
+                disabled={filter === 'all' && query.length === 0}
+                onClick={() => {
+                  setFilter('all');
+                  setQuery('');
+                }}
+              >
+                <Filter size={16} aria-hidden="true" />
+                Reset
+              </button>
+            </div>
           </div>
 
-          <div className="engine-definition-list">
+          <div className="exercise-filter-pills" aria-label="Filter exercise catalog">
+            <ExerciseFilterPill
+              value="all"
+              count={filterCount('all')}
+              activeFilter={filter}
+              onChange={setFilter}
+            >
+              All
+            </ExerciseFilterPill>
+            <ExerciseFilterPill
+              value="rep_validating"
+              count={filterCount('rep_validating')}
+              activeFilter={filter}
+              onChange={setFilter}
+            >
+              Rep-validating
+            </ExerciseFilterPill>
+            <ExerciseFilterPill
+              value="recognizable"
+              count={filterCount('recognizable')}
+              activeFilter={filter}
+              onChange={setFilter}
+            >
+              Recognizable
+            </ExerciseFilterPill>
+            <ExerciseFilterPill
+              value="planned"
+              count={filterCount('planned')}
+              activeFilter={filter}
+              onChange={setFilter}
+            >
+              Planned
+            </ExerciseFilterPill>
+            <ExerciseFilterPill
+              value="repetition"
+              count={filterCount('repetition')}
+              activeFilter={filter}
+              onChange={setFilter}
+            >
+              Repetition
+            </ExerciseFilterPill>
+            <ExerciseFilterPill
+              value="hold"
+              count={filterCount('hold')}
+              activeFilter={filter}
+              onChange={setFilter}
+            >
+              Holds
+            </ExerciseFilterPill>
+            <ExerciseFilterPill
+              value="compound"
+              count={filterCount('compound')}
+              activeFilter={filter}
+              onChange={setFilter}
+            >
+              Compound
+            </ExerciseFilterPill>
+          </div>
+
+          <div className="engine-definition-grid">
             {filteredDefinitions.length === 0 ? (
               <div className="engine-definition-empty">
                 No movement definitions match the current search and filter state.
@@ -3073,52 +3049,23 @@ function SupportedExercisesView({
   );
 }
 
-function EngineStatCard({
-  label,
-  value,
-  detail,
-  tone,
-  points,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly detail: string;
-  readonly tone: 'neutral' | 'rep_validating' | 'recognizable' | 'planned';
-  readonly points: readonly number[];
-}): ReactElement {
-  const maxPoint = Math.max(1, ...points);
-
-  return (
-    <div className="engine-stat-card" data-tone={tone}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-      <div className="engine-sparkline" aria-hidden="true">
-        {points.slice(0, 14).map((point, index) => (
-          <i
-            key={`${point}-${index}`}
-            style={{ blockSize: `${Math.max(12, (point / maxPoint) * 100)}%` }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function ExerciseFilterPill({
   value,
+  count,
   activeFilter,
   onChange,
   children,
 }: {
   readonly value: ExerciseCatalogFilter;
+  readonly count: number;
   readonly activeFilter: ExerciseCatalogFilter;
   readonly onChange: (value: ExerciseCatalogFilter) => void;
   readonly children: string;
 }): ReactElement {
   return (
     <button type="button" aria-pressed={activeFilter === value} onClick={() => onChange(value)}>
-      {children}
+      <span>{children}</span>
+      <strong>{count}</strong>
     </button>
   );
 }
@@ -3140,7 +3087,7 @@ function EngineDefinitionRow({
 
   return (
     <button
-      className="engine-definition-row"
+      className="engine-definition-card"
       data-maturity={definition.maturity}
       type="button"
       aria-pressed={isSelected}
@@ -3148,7 +3095,7 @@ function EngineDefinitionRow({
     >
       <MovementPreviewFrame definition={definition} guide={guide} />
       <div className="engine-definition-copy">
-        <div>
+        <div className="engine-definition-title-row">
           <strong>{definition.label}</strong>
           <span>{formatMaturityLevel(definition.maturity)}</span>
         </div>
@@ -3160,16 +3107,18 @@ function EngineDefinitionRow({
           <span>{definition.analysisSignals.length} signals</span>
         </div>
       </div>
-      <div className="engine-definition-score">
-        <div className="mini-signal-ring" style={{ '--score': maturityScore } as CSSProperties}>
-          <span>{maturityScore}%</span>
+      <div className="engine-definition-card-footer">
+        <div className="engine-definition-score">
+          <div className="mini-signal-ring" style={{ '--score': maturityScore } as CSSProperties}>
+            <span>{maturityScore}%</span>
+          </div>
+          <small>Maturity</small>
         </div>
-        <small>Definition maturity</small>
-      </div>
-      <div className="engine-definition-metadata">
-        <span>{telemetryRichness}% telemetry</span>
-        <span>{definition.supportedCameraAngles.length} camera angles</span>
-        <span>{movementComplexityLabel(definition)}</span>
+        <div className="engine-definition-metadata">
+          <span>{telemetryRichness}% telemetry</span>
+          <span>{definition.supportedCameraAngles.length} camera angles</span>
+          <span>{movementComplexityLabel(definition)}</span>
+        </div>
       </div>
     </button>
   );
@@ -4008,42 +3957,6 @@ function movementMaturitySteps(
     { label: 'Rep phases', active: definition.phaseLabels.length > 0 },
     { label: 'Quality', active: definition.maturity === 'rep_validating' },
   ];
-}
-
-function movementFamilyBreakdown(definitions: readonly MovementDefinition[]): readonly {
-  readonly orientation: MovementDefinition['bodyOrientation'];
-  readonly total: number;
-  readonly active: number;
-  readonly planned: number;
-  readonly coverage: number;
-}[] {
-  const orientations: readonly MovementDefinition['bodyOrientation'][] = [
-    'standing',
-    'floor',
-    'seated',
-    'hanging',
-    'mixed',
-  ];
-
-  return orientations
-    .map((orientation) => {
-      const familyDefinitions = definitions.filter(
-        (definition) => definition.bodyOrientation === orientation,
-      );
-      const active = familyDefinitions.filter(
-        (definition) => definition.maturity !== 'planned',
-      ).length;
-      const planned = familyDefinitions.length - active;
-
-      return {
-        orientation,
-        total: familyDefinitions.length,
-        active,
-        planned,
-        coverage: active / Math.max(1, familyDefinitions.length),
-      };
-    })
-    .filter((family) => family.total > 0);
 }
 
 function formatCameraAngle(cameraAngle: CameraAngle): string {
