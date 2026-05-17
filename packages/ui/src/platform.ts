@@ -3,7 +3,7 @@ import {
   type ActivitySession,
   type ActivitySummary,
 } from '@camchad/activity-history';
-import type { PoseTrace } from '@camchad/pose-core';
+import type { PoseRuntimeBenchmarkResult, PoseTrace } from '@camchad/pose-core';
 
 export interface CameraPermissionResult {
   readonly granted: boolean;
@@ -65,8 +65,18 @@ export interface PoseTraceSaveResult {
   readonly path?: string;
 }
 
+export interface RuntimeBenchmarkReport {
+  readonly schemaVersion: 1;
+  readonly generatedAt: string;
+  readonly runtime: 'web' | 'electron';
+  readonly source: 'camera' | 'video_file';
+  readonly sourceLabel?: string;
+  readonly result: PoseRuntimeBenchmarkResult;
+}
+
 export interface DeveloperToolsClient {
   savePoseTrace(trace: PoseTrace): Promise<PoseTraceSaveResult>;
+  saveRuntimeBenchmark?(report: RuntimeBenchmarkReport): Promise<PoseTraceSaveResult>;
 }
 
 export interface ActivityPlatform {

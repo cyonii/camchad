@@ -51,6 +51,8 @@ import {
   ExponentialPoseSmoother,
   MediaPipePoseEstimator,
   PoseTraceRecorder,
+  poseModelAssetPath,
+  runPoseRuntimeBenchmark,
   serializePoseTrace,
 } from '@camchad/pose-core';
 
@@ -66,7 +68,13 @@ import type {
   ActivitySummary,
   MovementSegment,
 } from '@camchad/activity-history';
-import type { LandmarkName, PoseEstimator, PoseFrame, PoseTrace } from '@camchad/pose-core';
+import type {
+  LandmarkName,
+  PoseEstimator,
+  PoseFrame,
+  PoseModelQuality,
+  PoseTrace,
+} from '@camchad/pose-core';
 import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
 
 import type {
@@ -77,7 +85,12 @@ import type {
   MovementDefinition,
 } from '@camchad/movement-core';
 import type { CameraFrameFeedback, CameraFrameImpulse } from './camera-frame-feedback.js';
-import type { ActivityPlatform, HistoryStorageInfo, WindowChromeState } from './platform.js';
+import type {
+  ActivityPlatform,
+  HistoryStorageInfo,
+  RuntimeBenchmarkReport,
+  WindowChromeState,
+} from './platform.js';
 const ActivityLogChart = lazy(async () => {
   const module = await import('./ActivityLogChart.js');
 
@@ -142,7 +155,10 @@ const themePreferenceStorageKey = 'camchad:theme-preference';
 const telemetryModeStorageKey = 'camchad:telemetry-mode';
 const settingsPreferencesStorageKey = 'camchad:settings-preferences';
 const developerTraceFlagStorageKey = 'camchad:developer-pose-trace';
+const developerBenchmarkFlagStorageKey = 'camchad:developer-runtime-benchmark';
 const poseInferenceIntervalMs = 80;
+const runtimeBenchmarkFrameCount = 60;
+const runtimeBenchmarkModelQualities: readonly PoseModelQuality[] = ['lite', 'full', 'heavy'];
 const defaultSettingsPreferences: AppSettingsPreferences = {
   cameraSource: 'system',
   cameraResolution: '720p',
@@ -637,8 +653,12 @@ function ActivityView({
   const lastInferenceAtRef = useRef(0);
   const detectorStateRef = useRef<MovementInterpreterState>(initialDetectorState);
   const developerTraceEnabledRef = useRef(readDeveloperTraceEnabled());
+  const developerBenchmarkEnabledRef = useRef(readDeveloperBenchmarkEnabled());
   const poseTraceRecorderRef = useRef<PoseTraceRecorder | undefined>(undefined);
   const poseTraceMovementLabelsRef = useRef(new Set<string>());
+  const benchmarkVideoRef = useRef<HTMLVideoElement | undefined>(undefined);
+  const benchmarkVideoUrlRef = useRef<string | undefined>(undefined);
+  const benchmarkVideoLabelRef = useRef<string | undefined>(undefined);
 
   const [isStarting, setIsStarting] = useState(false);
   const [isPreviewActive, setIsPreviewActive] = useState(false);
@@ -653,6 +673,10 @@ function ActivityView({
   const [developerTraceStatus, setDeveloperTraceStatus] = useState<string | undefined>(() =>
     developerTraceEnabledRef.current ? 'Pose trace capture armed' : undefined,
   );
+  const [developerBenchmarkStatus, setDeveloperBenchmarkStatus] = useState<string | undefined>(
+    () => (developerBenchmarkEnabledRef.current ? 'Runtime benchmark ready' : undefined),
+  );
+  const [isDeveloperBenchmarkRunning, setIsDeveloperBenchmarkRunning] = useState(false);
   const activeGuide = exerciseGuideFor(
     sessionTelemetry.movementType ??
       detectorState.recognition.movementType ??
@@ -721,6 +745,15 @@ function ActivityView({
         mode: 'idle',
       });
   }, [onShellSessionTelemetryChange]);
+
+  useEffect(() => {
+    return () => {
+      if (benchmarkVideoUrlRef.current) {
+        URL.revokeObjectURL(benchmarkVideoUrlRef.current);
+        benchmarkVideoUrlRef.current = undefined;
+      }
+    };
+  }, []);
 
   const endActiveMovement = useCallback((): void => {
     const service = sessionServiceRef.current;
@@ -1032,6 +1065,115 @@ function ActivityView({
     setDeveloperTraceStatus(`Downloaded ${trace.samples.length} pose samples as ${filename}.`);
   }, [platform.developerTools, preferredCameraAngle]);
 
+  const selectDeveloperBenchmarkVideo = useCallback(
+    async (file: File | undefined): Promise<void> => {
+      if (!file) {
+        return;
+      }
+
+      if (benchmarkVideoUrlRef.current) {
+        URL.revokeObjectURL(benchmarkVideoUrlRef.current);
+      }
+
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.src = url;
+      video.muted = true;
+      video.playsInline = true;
+      video.loop = true;
+      video.preload = 'auto';
+      benchmarkVideoRef.current = video;
+      benchmarkVideoUrlRef.current = url;
+      benchmarkVideoLabelRef.current = file.name;
+      setDeveloperBenchmarkStatus(`Loaded benchmark video: ${file.name}`);
+
+      await waitForVideoMetadata(video);
+    },
+    [],
+  );
+
+  const runDeveloperRuntimeBenchmark = useCallback(async (): Promise<void> => {
+    if (isDeveloperBenchmarkRunning) {
+      return;
+    }
+
+    const selectedVideo = benchmarkVideoRef.current;
+    const liveVideo = videoRef.current;
+    const video = selectedVideo ?? liveVideo;
+    const source = selectedVideo ? 'video_file' : 'camera';
+    const sourceLabel = selectedVideo
+      ? benchmarkVideoLabelRef.current
+      : isPreviewActive
+        ? 'Live camera preview'
+        : undefined;
+
+    if (!video || video.readyState < HTMLMediaElement.HAVE_METADATA) {
+      setDeveloperBenchmarkStatus(
+        selectedVideo
+          ? 'Benchmark video is not ready yet.'
+          : 'Start the camera or select a local benchmark video first.',
+      );
+      return;
+    }
+
+    setIsDeveloperBenchmarkRunning(true);
+    setDeveloperBenchmarkStatus(`Benchmarking ${runtimeBenchmarkModelQualities.join(', ')}.`);
+
+    try {
+      if (selectedVideo) {
+        selectedVideo.currentTime = 0;
+        await selectedVideo.play();
+      }
+
+      const modelBasePath = modelAssetBasePath(assets.modelAssetPath);
+      const runtime = platform.developerTools?.saveRuntimeBenchmark ? 'electron' : 'web';
+      const result = await runPoseRuntimeBenchmark({
+        video,
+        runtime,
+        frameCount: runtimeBenchmarkFrameCount,
+        targets: runtimeBenchmarkModelQualities.map((modelQuality) => ({
+          modelQuality,
+          delegate: 'CPU',
+          createEstimator: () =>
+            new MediaPipePoseEstimator({
+              modelQuality,
+              modelAssetPath: poseModelAssetPath(modelBasePath, modelQuality),
+              wasmAssetPath: assets.wasmAssetPath,
+              delegate: 'CPU',
+            }),
+        })),
+      });
+      const report: RuntimeBenchmarkReport = {
+        schemaVersion: 1,
+        generatedAt: new Date().toISOString(),
+        runtime,
+        source,
+        sourceLabel,
+        result,
+      };
+      const saved = platform.developerTools?.saveRuntimeBenchmark
+        ? await platform.developerTools.saveRuntimeBenchmark(report)
+        : { filename: downloadRuntimeBenchmarkReport(report) };
+
+      setDeveloperBenchmarkStatus(`Saved benchmark report to ${saved.path ?? saved.filename}.`);
+    } catch (error) {
+      setDeveloperBenchmarkStatus(
+        error instanceof Error ? error.message : 'Runtime benchmark failed.',
+      );
+    } finally {
+      setIsDeveloperBenchmarkRunning(false);
+      if (selectedVideo) {
+        selectedVideo.pause();
+      }
+    }
+  }, [
+    assets.modelAssetPath,
+    assets.wasmAssetPath,
+    isDeveloperBenchmarkRunning,
+    isPreviewActive,
+    platform.developerTools,
+  ]);
+
   const stopActivity = useCallback(async () => {
     startTokenRef.current += 1;
     startInFlightRef.current = false;
@@ -1193,7 +1335,7 @@ function ActivityView({
         {developerTraceEnabledRef.current ? (
           <div className="command-module command-module-trace">
             <span>Pose trace</span>
-            <div className="developer-trace-panel">
+            <div className="developer-tool-panel">
               <small>{developerTraceStatus ?? 'Developer capture enabled'}</small>
               <button
                 className="secondary-action compact-action"
@@ -1202,6 +1344,35 @@ function ActivityView({
               >
                 <Download size={16} aria-hidden="true" />
                 Export
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {developerBenchmarkEnabledRef.current ? (
+          <div className="command-module command-module-benchmark">
+            <span>Runtime benchmark</span>
+            <div className="developer-tool-panel">
+              <small>{developerBenchmarkStatus ?? 'Select video or use live preview'}</small>
+              <label className="secondary-action compact-action file-action">
+                <Upload size={16} aria-hidden="true" />
+                Video
+                <input
+                  accept="video/*"
+                  type="file"
+                  onChange={(event) =>
+                    void selectDeveloperBenchmarkVideo(event.currentTarget.files?.[0])
+                  }
+                />
+              </label>
+              <button
+                className="secondary-action compact-action"
+                type="button"
+                disabled={isDeveloperBenchmarkRunning}
+                onClick={() => void runDeveloperRuntimeBenchmark()}
+              >
+                <Gauge size={16} aria-hidden="true" />
+                {isDeveloperBenchmarkRunning ? 'Running' : 'Run'}
               </button>
             </div>
           </div>
@@ -3331,9 +3502,46 @@ function readDeveloperTraceEnabled(): boolean {
   }
 }
 
+function readDeveloperBenchmarkEnabled(): boolean {
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+
+    if (searchParams.get('dev-benchmark') === '1' || searchParams.get('benchmark') === 'runtime') {
+      localStorage.setItem(developerBenchmarkFlagStorageKey, '1');
+      return true;
+    }
+
+    if (searchParams.get('dev-benchmark') === '0') {
+      localStorage.removeItem(developerBenchmarkFlagStorageKey);
+      return false;
+    }
+
+    return localStorage.getItem(developerBenchmarkFlagStorageKey) === '1';
+  } catch {
+    return false;
+  }
+}
+
 function downloadPoseTrace(trace: PoseTrace): string {
   const filename = poseTraceFilename(trace.createdAt);
   const blob = new Blob([serializePoseTrace(trace)], { type: 'application/json' });
+  downloadBlob(blob, filename);
+
+  return filename;
+}
+
+function downloadRuntimeBenchmarkReport(report: RuntimeBenchmarkReport): string {
+  const filename = runtimeBenchmarkFilename(report.generatedAt);
+  const blob = new Blob([`${JSON.stringify(report, null, 2)}\n`], {
+    type: 'application/json',
+  });
+
+  downloadBlob(blob, filename);
+
+  return filename;
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -3342,12 +3550,44 @@ function downloadPoseTrace(trace: PoseTrace): string {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-
-  return filename;
 }
 
 function poseTraceFilename(createdAt: string): string {
   return `pose-trace-${createdAt.replaceAll(/[:.]/g, '-')}.json`;
+}
+
+function runtimeBenchmarkFilename(generatedAt: string): string {
+  return `perception-runtime-benchmark-${generatedAt.replaceAll(/[:.]/g, '-')}.json`;
+}
+
+function modelAssetBasePath(modelAssetPath: string): string {
+  const lastSlashIndex = modelAssetPath.lastIndexOf('/');
+
+  return lastSlashIndex === -1 ? '.' : modelAssetPath.slice(0, lastSlashIndex);
+}
+
+async function waitForVideoMetadata(video: HTMLVideoElement): Promise<void> {
+  if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = (): void => {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('error', handleError);
+    };
+    const handleLoadedMetadata = (): void => {
+      cleanup();
+      resolve();
+    };
+    const handleError = (): void => {
+      cleanup();
+      reject(new Error('Benchmark video metadata failed to load.'));
+    };
+
+    video.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
+    video.addEventListener('error', handleError, { once: true });
+  });
 }
 
 function cameraResolutionConstraints(

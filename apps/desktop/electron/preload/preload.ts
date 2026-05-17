@@ -42,6 +42,8 @@ const api = {
   developerTools: {
     savePoseTrace: (trace: unknown): Promise<unknown> =>
       ipcRenderer.invoke('developer:save-pose-trace', trace),
+    saveRuntimeBenchmark: (report: unknown): Promise<unknown> =>
+      ipcRenderer.invoke('developer:save-runtime-benchmark', report),
   },
 };
 

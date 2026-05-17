@@ -1692,23 +1692,38 @@ button,
   min-width: 0;
 }
 
-.command-module-trace {
-  width: min(320px, 100%);
+.command-module-trace,
+.command-module-benchmark {
+  width: min(360px, 100%);
 }
 
-.developer-trace-panel {
+.developer-tool-panel {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
-.developer-trace-panel small {
+.developer-tool-panel small {
+  min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   color: var(--text-muted);
   font-size: 0.74rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-action {
+  position: relative;
+  cursor: pointer;
+}
+
+.file-action input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .camera-guidance {

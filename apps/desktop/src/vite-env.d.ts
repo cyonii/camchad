@@ -33,6 +33,7 @@ declare global {
       };
       developerTools: {
         savePoseTrace(trace: unknown): Promise<unknown>;
+        saveRuntimeBenchmark(report: unknown): Promise<unknown>;
       };
     };
   }

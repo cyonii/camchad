@@ -40,6 +40,11 @@ interface PoseTraceSaveResult {
   readonly path: string;
 }
 
+interface DeveloperReportSaveResult {
+  readonly filename: string;
+  readonly path: string;
+}
+
 let mainWindow: BrowserWindow | undefined;
 
 function windowChromePlatform(): 'macos' | 'windows' | 'linux' {
@@ -151,6 +156,12 @@ function developerTraceDirectory(): string {
   return app.isPackaged
     ? join(app.getPath('userData'), 'pose-traces')
     : join(process.cwd(), '.dev', 'traces');
+}
+
+function developerReportDirectory(): string {
+  return app.isPackaged
+    ? join(app.getPath('userData'), 'developer-reports')
+    : join(process.cwd(), '.dev', 'reports');
 }
 
 async function readHistory(): Promise<PersistedActivityHistory> {
@@ -303,6 +314,26 @@ ipcMain.handle(
   },
 );
 
+ipcMain.handle(
+  'developer:save-runtime-benchmark',
+  async (_event, report: unknown): Promise<DeveloperReportSaveResult> => {
+    if (!isRuntimeBenchmarkReport(report)) {
+      throw new Error('Cannot save malformed runtime benchmark report.');
+    }
+
+    const directory = developerReportDirectory();
+    await mkdir(directory, { recursive: true });
+    const filename = runtimeBenchmarkFilename(report.generatedAt);
+    const target = join(directory, filename);
+    await writeFile(target, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+
+    return {
+      filename,
+      path: target,
+    };
+  },
+);
+
 ipcMain.handle('window:get-state', (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
 
@@ -385,4 +416,24 @@ function isPoseTraceRecord(value: unknown): value is {
 
 function poseTraceFilename(createdAt: string): string {
   return `pose-trace-${createdAt.replaceAll(/[:.]/g, '-')}.json`;
+}
+
+function isRuntimeBenchmarkReport(value: unknown): value is {
+  readonly generatedAt: string;
+  readonly runtime: string;
+  readonly result: unknown;
+} {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'generatedAt' in value &&
+    typeof value.generatedAt === 'string' &&
+    'runtime' in value &&
+    typeof value.runtime === 'string' &&
+    'result' in value
+  );
+}
+
+function runtimeBenchmarkFilename(generatedAt: string): string {
+  return `perception-runtime-benchmark-${generatedAt.replaceAll(/[:.]/g, '-')}.json`;
 }

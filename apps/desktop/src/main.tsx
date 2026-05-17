@@ -6,6 +6,7 @@ import type {
   ActivityPlatform,
   HistoryStorageInfo,
   PoseTraceSaveResult,
+  RuntimeBenchmarkReport,
   WindowChromeState,
 } from '@camchad/ui';
 import { ActivityApp } from '@camchad/ui';
@@ -64,6 +65,9 @@ const platform: ActivityPlatform = {
   developerTools: {
     async savePoseTrace(trace: PoseTrace): Promise<PoseTraceSaveResult> {
       return (await desktopApi.developerTools.savePoseTrace(trace)) as PoseTraceSaveResult;
+    },
+    async saveRuntimeBenchmark(report: RuntimeBenchmarkReport): Promise<PoseTraceSaveResult> {
+      return (await desktopApi.developerTools.saveRuntimeBenchmark(report)) as PoseTraceSaveResult;
     },
   },
 };
