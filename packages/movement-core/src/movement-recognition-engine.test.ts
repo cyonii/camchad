@@ -5,7 +5,7 @@ import {
   createMovementRecognitionEngine,
   MovementRecognitionEngine,
 } from './movement-recognition-engine.js';
-import { makePushUpFrame, makeSquatFrame } from './test-fixtures.js';
+import { makeHighKneesSequence, makePushUpFrame, makeSquatFrame } from './test-fixtures.js';
 
 describe('MovementRecognitionEngine', () => {
   it('selects the strongest recognized movement as the primary state', () => {
@@ -207,6 +207,32 @@ describe('MovementRecognitionEngine', () => {
 
     expect(state.inference.status).toBe('ambiguous');
     expect(state.inference.competingMovementTypes).toEqual(['push_up', 'squat']);
+  });
+
+  it('adds declarative profile criteria evidence and metrics to recognition-only candidates', () => {
+    const sequence = makeHighKneesSequence();
+    const engine = new MovementRecognitionEngine([
+      sequencedInterpreter(
+        sequence.map((_, index) =>
+          movementState({
+            movementType: 'high_knees',
+            recognition: {
+              movementType: 'high_knees',
+              confidence: 0.62,
+              status: 'active',
+              evidence: [`frame_${index}`],
+            },
+          }),
+        ),
+      ),
+    ]);
+
+    engine.processPose(sequence[0]);
+    const state = engine.processPose(sequence[1]);
+
+    expect(state.primary.recognition.evidence).toContain('profile_criteria_checked');
+    expect(state.primary.metrics.profileCriteriaConfidence).toBeGreaterThan(0);
+    expect(state.primary.metrics.profileCriteriaPassed).toEqual(expect.any(Number));
   });
 });
 

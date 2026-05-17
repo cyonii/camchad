@@ -4,7 +4,14 @@ import type {
   MovementInterpreter,
   MovementInterpreterState,
   MovementType,
+  CameraAngle,
 } from './movement-interpreter.js';
+import {
+  createMovementProfileWindow,
+  evaluateMovementProfileFrame,
+  type MovementProfileEvaluationContext,
+} from './movement-profile-evaluation-context.js';
+import { evaluateMovementRecognitionCriteria } from './movement-profile-criteria.js';
 import {
   movementRegistry,
   type MovementDefinition,
@@ -28,24 +35,41 @@ export interface MovementInferenceState {
   readonly evidence: readonly string[];
 }
 
+export interface MovementRecognitionEngineOptions {
+  readonly cameraAngle?: CameraAngle;
+  readonly definitions?: readonly MovementDefinition[];
+}
+
 const unknownConfidenceThreshold = 0.32;
 const ambiguityConfidenceGap = 0.08;
 
 export class MovementRecognitionEngine {
   private lastState: MovementRecognitionEngineState;
   private readonly candidateConfidence = new Map<MovementType, TemporalConfidenceAccumulator>();
+  private readonly profileWindow = createMovementProfileWindow({ maxAgeMs: 1400 });
+  private readonly definitionsByType: ReadonlyMap<MovementType, MovementDefinition>;
 
-  public constructor(private readonly interpreters: readonly MovementInterpreter[]) {
+  public constructor(
+    private readonly interpreters: readonly MovementInterpreter[],
+    private readonly options: MovementRecognitionEngineOptions = {},
+  ) {
     if (interpreters.length === 0) {
       throw new Error('MovementRecognitionEngine requires at least one movement interpreter.');
     }
 
+    this.definitionsByType = new Map(
+      (options.definitions ?? movementRegistry).map((definition) => [definition.type, definition]),
+    );
     this.lastState = this.buildState(interpreters.map((interpreter) => interpreter.getState()));
   }
 
   public processPose(frame: PoseFrame | undefined): MovementRecognitionEngineState {
+    const context = evaluateMovementProfileFrame({
+      frame,
+      window: this.profileWindow,
+    });
     const candidates = this.interpreters.map((interpreter) =>
-      this.stabilizeCandidate(interpreter.processPose(frame)),
+      this.stabilizeCandidate(this.applyProfileCriteria(interpreter.processPose(frame), context)),
     );
     this.lastState = this.buildState(candidates);
 
@@ -58,6 +82,7 @@ export class MovementRecognitionEngine {
     }
 
     this.candidateConfidence.clear();
+    this.profileWindow.reset();
     this.lastState = this.buildState(
       this.interpreters.map((interpreter) => interpreter.getState()),
     );
@@ -80,6 +105,49 @@ export class MovementRecognitionEngine {
       primary,
       candidates,
       inference: inferMovementState(primary, candidates),
+    };
+  }
+
+  private applyProfileCriteria(
+    state: MovementInterpreterState,
+    context: MovementProfileEvaluationContext | undefined,
+  ): MovementInterpreterState {
+    const definition = this.definitionsByType.get(state.movementType);
+
+    if (
+      !context ||
+      !definition ||
+      definition.supportLevel !== 'recognition' ||
+      state.recognition.status === 'tracking_lost'
+    ) {
+      return state;
+    }
+
+    const evaluation = evaluateMovementRecognitionCriteria({
+      definition,
+      context,
+      cameraAngle: this.options.cameraAngle,
+    });
+    const blendedConfidence = evaluation.passed
+      ? blendConfidence(state.recognition.confidence, evaluation.confidence, 0.18)
+      : blendConfidence(state.recognition.confidence, evaluation.confidence, 0.1) * 0.82;
+
+    return {
+      ...state,
+      recognition: {
+        ...state.recognition,
+        confidence: clamp01(blendedConfidence),
+        evidence: [
+          ...state.recognition.evidence,
+          'profile_criteria_checked',
+          ...evaluation.evidence.slice(0, 4),
+        ],
+      },
+      metrics: {
+        ...state.metrics,
+        profileCriteriaConfidence: evaluation.confidence,
+        profileCriteriaPassed: evaluation.passed ? 1 : 0,
+      },
     };
   }
 
@@ -195,6 +263,10 @@ export function createMovementRecognitionEngine(
     definitions.flatMap((definition) =>
       definition.createInterpreter ? [definition.createInterpreter(options)] : [],
     ),
+    {
+      cameraAngle: options.cameraAngle,
+      definitions,
+    },
   );
 }
 
@@ -219,4 +291,16 @@ function recognitionRank(state: MovementInterpreterState): number {
   }
 
   return 0;
+}
+
+function blendConfidence(
+  recognitionConfidence: number,
+  criteriaConfidence: number,
+  criteriaWeight: number,
+): number {
+  return recognitionConfidence * (1 - criteriaWeight) + criteriaConfidence * criteriaWeight;
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
 }
