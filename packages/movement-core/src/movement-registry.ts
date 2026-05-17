@@ -1,9 +1,4 @@
-import type {
-  CameraAngle,
-  ExerciseType,
-  MovementInterpreter,
-  MovementType,
-} from './movement-interpreter.js';
+import type { CameraAngle, MovementInterpreter, MovementType } from './movement-interpreter.js';
 import { defaultPushUpConfig, PushUpMovementInterpreter } from './push-up-interpreter.js';
 import {
   createRecognitionMovementInterpreter,
@@ -88,7 +83,7 @@ export interface MovementCameraGuidance {
 }
 
 export interface CameraAngleAdvice {
-  readonly movementType: ExerciseType;
+  readonly movementType: MovementType;
   readonly severity: 'info' | 'warning';
   readonly title: string;
   readonly message: string;
@@ -394,7 +389,7 @@ export function movementDefinitionFor(type: MovementType): MovementDefinition {
 }
 
 export function cameraAdviceFor(
-  movementType: ExerciseType,
+  movementType: MovementType,
   cameraAngle: CameraAngle,
 ): CameraAngleAdvice {
   const definition = movementDefinitionFor(movementType);
@@ -453,7 +448,7 @@ function recognitionExercise(
 }
 
 function plannedExercise(
-  type: ExerciseType,
+  type: MovementType,
   label: string,
   pluralLabel: string,
   bodyOrientation: MovementBodyOrientation,

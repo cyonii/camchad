@@ -135,9 +135,7 @@ export interface ActivityAppProps {
 }
 
 const themePreferenceStorageKey = 'camchad:theme-preference';
-const legacyThemePreferenceStorageKey = 'home-activity:theme-preference';
 const telemetryModeStorageKey = 'camchad:telemetry-mode';
-const legacyTelemetryModeStorageKey = 'home-activity:telemetry-mode';
 const settingsPreferencesStorageKey = 'camchad:settings-preferences';
 const poseInferenceIntervalMs = 80;
 const defaultSettingsPreferences: AppSettingsPreferences = {
@@ -1882,7 +1880,6 @@ function SettingsView({
     try {
       localStorage.removeItem(settingsPreferencesStorageKey);
       localStorage.removeItem(telemetryModeStorageKey);
-      localStorage.removeItem(legacyTelemetryModeStorageKey);
       onPreferencesChange(defaultSettingsPreferences);
       onTelemetryModeChange('fixed');
       setDataStatus('Interface preferences and cached UI state have been reset.');
@@ -3069,9 +3066,7 @@ function nextThemePreference(value: ThemePreference): ThemePreference {
 
 function readThemePreference(): ThemePreference {
   try {
-    const storedPreference =
-      localStorage.getItem(themePreferenceStorageKey) ??
-      localStorage.getItem(legacyThemePreferenceStorageKey);
+    const storedPreference = localStorage.getItem(themePreferenceStorageKey);
 
     if (
       storedPreference === 'system' ||
@@ -3106,9 +3101,7 @@ function applyThemePreference(preference: ThemePreference): void {
 
 function readTelemetryMode(): TelemetryMode {
   try {
-    const storedMode =
-      localStorage.getItem(telemetryModeStorageKey) ??
-      localStorage.getItem(legacyTelemetryModeStorageKey);
+    const storedMode = localStorage.getItem(telemetryModeStorageKey);
 
     if (storedMode === 'fixed' || storedMode === 'engraved') {
       return storedMode;

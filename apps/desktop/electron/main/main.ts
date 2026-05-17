@@ -142,56 +142,16 @@ function historyPath(): string {
   return join(app.getPath('userData'), 'activity-history.json');
 }
 
-function legacyHistoryPath(): string {
-  return join(app.getPath('userData'), 'workout-history.json');
-}
-
-function previousBrandHistoryPaths(): readonly string[] {
-  const appDataPath = app.getPath('appData');
-
-  return [
-    join(appDataPath, 'Home Activity Tracker', 'activity-history.json'),
-    join(appDataPath, 'Home Activity Tracker', 'workout-history.json'),
-    join(appDataPath, 'Home Workout Tracker', 'workout-history.json'),
-  ];
-}
-
 async function readHistory(): Promise<PersistedActivityHistory> {
   try {
     const raw = await readFile(historyPath(), 'utf8');
     return normalizeActivityHistory(JSON.parse(raw));
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      return readLegacyHistory();
+      return { sessions: [] };
     }
 
     throw error;
-  }
-}
-
-async function readLegacyHistory(): Promise<PersistedActivityHistory> {
-  try {
-    const raw = await readFile(legacyHistoryPath(), 'utf8');
-    return normalizeActivityHistory(JSON.parse(raw));
-  } catch (error) {
-    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
-      throw error;
-    }
-
-    for (const legacyPath of previousBrandHistoryPaths()) {
-      try {
-        const raw = await readFile(legacyPath, 'utf8');
-        return normalizeActivityHistory(JSON.parse(raw));
-      } catch (legacyError) {
-        if (
-          !(legacyError instanceof Error && 'code' in legacyError && legacyError.code === 'ENOENT')
-        ) {
-          throw legacyError;
-        }
-      }
-    }
-
-    return { sessions: [] };
   }
 }
 

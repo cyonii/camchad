@@ -94,15 +94,11 @@ export const localBrowserHistoryClient: HistoryClient = {
 
   async clear(): Promise<void> {
     localStorage.removeItem('camchad:sessions');
-    localStorage.removeItem('home-activity:sessions');
-    localStorage.removeItem('home-workout:sessions');
   },
 
   async replace(sessions: readonly ActivitySession[]): Promise<void> {
     const normalizedSessions = normalizeActivitySessions(sessions);
     localStorage.setItem('camchad:sessions', JSON.stringify(normalizedSessions));
-    localStorage.removeItem('home-activity:sessions');
-    localStorage.removeItem('home-workout:sessions');
   },
 
   async storageInfo(): Promise<HistoryStorageInfo> {
@@ -135,11 +131,7 @@ export const browserAppLifecycleClient: AppLifecycleClient = {
 };
 
 function readLocalSessions(): readonly ActivitySession[] {
-  const raw =
-    localStorage.getItem('camchad:sessions') ??
-    localStorage.getItem('home-activity:sessions') ??
-    localStorage.getItem('home-workout:sessions') ??
-    '[]';
+  const raw = localStorage.getItem('camchad:sessions') ?? '[]';
 
   try {
     return normalizeActivitySessions(JSON.parse(raw));

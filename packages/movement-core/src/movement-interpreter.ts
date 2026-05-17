@@ -1,6 +1,6 @@
 import type { PoseFrame } from '@camchad/pose-core';
 
-export type ExerciseType =
+export type MovementType =
   | 'push_up'
   | 'squat'
   | 'sit_up'
@@ -28,8 +28,6 @@ export type ExerciseType =
   | 'bird_dog'
   | 'superman_hold'
   | 'russian_twist';
-
-export type MovementType = ExerciseType;
 
 export type CameraAngle = 'side' | 'front' | 'front_diagonal';
 
