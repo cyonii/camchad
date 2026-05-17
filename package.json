@@ -1,8 +1,8 @@
 {
-  "name": "camchad-workout",
+  "name": "camchad",
   "version": "0.1.0",
   "private": true,
-  "description": "CamChad Workout is a local-first camera-based movement analysis app.",
+  "description": "CamChad is a local-first camera-based movement analysis app.",
   "type": "module",
   "workspaces": [
     "apps/*",

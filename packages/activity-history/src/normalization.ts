@@ -36,11 +36,7 @@ export function normalizeActivitySession(value: unknown): readonly ActivitySessi
     return [];
   }
 
-  const movements = Array.isArray(value.movements)
-    ? value.movements
-    : Array.isArray(value.exercises)
-      ? value.exercises
-      : [];
+  const movements = Array.isArray(value.movements) ? value.movements : [];
 
   return [
     {

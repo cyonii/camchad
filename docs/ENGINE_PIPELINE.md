@@ -37,7 +37,7 @@ flowchart LR
 - Owns durable local session models, normalization, timeline events, repository interfaces, and session recording.
 - Input: movement states and session telemetry from the UI runtime.
 - Output: normalized `ActivitySession` records with movement segments, timeline events, rep events, guidance, and telemetry metrics.
-- Failure modes: malformed imported history, legacy data shape, unsupported movement records, local storage or filesystem persistence failure.
+- Failure modes: malformed imported history, unsupported movement records, local storage or filesystem persistence failure.
 
 `packages/ui`
 
@@ -96,7 +96,7 @@ flowchart LR
 - Use deterministic thresholds and explainable state machines before introducing opaque models.
 - Add new movement support through structured definitions and shared primitives where possible.
 - Keep optional perception upgrades behind capabilities and measurement. Holistic, hand, face, segmentation, and ONNX models should be adopted only when they improve a defined product signal.
-- Store local history defensively. Normalize imported or legacy records before use.
+- Store local history defensively. Normalize imported records before use and reject unsupported shapes explicitly.
 
 ## Current Gaps
 

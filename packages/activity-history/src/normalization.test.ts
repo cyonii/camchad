@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeActivityHistory, normalizeActivitySessions } from './normalization.js';
 
 describe('activity history normalization', () => {
-  it('normalizes current and legacy movement collections', () => {
+  it('normalizes movement collections', () => {
     const history = normalizeActivityHistory({
       sessions: [
         {
@@ -19,7 +19,7 @@ describe('activity history normalization', () => {
               recognitionConfidence: 0.4,
             },
           ],
-          exercises: [
+          movements: [
             {
               id: 'set_1',
               movementType: 'push_up',
