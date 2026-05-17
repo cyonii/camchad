@@ -9,6 +9,8 @@ export interface PoseBenchmarkSample {
   readonly startedAtMs: number;
   readonly endedAtMs: number;
   readonly poseDetected: boolean;
+  readonly frameReady?: boolean;
+  readonly videoTimestampMs?: number;
 }
 
 export interface PoseBenchmarkSummary {
@@ -20,6 +22,7 @@ export interface PoseBenchmarkSummary {
   readonly averageLatencyMs: number;
   readonly p95LatencyMs: number;
   readonly estimatedFps: number;
+  readonly droppedFrameRatio: number;
 }
 
 export function summarizePoseBenchmark(
@@ -49,6 +52,8 @@ export function summarizePoseBenchmark(
     averageLatencyMs,
     p95LatencyMs: percentile(latencies, 0.95),
     estimatedFps: averageLatencyMs <= 0 ? 0 : 1000 / averageLatencyMs,
+    droppedFrameRatio:
+      samples.filter((sample) => sample.frameReady === false).length / samples.length,
   };
 }
 
@@ -60,6 +65,8 @@ export function benchmarkSampleFor(options: {
   readonly startedAtMs: number;
   readonly endedAtMs: number;
   readonly poseDetected: boolean;
+  readonly frameReady?: boolean;
+  readonly videoTimestampMs?: number;
 }): PoseBenchmarkSample {
   return options;
 }
