@@ -21,7 +21,6 @@ import {
   Moon,
   Move,
   PanelRight,
-  Pause,
   Play,
   Power,
   RadioTower,
@@ -165,7 +164,7 @@ const defaultSettingsPreferences: AppSettingsPreferences = {
   autoSaveSessions: true,
 };
 const defaultMovementDefinition = defaultCatalogDefinition();
-const defaultCameraAngle: CameraAngle = defaultMovementDefinition.defaultCameraAngle;
+const naturalCameraAngle: CameraAngle = 'front';
 const initialDetectorState: MovementInterpreterState = {
   movementType: defaultMovementDefinition.type,
   recognition: {
@@ -608,11 +607,14 @@ function ActivityView({
   readonly onTelemetryModeChange: (mode: TelemetryMode) => void;
   readonly settingsPreferences: AppSettingsPreferences;
 }): ReactElement {
+  const preferredCameraAngle = cameraAngleForSettingsPreferences(settingsPreferences);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const estimatorRef = useRef<PoseEstimator | null>(null);
   const smootherRef = useRef(new ExponentialPoseSmoother());
-  const recognitionEngineRef = useRef(createMovementRecognitionEngine());
+  const recognitionEngineRef = useRef(
+    createMovementRecognitionEngine({ cameraAngle: preferredCameraAngle }),
+  );
   const activityWindowRef = useRef(new MovementWindow({ maxAgeMs: 1400 }));
   const activityStateSegmenterRef = useRef(
     new ActivityStateSegmenter({
@@ -622,7 +624,7 @@ function ActivityView({
     }),
   );
   const sessionOrchestratorRef = useRef(
-    new ActivitySessionOrchestrator({ cameraAngle: defaultCameraAngle }),
+    new ActivitySessionOrchestrator({ cameraAngle: preferredCameraAngle }),
   );
   const animationFrameRef = useRef<number | undefined>(undefined);
   const sessionRef = useRef<ActivitySession | undefined>(undefined);
@@ -774,7 +776,7 @@ function ActivityView({
       }
 
       if (!activeMovementTypeRef.current) {
-        service.startMovement(telemetry.movementType, defaultCameraAngle);
+        service.startMovement(telemetry.movementType, preferredCameraAngle);
         activeMovementTypeRef.current = telemetry.movementType;
       }
 
@@ -786,7 +788,7 @@ function ActivityView({
       hasRecordableActivityRef.current =
         hasRecordableActivityRef.current || isRecordableMovement(updatedMovement);
     },
-    [endActiveMovement],
+    [endActiveMovement, preferredCameraAngle],
   );
 
   const processFrame = useCallback(
@@ -913,12 +915,12 @@ function ActivityView({
 
       setStatus('Starting pose engine');
       recognitionEngineRef.current = createMovementRecognitionEngine({
-        cameraAngle: defaultCameraAngle,
+        cameraAngle: preferredCameraAngle,
       });
       activityWindowRef.current.reset();
       activityStateSegmenterRef.current.reset();
       sessionOrchestratorRef.current.reset();
-      sessionOrchestratorRef.current.updateOptions({ cameraAngle: defaultCameraAngle });
+      sessionOrchestratorRef.current.updateOptions({ cameraAngle: preferredCameraAngle });
       lastInferenceAtRef.current = 0;
       smootherRef.current.reset();
       activeMovementTypeRef.current = undefined;
@@ -936,7 +938,7 @@ function ActivityView({
           notes: 'Developer pose trace capture. No raw video frames are included.',
           metadata: {
             sessionId: sessionRef.current.id,
-            cameraAngle: defaultCameraAngle,
+            cameraAngle: preferredCameraAngle,
             captureNotes: 'Captured from the live activity loop.',
           },
         });
@@ -987,6 +989,7 @@ function ActivityView({
     isTracking,
     onSessionSaved,
     platform.cameraPermission,
+    preferredCameraAngle,
     processFrame,
     settingsPreferences.cameraFrameRate,
     settingsPreferences.cameraResolution,
@@ -1013,7 +1016,7 @@ function ActivityView({
         ...snapshot.metadata,
         sessionId: snapshot.metadata?.sessionId ?? sessionRef.current?.id,
         movementLabels: [...poseTraceMovementLabelsRef.current].sort(),
-        cameraAngle: snapshot.metadata?.cameraAngle ?? defaultCameraAngle,
+        cameraAngle: snapshot.metadata?.cameraAngle ?? preferredCameraAngle,
       },
     };
 
@@ -1027,7 +1030,7 @@ function ActivityView({
 
     const filename = downloadPoseTrace(trace);
     setDeveloperTraceStatus(`Downloaded ${trace.samples.length} pose samples as ${filename}.`);
-  }, [platform.developerTools]);
+  }, [platform.developerTools, preferredCameraAngle]);
 
   const stopActivity = useCallback(async () => {
     startTokenRef.current += 1;
@@ -1076,6 +1079,27 @@ function ActivityView({
     setDetectorState(initialDetectorState);
     setStatus('Ready');
   }, [endActiveMovement, exportDeveloperPoseTrace, settingsPreferences.autoSaveSessions]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.code !== 'Space' || event.repeat || isKeyboardInputTarget(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (isTracking || isStarting) {
+        void stopActivity();
+        return;
+      }
+
+      void startActivity();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isStarting, isTracking, startActivity, stopActivity]);
 
   return (
     <section
@@ -1192,16 +1216,10 @@ function ActivityView({
                 Start
               </button>
             ) : (
-              <>
-                <button className="secondary-action" type="button" disabled>
-                  <Pause size={18} aria-hidden="true" />
-                  {isStarting ? 'Starting' : 'Pause'}
-                </button>
-                <button className="danger-action" type="button" onClick={() => void stopActivity()}>
-                  <Square size={18} aria-hidden="true" />
-                  Stop
-                </button>
-              </>
+              <button className="danger-action" type="button" onClick={() => void stopActivity()}>
+                <Square size={18} aria-hidden="true" />
+                Stop
+              </button>
             )}
           </div>
         </div>
@@ -1323,6 +1341,7 @@ function SidebarTelemetryPanel({
       detectorState.movementType,
   );
   const telemetryMetrics = telemetryMetricsFor(movementDefinition, detectorState);
+  const telemetrySignal = strongestTelemetrySignal(detectorState, sessionTelemetry);
   const liveState = liveTelemetryStateFor(detectorState, sessionTelemetry);
 
   return (
@@ -1344,7 +1363,7 @@ function SidebarTelemetryPanel({
           <strong>{detectorState.validReps}</strong>
           <small>{detectorState.partialReps} partial reps</small>
         </div>
-        <SignalDial value={detectorState.metrics.poseConfidence} phase={detectorState.phase} />
+        <SignalDial value={telemetrySignal} phase={detectorState.phase} />
       </div>
 
       <div className="metric-grid telemetry-block">
@@ -1353,7 +1372,14 @@ function SidebarTelemetryPanel({
           label="Activity"
           value={formatActivityState(sessionTelemetry.activityState ?? 'idle')}
         />
-        <Metric label="Signal" value={formatMetric(sessionTelemetry.recognitionConfidence, '%')} />
+        <Metric
+          label="Recognition"
+          value={formatMetric(sessionTelemetry.recognitionConfidence, '%')}
+        />
+        <Metric
+          label="Activity confidence"
+          value={formatMetric(sessionTelemetry.activityConfidence, '%')}
+        />
         <Metric label="Movement state" value={liveState.label} />
         <Metric label="State detail" value={liveState.detail} />
         {telemetryMetrics.map((metric) => (
@@ -2069,8 +2095,8 @@ function SettingsView({
             />
           </SettingsRow>
           <SettingsRow
-            label="Positioning guidance"
-            description="Preferred camera angle hints for reliable movement interpretation."
+            label="Default camera view"
+            description="Start from a natural front-facing view, then surface angle guidance per movement."
           >
             <SettingsSelect
               value={preferences.cameraPositionGuide}
@@ -2078,7 +2104,7 @@ function SettingsView({
                 updatePreference('cameraPositionGuide', value as SettingsPositionGuide)
               }
               options={[
-                ['auto', 'Automatic guidance'],
+                ['auto', 'Default camera view'],
                 ['side', 'Prioritize side view'],
                 ['front', 'Prioritize front view'],
               ]}
@@ -3485,6 +3511,45 @@ function telemetryMetricsFor(
     label: metric.label,
     value: formatMetric(state.metrics[metric.key], metric.unit),
   }));
+}
+
+function strongestTelemetrySignal(
+  state: MovementInterpreterState,
+  telemetry: ActivitySessionTelemetry,
+): number | undefined {
+  const signals = [
+    state.metrics.poseConfidence,
+    state.metrics.movementConfidence,
+    state.metrics.temporalCandidateConfidence,
+    telemetry.activityConfidence,
+    telemetry.recognitionConfidence,
+  ].filter((value): value is number => value !== undefined && !Number.isNaN(value));
+
+  return signals.length === 0 ? undefined : Math.max(...signals);
+}
+
+function cameraAngleForSettingsPreferences(preferences: AppSettingsPreferences): CameraAngle {
+  if (preferences.cameraPositionGuide === 'side') {
+    return 'side';
+  }
+
+  return naturalCameraAngle;
+}
+
+function isKeyboardInputTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+
+  return (
+    target.isContentEditable ||
+    tagName === 'input' ||
+    tagName === 'textarea' ||
+    tagName === 'select' ||
+    tagName === 'button'
+  );
 }
 
 function createSessionRepository(
