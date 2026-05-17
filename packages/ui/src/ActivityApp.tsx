@@ -49,7 +49,6 @@ import {
 } from '@camchad/movement-core';
 import {
   ExponentialPoseSmoother,
-  MediaPipePoseEstimator,
   PoseTraceRecorder,
   poseModelAssetPath,
   runPoseRuntimeBenchmark,
@@ -978,6 +977,7 @@ function ActivityView({
         setDeveloperTraceStatus('Recording pose trace');
       }
 
+      const { MediaPipePoseEstimator } = await import('@camchad/pose-core');
       const estimator = new MediaPipePoseEstimator({
         modelAssetPath: assets.modelAssetPath,
         wasmAssetPath: assets.wasmAssetPath,
@@ -1134,13 +1134,16 @@ function ActivityView({
         targets: runtimeBenchmarkModelQualities.map((modelQuality) => ({
           modelQuality,
           delegate: 'CPU',
-          createEstimator: () =>
-            new MediaPipePoseEstimator({
+          createEstimator: async () => {
+            const { MediaPipePoseEstimator } = await import('@camchad/pose-core');
+
+            return new MediaPipePoseEstimator({
               modelQuality,
               modelAssetPath: poseModelAssetPath(modelBasePath, modelQuality),
               wasmAssetPath: assets.wasmAssetPath,
               delegate: 'CPU',
-            }),
+            });
+          },
         })),
       });
       const report: RuntimeBenchmarkReport = {
