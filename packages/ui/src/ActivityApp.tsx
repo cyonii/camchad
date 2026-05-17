@@ -1988,10 +1988,21 @@ function SettingsView({
   return (
     <section className="settings-command-center">
       <div className="settings-primary-column">
-        <div className="settings-page-heading">
-          <span>Instrument control</span>
-          <h1>Settings</h1>
-          <p>Configure the local movement engine, camera guidance, telemetry, and data controls.</p>
+        <div className="settings-heading-row">
+          <div className="page-heading settings-page-heading">
+            <div>
+              <span>Instrument control</span>
+              <h1>Settings</h1>
+              <p>
+                Configure the local movement engine, camera guidance, telemetry, and data controls.
+              </p>
+            </div>
+          </div>
+
+          <div className="history-window-badge settings-header-badge">
+            <ShieldCheck size={16} aria-hidden="true" />
+            <span>Local only</span>
+          </div>
         </div>
 
         <SettingsSection
@@ -2673,14 +2684,27 @@ function SupportedExercisesView({
   return (
     <section className="exercise-observatory">
       <div className="exercise-library-column">
-        <div className="exercise-hero-panel">
+        <div className="exercise-heading-row">
+          <div className="page-heading exercise-page-heading">
+            <div>
+              <span>Movement engine library</span>
+              <h1>Capability Registry</h1>
+              <p>
+                A local map of movement definitions the engine can validate, recognize, or has
+                queued as dormant profiles for future analysis.
+              </p>
+            </div>
+          </div>
+
+          <div className="history-window-badge exercise-header-badge">
+            <Cpu size={16} aria-hidden="true" />
+            <span>{recognizedCount} active profiles</span>
+          </div>
+        </div>
+
+        <div className="exercise-search-row">
           <div>
-            <span>Movement engine library</span>
-            <h1>Capability Registry</h1>
-            <p>
-              A local map of movement definitions the engine can validate, recognize, or has queued
-              as dormant profiles for future analysis.
-            </p>
+            <span>Catalog search</span>
           </div>
           <div className="exercise-search-cluster">
             <label className="exercise-search">
