@@ -6,34 +6,35 @@ import {
 } from '@camchad/pose-core';
 import { describe, expect, it } from 'vitest';
 
+import { createMovementInterpreterForDefinition } from './movement-definition-interpreter.js';
 import { movementRegistry } from './movement-registry.js';
-import { createRecognitionMovementInterpreter } from './recognition-movement-interpreters.js';
+import { createProfileMovementInterpreter } from './profile-movement-interpreters.js';
 
-describe('recognition movement interpreters', () => {
-  it('creates interpreters for every currently recognized catalog movement', () => {
+describe('profile movement interpreters', () => {
+  it('creates interpreters for every active movement definition through the shared factory', () => {
     expect(
       movementRegistry
-        .filter((definition) => definition.supportLevel !== 'planned')
-        .every((definition) => definition.createInterpreter),
+        .filter((definition) => definition.maturity !== 'planned')
+        .every((definition) => createMovementInterpreterForDefinition(definition) !== undefined),
     ).toBe(true);
     expect(
       movementRegistry
-        .filter((definition) => definition.supportLevel === 'planned')
-        .every((definition) => !definition.createInterpreter),
+        .filter((definition) => definition.maturity === 'planned')
+        .every((definition) => createMovementInterpreterForDefinition(definition) === undefined),
     ).toBe(true);
     expect(
-      movementRegistry.filter((definition) => definition.supportLevel === 'validation'),
+      movementRegistry.filter((definition) => definition.maturity === 'rep_validating'),
     ).toHaveLength(2);
     expect(
-      movementRegistry.filter((definition) => definition.supportLevel === 'recognition'),
+      movementRegistry.filter((definition) => definition.maturity === 'recognizable'),
     ).toHaveLength(10);
     expect(
-      movementRegistry.filter((definition) => definition.supportLevel === 'planned').length,
+      movementRegistry.filter((definition) => definition.maturity === 'planned').length,
     ).toBeGreaterThan(0);
   });
 
   it('counts a high-knees cycle from knee lift rhythm', () => {
-    const interpreter = createRecognitionMovementInterpreter('high_knees');
+    const interpreter = createProfileMovementInterpreter('high_knees');
 
     interpreter.processPose(makeStandingKneeLiftFrame({ timestampMs: 0, kneeY: 0.66 }));
     interpreter.processPose(makeStandingKneeLiftFrame({ timestampMs: 100, kneeY: 0.5 }));
@@ -55,7 +56,7 @@ describe('recognition movement interpreters', () => {
   });
 
   it('promotes a stable plank hold only after the hold window is satisfied', () => {
-    const interpreter = createRecognitionMovementInterpreter('plank');
+    const interpreter = createProfileMovementInterpreter('plank');
 
     const earlyState = interpreter.processPose(makePlankFrame(0));
     const heldState = interpreter.processPose(makePlankFrame(1300));

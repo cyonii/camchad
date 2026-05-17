@@ -13,10 +13,10 @@ import {
 } from './movement-profile-evaluation-context.js';
 import { evaluateMovementRecognitionCriteria } from './movement-profile-criteria.js';
 import {
-  movementRegistry,
-  type MovementDefinition,
+  createMovementInterpreterForDefinition,
   type MovementInterpreterFactoryOptions,
-} from './movement-registry.js';
+} from './movement-definition-interpreter.js';
+import { movementRegistry, type MovementDefinition } from './movement-registry.js';
 import { TemporalConfidenceAccumulator } from './temporal-confidence.js';
 
 export interface MovementRecognitionEngineState {
@@ -114,12 +114,7 @@ export class MovementRecognitionEngine {
   ): MovementInterpreterState {
     const definition = this.definitionsByType.get(state.movementType);
 
-    if (
-      !context ||
-      !definition ||
-      definition.supportLevel !== 'recognition' ||
-      state.recognition.status === 'tracking_lost'
-    ) {
+    if (!context || !definition || state.recognition.status === 'tracking_lost') {
       return state;
     }
 
@@ -260,9 +255,11 @@ export function createMovementRecognitionEngine(
   definitions: readonly MovementDefinition[] = movementRegistry,
 ): MovementRecognitionEngine {
   return new MovementRecognitionEngine(
-    definitions.flatMap((definition) =>
-      definition.createInterpreter ? [definition.createInterpreter(options)] : [],
-    ),
+    definitions.flatMap((definition) => {
+      const interpreter = createMovementInterpreterForDefinition(definition, options);
+
+      return interpreter ? [interpreter] : [];
+    }),
     {
       cameraAngle: options.cameraAngle,
       definitions,

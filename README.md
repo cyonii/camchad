@@ -11,8 +11,8 @@ CamChad should feel like a local movement-analysis instrument:
 - no accounts, backend, cloud dependency, or remote telemetry;
 - live camera-based pose inference on-device;
 - automatic movement recognition instead of manual exercise selection;
-- validation-ready movement profiles where the engine can judge rep quality;
-- recognition-only profiles where the engine can identify movement patterns without claiming mature validation;
+- rep-validating movement profiles where the engine can judge rep quality;
+- recognizable profiles where the engine can identify movement patterns without claiming mature validation;
 - local session history with movement segments, rep events, guidance, and telemetry;
 - tactical, readable instrumentation UI for live analysis, logs, exercises, and settings.
 
@@ -69,19 +69,19 @@ Important engine concepts:
 - `PoseFrame`: raw timestamped landmark output from the active pose model.
 - `BodyState`: normalized body-relative representation with coverage, orientation, joint angles, and geometry signals.
 - `MovementWindow`: rolling temporal buffer for velocity, signal range, rhythm, confidence, and missing-frame accounting.
-- `MovementDefinition`: profile metadata for recognition maturity, body orientation, required regions, camera guidance, telemetry, and validation status.
+- `MovementDefinition`: profile metadata for maturity, body orientation, required regions, camera guidance, telemetry, and validation criteria.
 - `MovementInterpreterState`: current recognition, phase, rep counts, warnings, and metrics for one movement profile.
 
 See [docs/ENGINE_PIPELINE.md](docs/ENGINE_PIPELINE.md) for the full architecture notes.
 
 ## Movement Coverage
 
-Validation-ready:
+Rep-validating:
 
 - push-ups
 - squats
 
-Recognition-only:
+Recognizable:
 
 - sit-ups
 - lunges
@@ -286,7 +286,7 @@ Near-term priorities are tracked locally under `.dev/plans` and `.dev/core-movem
 
 Current themes:
 
-- improve movement-profile specificity for recognition-only profiles;
+- improve movement-profile specificity for recognizable profiles;
 - build real browser/Electron runtime perception benchmarking;
 - compare Pose Lite, Full, and Heavy with measured latency, FPS, detection ratio, jitter, and downstream recognition stability;
 - grow a local pose-trace corpus for replay tests;

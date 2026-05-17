@@ -4,6 +4,7 @@ import type {
   MovementInterpreterState,
   MovementPhase,
   MovementRecognition,
+  MovementType,
   RepEvent,
 } from './movement-interpreter.js';
 import {
@@ -27,7 +28,7 @@ import {
   wristSpanRatio,
 } from './movement-profile-signals.js';
 
-export type RecognitionMovementType =
+export type ProfileMovementType =
   | 'sit_up'
   | 'lunge'
   | 'jumping_jack'
@@ -42,7 +43,7 @@ export type RecognitionMovementType =
 type MovementDirection = 'increase' | 'decrease';
 
 interface CycleMovementInterpreterConfig {
-  readonly movementType: RecognitionMovementType;
+  readonly movementType: ProfileMovementType;
   readonly minVisibility: number;
   readonly expectedOrientations: readonly BodyOrientationSignal[];
   readonly restThreshold: number;
@@ -56,7 +57,7 @@ interface CycleMovementInterpreterConfig {
 }
 
 interface HoldMovementInterpreterConfig {
-  readonly movementType: RecognitionMovementType;
+  readonly movementType: ProfileMovementType;
   readonly minVisibility: number;
   readonly expectedOrientations: readonly BodyOrientationSignal[];
   readonly minHoldMs: number;
@@ -66,20 +67,26 @@ interface HoldMovementInterpreterConfig {
   readonly evidence: readonly string[];
 }
 
-export function createRecognitionMovementInterpreter(
-  movementType: RecognitionMovementType,
+export function createProfileMovementInterpreter(
+  movementType: ProfileMovementType,
 ): MovementInterpreter {
-  const config = recognitionMovementConfigs[movementType];
+  const config = profileMovementConfigs[movementType];
 
   if (config.kind === 'hold') {
-    return new HoldRecognitionMovementInterpreter(config);
+    return new HoldProfileMovementInterpreter(config);
   }
 
-  return new CycleRecognitionMovementInterpreter(config);
+  return new CycleProfileMovementInterpreter(config);
 }
 
-class CycleRecognitionMovementInterpreter implements MovementInterpreter {
-  public readonly movementType: RecognitionMovementType;
+export function isProfileMovementType(
+  movementType: MovementType,
+): movementType is ProfileMovementType {
+  return movementType in profileMovementConfigs;
+}
+
+class CycleProfileMovementInterpreter implements MovementInterpreter {
+  public readonly movementType: ProfileMovementType;
 
   private phase: MovementPhase = 'setup_needed';
   private reps = 0;
@@ -336,8 +343,8 @@ class CycleRecognitionMovementInterpreter implements MovementInterpreter {
   }
 }
 
-class HoldRecognitionMovementInterpreter implements MovementInterpreter {
-  public readonly movementType: RecognitionMovementType;
+class HoldProfileMovementInterpreter implements MovementInterpreter {
+  public readonly movementType: ProfileMovementType;
 
   private phase: MovementPhase = 'setup_needed';
   private reps = 0;
@@ -471,8 +478,8 @@ class HoldRecognitionMovementInterpreter implements MovementInterpreter {
   }
 }
 
-const recognitionMovementConfigs: Record<
-  RecognitionMovementType,
+const profileMovementConfigs: Record<
+  ProfileMovementType,
   | (CycleMovementInterpreterConfig & { readonly kind: 'cycle' })
   | (HoldMovementInterpreterConfig & { readonly kind: 'hold' })
 > = {

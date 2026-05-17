@@ -209,7 +209,7 @@ describe('MovementRecognitionEngine', () => {
     expect(state.inference.competingMovementTypes).toEqual(['push_up', 'squat']);
   });
 
-  it('adds declarative profile criteria evidence and metrics to recognition-only candidates', () => {
+  it('adds declarative profile criteria evidence and metrics to recognizable candidates', () => {
     const sequence = makeHighKneesSequence();
     const engine = new MovementRecognitionEngine([
       sequencedInterpreter(
@@ -233,6 +233,27 @@ describe('MovementRecognitionEngine', () => {
     expect(state.primary.recognition.evidence).toContain('profile_criteria_checked');
     expect(state.primary.metrics.profileCriteriaConfidence).toBeGreaterThan(0);
     expect(state.primary.metrics.profileCriteriaPassed).toEqual(expect.any(Number));
+  });
+
+  it('applies declarative profile criteria to rep-validating candidates too', () => {
+    const engine = new MovementRecognitionEngine([
+      fakeInterpreter(
+        movementState({
+          movementType: 'push_up',
+          recognition: {
+            movementType: 'push_up',
+            confidence: 0.74,
+            status: 'active',
+            evidence: ['rep_module_signal'],
+          },
+        }),
+      ),
+    ]);
+
+    const state = engine.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 152 }));
+
+    expect(state.primary.recognition.evidence).toContain('profile_criteria_checked');
+    expect(state.primary.metrics.profileCriteriaConfidence).toBeGreaterThan(0);
   });
 });
 

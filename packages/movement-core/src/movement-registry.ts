@@ -1,10 +1,4 @@
-import type { CameraAngle, MovementInterpreter, MovementType } from './movement-interpreter.js';
-import { defaultPushUpConfig, PushUpMovementInterpreter } from './push-up-interpreter.js';
-import {
-  createRecognitionMovementInterpreter,
-  type RecognitionMovementType,
-} from './recognition-movement-interpreters.js';
-import { defaultSquatConfig, SquatMovementInterpreter } from './squat-interpreter.js';
+import type { CameraAngle, MovementType } from './movement-interpreter.js';
 
 export interface MovementDefinition {
   readonly type: MovementType;
@@ -13,7 +7,7 @@ export interface MovementDefinition {
   readonly repLabel: string;
   readonly repPluralLabel: string;
   readonly category: MovementCategory;
-  readonly supportLevel: MovementSupportLevel;
+  readonly maturity: MovementMaturityLevel;
   readonly bodyOrientation: MovementBodyOrientation;
   readonly analysisSignals: readonly string[];
   readonly phaseLabels: readonly string[];
@@ -22,20 +16,17 @@ export interface MovementDefinition {
   readonly cameraGuidance: MovementCameraGuidance;
   readonly telemetryMetrics: readonly MovementTelemetryMetricDefinition[];
   readonly profile: MovementProfileMetadata;
-  readonly createInterpreter?: (options?: MovementInterpreterFactoryOptions) => MovementInterpreter;
 }
 
 export type MovementCategory = 'repetition' | 'hold' | 'compound';
 
-export type MovementSupportLevel = 'validation' | 'recognition' | 'planned';
+export type MovementMaturityLevel = 'rep_validating' | 'recognizable' | 'planned';
 
 export type MovementBodyOrientation = 'standing' | 'floor' | 'seated' | 'hanging' | 'mixed';
 
 export type MovementRegion = 'head' | 'torso' | 'arms' | 'hands' | 'hips' | 'legs' | 'feet';
 
 export type MovementRhythmType = 'cyclic' | 'hold' | 'compound' | 'unknown';
-
-export type MovementValidationReadiness = 'rep_validation' | 'recognition_only' | 'profile_pending';
 
 export type MovementCameraSensitivity = 'low' | 'medium' | 'high';
 
@@ -44,7 +35,7 @@ export interface MovementProfileMetadata {
   readonly primaryJoints: readonly string[];
   readonly phaseModel: readonly string[];
   readonly rhythm: MovementRhythmType;
-  readonly validationReadiness: MovementValidationReadiness;
+  readonly maturity: MovementMaturityLevel;
   readonly cameraSensitivity: MovementCameraSensitivity;
   readonly recognitionCriteria: readonly MovementProfileCriterion[];
   readonly validationCriteria: readonly MovementProfileCriterion[];
@@ -53,7 +44,7 @@ export interface MovementProfileMetadata {
   readonly failureCriteria: readonly string[];
 }
 
-export type MovementProfileCriterionSource = 'declarative' | 'custom_validator' | 'planned';
+export type MovementProfileCriterionSource = 'declarative' | 'definition_module' | 'planned';
 
 export interface MovementProfileCriterion {
   readonly key: string;
@@ -68,10 +59,6 @@ export interface MovementTelemetryExtractorDefinition {
   readonly label: string;
   readonly source: MovementTelemetryExtractorSource;
   readonly description: string;
-}
-
-export interface MovementInterpreterFactoryOptions {
-  readonly cameraAngle?: CameraAngle;
 }
 
 export interface MovementCameraGuidance {
@@ -104,7 +91,7 @@ export const movementRegistry: readonly MovementDefinition[] = [
     repLabel: 'push-up',
     repPluralLabel: 'push-ups',
     category: 'repetition',
-    supportLevel: 'validation',
+    maturity: 'rep_validating',
     bodyOrientation: 'floor',
     analysisSignals: [
       'horizontal torso orientation',
@@ -133,7 +120,7 @@ export const movementRegistry: readonly MovementDefinition[] = [
       primaryJoints: ['elbow', 'shoulder', 'hip'],
       phaseModel: ['top', 'descending', 'bottom', 'ascending'],
       rhythm: 'cyclic',
-      validationReadiness: 'rep_validation',
+      maturity: 'rep_validating',
       cameraSensitivity: 'high',
       recognitionCriteria: [
         profileCriterion('floor_orientation', 'Floor-oriented torso', 'declarative'),
@@ -144,7 +131,7 @@ export const movementRegistry: readonly MovementDefinition[] = [
         profileCriterion(
           'push_up_phase_machine',
           'Top-bottom-top phase validation',
-          'custom_validator',
+          'definition_module',
         ),
         profileCriterion('push_up_depth', 'Elbow depth threshold', 'declarative'),
         profileCriterion('body_line_quality', 'Shoulder-hip-ankle line quality', 'declarative'),
@@ -179,11 +166,6 @@ export const movementRegistry: readonly MovementDefinition[] = [
       ],
       failureCriteria: ['tracking loss', 'severe body-line drift', 'partial depth'],
     },
-    createInterpreter: (options) =>
-      new PushUpMovementInterpreter({
-        ...defaultPushUpConfig,
-        cameraAngle: options?.cameraAngle ?? defaultPushUpConfig.cameraAngle,
-      }),
   },
   {
     type: 'squat',
@@ -192,7 +174,7 @@ export const movementRegistry: readonly MovementDefinition[] = [
     repLabel: 'squat',
     repPluralLabel: 'squats',
     category: 'repetition',
-    supportLevel: 'validation',
+    maturity: 'rep_validating',
     bodyOrientation: 'standing',
     analysisSignals: [
       'vertical torso orientation',
@@ -222,7 +204,7 @@ export const movementRegistry: readonly MovementDefinition[] = [
       primaryJoints: ['knee', 'hip', 'ankle'],
       phaseModel: ['standing', 'lowering', 'bottom', 'rising'],
       rhythm: 'cyclic',
-      validationReadiness: 'rep_validation',
+      maturity: 'rep_validating',
       cameraSensitivity: 'medium',
       recognitionCriteria: [
         profileCriterion('standing_orientation', 'Standing torso orientation', 'declarative'),
@@ -233,7 +215,7 @@ export const movementRegistry: readonly MovementDefinition[] = [
         profileCriterion(
           'squat_phase_machine',
           'Standing-bottom-standing phase validation',
-          'custom_validator',
+          'definition_module',
         ),
         profileCriterion('squat_depth', 'Knee depth threshold', 'declarative'),
         profileCriterion('torso_control', 'Torso control threshold', 'declarative'),
@@ -268,51 +250,46 @@ export const movementRegistry: readonly MovementDefinition[] = [
       ],
       failureCriteria: ['tracking loss', 'forward torso collapse', 'partial depth'],
     },
-    createInterpreter: (options) =>
-      new SquatMovementInterpreter({
-        ...defaultSquatConfig,
-        cameraAngle: options?.cameraAngle ?? defaultSquatConfig.cameraAngle,
-      }),
   },
-  recognitionExercise('sit_up', 'Sit-up', 'Sit-ups', 'floor', [
+  recognizableExercise('sit_up', 'Sit-up', 'Sit-ups', 'floor', [
     'torso curl trajectory',
     'hip anchor stability',
   ]),
-  recognitionExercise('lunge', 'Lunge', 'Lunges', 'standing', [
+  recognizableExercise('lunge', 'Lunge', 'Lunges', 'standing', [
     'split stance',
     'front knee flexion',
     'hip drop',
   ]),
-  recognitionExercise('jumping_jack', 'Jumping jack', 'Jumping jacks', 'standing', [
+  recognizableExercise('jumping_jack', 'Jumping jack', 'Jumping jacks', 'standing', [
     'arm-leg abduction rhythm',
     'wrist and ankle span oscillation',
   ]),
-  recognitionExercise('plank', 'Plank', 'Planks', 'floor', [
+  recognizableExercise('plank', 'Plank', 'Planks', 'floor', [
     'horizontal body line',
     'static hold stability',
   ]),
-  recognitionExercise('pull_up', 'Pull-up', 'Pull-ups', 'hanging', [
+  recognizableExercise('pull_up', 'Pull-up', 'Pull-ups', 'hanging', [
     'vertical hanging posture',
     'elbow flexion',
     'shoulder elevation change',
   ]),
-  recognitionExercise('burpee', 'Burpee', 'Burpees', 'mixed', [
+  recognizableExercise('burpee', 'Burpee', 'Burpees', 'mixed', [
     'standing-floor-standing transition',
     'compound motion rhythm',
   ]),
-  recognitionExercise('mountain_climber', 'Mountain climber', 'Mountain climbers', 'floor', [
+  recognizableExercise('mountain_climber', 'Mountain climber', 'Mountain climbers', 'floor', [
     'plank base',
     'alternating knee drive',
   ]),
-  recognitionExercise('high_knees', 'High knees', 'High knees', 'standing', [
+  recognizableExercise('high_knees', 'High knees', 'High knees', 'standing', [
     'alternating knee lift',
     'vertical cadence',
   ]),
-  recognitionExercise('lateral_raise', 'Lateral raise', 'Lateral raises', 'standing', [
+  recognizableExercise('lateral_raise', 'Lateral raise', 'Lateral raises', 'standing', [
     'shoulder abduction',
     'arm elevation symmetry',
   ]),
-  recognitionExercise('yoga_hold', 'Yoga hold', 'Yoga holds', 'mixed', [
+  recognizableExercise('yoga_hold', 'Yoga hold', 'Yoga holds', 'mixed', [
     'static pose geometry',
     'hold stability',
   ]),
@@ -405,8 +382,8 @@ export function cameraAdviceFor(
   };
 }
 
-function recognitionExercise(
-  type: RecognitionMovementType,
+function recognizableExercise(
+  type: MovementType,
   label: string,
   pluralLabel: string,
   bodyOrientation: MovementBodyOrientation,
@@ -419,7 +396,7 @@ function recognitionExercise(
     repLabel: label.toLowerCase(),
     repPluralLabel: pluralLabel.toLowerCase(),
     category: type === 'plank' || type === 'yoga_hold' ? 'hold' : 'repetition',
-    supportLevel: 'recognition',
+    maturity: 'recognizable',
     bodyOrientation,
     analysisSignals,
     phaseLabels: [],
@@ -431,19 +408,18 @@ function recognitionExercise(
       usableTitle: 'Camera angle usable',
       usableMessage: `Keep your body fully visible for ${label.toLowerCase()} analysis.`,
       warningTitle: 'Adjust camera angle',
-      warningMessage: `${label} analysis will need a clearer camera angle before validation is enabled.`,
+      warningMessage: `${label} analysis will need a clearer camera angle before rep validation is enabled.`,
     },
     telemetryMetrics: [
       { key: 'movementConfidence', label: 'Signal', unit: '%' },
       { key: 'rangeOfMotionScore', label: 'Range', unit: '%' },
     ],
     profile: profileFor({
-      supportLevel: 'recognition',
+      maturity: 'recognizable',
       category: type === 'plank' || type === 'yoga_hold' ? 'hold' : 'repetition',
       bodyOrientation,
       analysisSignals,
     }),
-    createInterpreter: () => createRecognitionMovementInterpreter(type),
   };
 }
 
@@ -462,7 +438,7 @@ function plannedExercise(
     repPluralLabel: pluralLabel.toLowerCase(),
     category:
       type.includes('hold') || type === 'wall_sit' || type === 'side_plank' ? 'hold' : 'repetition',
-    supportLevel: 'planned',
+    maturity: 'planned',
     bodyOrientation,
     analysisSignals,
     phaseLabels: [],
@@ -478,7 +454,7 @@ function plannedExercise(
     },
     telemetryMetrics: [],
     profile: profileFor({
-      supportLevel: 'planned',
+      maturity: 'planned',
       category:
         type.includes('hold') || type === 'wall_sit' || type === 'side_plank'
           ? 'hold'
@@ -490,7 +466,7 @@ function plannedExercise(
 }
 
 function profileFor(options: {
-  readonly supportLevel: MovementSupportLevel;
+  readonly maturity: MovementMaturityLevel;
   readonly category: MovementCategory;
   readonly bodyOrientation: MovementBodyOrientation;
   readonly analysisSignals: readonly string[];
@@ -508,13 +484,8 @@ function profileFor(options: {
         : options.category === 'compound'
           ? 'compound'
           : 'cyclic',
-    validationReadiness:
-      options.supportLevel === 'validation'
-        ? 'rep_validation'
-        : options.supportLevel === 'recognition'
-          ? 'recognition_only'
-          : 'profile_pending',
-    cameraSensitivity: options.supportLevel === 'planned' ? 'high' : 'medium',
+    maturity: options.maturity,
+    cameraSensitivity: options.maturity === 'planned' ? 'high' : 'medium',
     recognitionCriteria: options.analysisSignals.map((signal) =>
       profileCriterion(
         signal
@@ -522,16 +493,16 @@ function profileFor(options: {
           .replaceAll(/[^a-z0-9]+/g, '_')
           .replaceAll(/^_|_$/g, ''),
         signal,
-        options.supportLevel === 'planned' ? 'planned' : 'declarative',
+        options.maturity === 'planned' ? 'planned' : 'declarative',
       ),
     ),
     validationCriteria:
-      options.supportLevel === 'planned'
-        ? [profileCriterion('profile_pending', 'Movement profile not implemented', 'planned')]
+      options.maturity === 'planned'
+        ? [profileCriterion('planned', 'Movement profile not implemented', 'planned')]
         : [
             profileCriterion(
-              'validation_pending',
-              'Validation rules not implemented yet',
+              'rep_validating_pending',
+              'Rep-validating rules not implemented yet',
               'planned',
             ),
           ],
@@ -543,14 +514,14 @@ function profileFor(options: {
           .replaceAll(/[^a-z0-9]+/g, '_')
           .replaceAll(/^_|_$/g, ''),
         signal,
-        options.supportLevel === 'planned' ? 'planned' : 'derived',
-        options.supportLevel === 'planned'
+        options.maturity === 'planned' ? 'planned' : 'derived',
+        options.maturity === 'planned'
           ? `${signal} is planned and not yet computed.`
           : `${signal} contributes to recognition confidence.`,
       ),
     ),
     failureCriteria:
-      options.supportLevel === 'planned'
+      options.maturity === 'planned'
         ? ['movement profile not implemented']
         : ['tracking loss', 'low confidence', 'incomplete movement evidence'],
   };

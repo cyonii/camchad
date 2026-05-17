@@ -102,7 +102,7 @@ type SettingsTelemetryDensity = 'compact' | 'standard' | 'expanded';
 type SettingsFeedbackVerbosity = 'minimal' | 'balanced' | 'detailed';
 type ExerciseCatalogFilter =
   | 'all'
-  | MovementDefinition['supportLevel']
+  | MovementDefinition['maturity']
   | MovementDefinition['category'];
 
 interface AppSettingsPreferences {
@@ -2654,23 +2654,23 @@ function SupportedExercisesView({
 }): ReactElement {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ExerciseCatalogFilter>('all');
-  const validationDefinitions = movementRegistry.filter(
-    (definition) => definition.supportLevel === 'validation',
+  const repValidatingDefinitions = movementRegistry.filter(
+    (definition) => definition.maturity === 'rep_validating',
   );
-  const recognitionDefinitions = movementRegistry.filter(
-    (definition) => definition.supportLevel === 'recognition',
+  const recognizableDefinitions = movementRegistry.filter(
+    (definition) => definition.maturity === 'recognizable',
   );
   const plannedDefinitions = movementRegistry.filter(
-    (definition) => definition.supportLevel === 'planned',
+    (definition) => definition.maturity === 'planned',
   );
-  const recognizedCount = validationDefinitions.length + recognitionDefinitions.length;
+  const activeDefinitionCount = repValidatingDefinitions.length + recognizableDefinitions.length;
   const selectedDefinition =
     movementRegistry.find((definition) => definition.type === selectedMovementType) ??
     movementRegistry[0];
   const normalizedQuery = query.trim().toLowerCase();
   const filteredDefinitions = movementRegistry.filter((definition) => {
     const matchesFilter =
-      filter === 'all' || definition.supportLevel === filter || definition.category === filter;
+      filter === 'all' || definition.maturity === filter || definition.category === filter;
     const matchesQuery =
       normalizedQuery.length === 0 ||
       definition.label.toLowerCase().includes(normalizedQuery) ||
@@ -2698,7 +2698,7 @@ function SupportedExercisesView({
 
           <div className="history-window-badge exercise-header-badge">
             <Cpu size={16} aria-hidden="true" />
-            <span>{recognizedCount} active profiles</span>
+            <span>{activeDefinitionCount} active profiles</span>
           </div>
         </div>
 
@@ -2740,18 +2740,18 @@ function SupportedExercisesView({
             points={movementRegistry.map((definition) => definition.analysisSignals.length)}
           />
           <EngineStatCard
-            label="Validation-ready"
-            value={String(validationDefinitions.length)}
+            label="Rep-validating"
+            value={String(repValidatingDefinitions.length)}
             detail="Rep and quality logic"
-            tone="valid"
-            points={validationDefinitions.map(movementMaturityScore)}
+            tone="rep_validating"
+            points={repValidatingDefinitions.map(movementMaturityScore)}
           />
           <EngineStatCard
-            label="Recognition-only"
-            value={String(recognitionDefinitions.length)}
+            label="Recognizable"
+            value={String(recognizableDefinitions.length)}
             detail="Pattern inference"
-            tone="recognition"
-            points={recognitionDefinitions.map(movementMaturityScore)}
+            tone="recognizable"
+            points={recognizableDefinitions.map(movementMaturityScore)}
           />
           <EngineStatCard
             label="Planned profiles"
@@ -2762,12 +2762,14 @@ function SupportedExercisesView({
           />
           <div className="engine-confidence-card">
             <SignalDial
-              value={recognizedCount / Math.max(1, movementRegistry.length)}
+              value={activeDefinitionCount / Math.max(1, movementRegistry.length)}
               phase="engine coverage"
             />
             <div>
               <span>Engine coverage</span>
-              <strong>{Math.round((recognizedCount / movementRegistry.length) * 100)}%</strong>
+              <strong>
+                {Math.round((activeDefinitionCount / movementRegistry.length) * 100)}%
+              </strong>
               <small>Active recognition surface</small>
             </div>
           </div>
@@ -2802,11 +2804,11 @@ function SupportedExercisesView({
               <ExerciseFilterPill value="all" activeFilter={filter} onChange={setFilter}>
                 All
               </ExerciseFilterPill>
-              <ExerciseFilterPill value="validation" activeFilter={filter} onChange={setFilter}>
-                Validation-ready
+              <ExerciseFilterPill value="rep_validating" activeFilter={filter} onChange={setFilter}>
+                Rep-validating
               </ExerciseFilterPill>
-              <ExerciseFilterPill value="recognition" activeFilter={filter} onChange={setFilter}>
-                Recognition-only
+              <ExerciseFilterPill value="recognizable" activeFilter={filter} onChange={setFilter}>
+                Recognizable
               </ExerciseFilterPill>
               <ExerciseFilterPill value="planned" activeFilter={filter} onChange={setFilter}>
                 Planned
@@ -2881,7 +2883,7 @@ function EngineStatCard({
   readonly label: string;
   readonly value: string;
   readonly detail: string;
-  readonly tone: 'neutral' | 'valid' | 'recognition' | 'planned';
+  readonly tone: 'neutral' | 'rep_validating' | 'recognizable' | 'planned';
   readonly points: readonly number[];
 }): ReactElement {
   const maxPoint = Math.max(1, ...points);
@@ -2939,7 +2941,7 @@ function EngineDefinitionRow({
   return (
     <button
       className="engine-definition-row"
-      data-support={definition.supportLevel}
+      data-maturity={definition.maturity}
       type="button"
       aria-pressed={isSelected}
       onClick={onSelect}
@@ -2948,7 +2950,7 @@ function EngineDefinitionRow({
       <div className="engine-definition-copy">
         <div>
           <strong>{definition.label}</strong>
-          <span>{formatSupportLevel(definition.supportLevel)}</span>
+          <span>{formatMaturityLevel(definition.maturity)}</span>
         </div>
         <p>{movementDefinitionSummary(definition)}</p>
         <div className="engine-definition-tags">
@@ -2981,7 +2983,7 @@ function MovementPreviewFrame({
   readonly guide: ExerciseGuide | undefined;
 }): ReactElement {
   return (
-    <div className="movement-preview-frame" data-support={definition.supportLevel}>
+    <div className="movement-preview-frame" data-maturity={definition.maturity}>
       {guide ? (
         <img src={guide.src} alt="" loading="lazy" />
       ) : (
@@ -2990,8 +2992,8 @@ function MovementPreviewFrame({
         </div>
       )}
       <div className="movement-preview-hud">
-        <span>{definition.supportLevel === 'planned' ? 'Blueprint' : 'Motion preview'}</span>
-        {definition.supportLevel === 'planned' ? (
+        <span>{definition.maturity === 'planned' ? 'Blueprint' : 'Motion preview'}</span>
+        {definition.maturity === 'planned' ? (
           <Lock size={14} aria-hidden="true" />
         ) : (
           <Play size={13} aria-hidden="true" />
@@ -3020,7 +3022,7 @@ function MovementDefinitionInspector({
         <p>
           {formatMovementCategory(definition.category)} /{' '}
           {formatBodyOrientation(definition.bodyOrientation)} /{' '}
-          {formatSupportLevel(definition.supportLevel)}
+          {formatMaturityLevel(definition.maturity)}
         </p>
       </div>
 
@@ -3645,11 +3647,11 @@ function formatQualityScore(score: number | undefined): string {
 }
 
 function movementMaturityScore(definition: MovementDefinition): number {
-  if (definition.supportLevel === 'planned') {
+  if (definition.maturity === 'planned') {
     return 18 + definition.analysisSignals.length * 3;
   }
 
-  const supportBase = definition.supportLevel === 'validation' ? 72 : 46;
+  const supportBase = definition.maturity === 'rep_validating' ? 72 : 46;
   const telemetryWeight = Math.min(18, definition.telemetryMetrics.length * 4);
   const phaseWeight = Math.min(8, definition.phaseLabels.length * 2);
   const cameraWeight = Math.min(6, definition.supportedCameraAngles.length * 2);
@@ -3666,7 +3668,7 @@ function movementTelemetryRichness(definition: MovementDefinition): number {
 }
 
 function movementDefinitionSummary(definition: MovementDefinition): string {
-  if (definition.supportLevel === 'planned') {
+  if (definition.maturity === 'planned') {
     return `${definition.analysisSignals.join(' / ')}. Movement profile not implemented yet.`;
   }
 
@@ -3694,9 +3696,9 @@ function movementMaturitySteps(
 ): readonly { readonly label: string; readonly active: boolean }[] {
   return [
     { label: 'Profiled', active: true },
-    { label: 'Recognized', active: definition.supportLevel !== 'planned' },
+    { label: 'Recognized', active: definition.maturity !== 'planned' },
     { label: 'Rep phases', active: definition.phaseLabels.length > 0 },
-    { label: 'Quality', active: definition.supportLevel === 'validation' },
+    { label: 'Quality', active: definition.maturity === 'rep_validating' },
   ];
 }
 
@@ -3721,7 +3723,7 @@ function movementFamilyBreakdown(definitions: readonly MovementDefinition[]): re
         (definition) => definition.bodyOrientation === orientation,
       );
       const active = familyDefinitions.filter(
-        (definition) => definition.supportLevel !== 'planned',
+        (definition) => definition.maturity !== 'planned',
       ).length;
       const planned = familyDefinitions.length - active;
 
@@ -3764,13 +3766,13 @@ function formatBodyOrientation(orientation: MovementDefinition['bodyOrientation'
   return `${orientation[0].toUpperCase()}${orientation.slice(1)}`;
 }
 
-function formatSupportLevel(level: MovementDefinition['supportLevel']): string {
-  if (level === 'validation') {
-    return 'Validation-ready';
+function formatMaturityLevel(level: MovementDefinition['maturity']): string {
+  if (level === 'rep_validating') {
+    return 'Rep-validating';
   }
 
-  if (level === 'recognition') {
-    return 'Recognition';
+  if (level === 'recognizable') {
+    return 'Recognizable';
   }
 
   return 'Planned';
@@ -3806,9 +3808,8 @@ function exerciseGuideFor(
 
 function defaultCatalogDefinition(): MovementDefinition {
   const definition =
-    movementRegistry.find(
-      (movement) => movement.supportLevel === 'validation' && movement.createInterpreter,
-    ) ?? movementRegistry[0];
+    movementRegistry.find((movement) => movement.maturity === 'rep_validating') ??
+    movementRegistry[0];
 
   if (!definition) {
     throw new Error('CamChad requires at least one exercise definition.');

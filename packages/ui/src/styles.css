@@ -2071,11 +2071,11 @@ button,
   line-height: 1.45;
 }
 
-.exercise-definition-row[data-support='validation'] .exercise-definition-main span {
+.exercise-definition-row[data-maturity='rep_validating'] .exercise-definition-main span {
   color: var(--primary);
 }
 
-.exercise-definition-row[data-support='recognition'] .exercise-definition-main span {
+.exercise-definition-row[data-maturity='recognizable'] .exercise-definition-main span {
   color: var(--warning);
 }
 
@@ -2094,7 +2094,7 @@ button,
   background: rgb(var(--surface-rgb) / 30%);
 }
 
-.exercise-definition-row[data-support='planned'] .exercise-definition-details div {
+.exercise-definition-row[data-maturity='planned'] .exercise-definition-details div {
   border-style: dashed;
 }
 
@@ -2858,11 +2858,11 @@ button,
   font-weight: 500;
 }
 
-.engine-stat-card[data-tone='valid'] strong {
+.engine-stat-card[data-tone='rep_validating'] strong {
   color: var(--primary);
 }
 
-.engine-stat-card[data-tone='recognition'] strong {
+.engine-stat-card[data-tone='recognizable'] strong {
   color: var(--warning);
 }
 
@@ -3068,7 +3068,7 @@ button,
   background: rgb(var(--primary-rgb) / 5%);
 }
 
-.engine-definition-row[data-support='planned'] {
+.engine-definition-row[data-maturity='planned'] {
   opacity: 0.72;
 }
 
@@ -3091,7 +3091,7 @@ button,
   filter: saturate(0.86) contrast(1.08) brightness(0.78);
 }
 
-.movement-preview-frame[data-support='planned'] {
+.movement-preview-frame[data-maturity='planned'] {
   border-style: dashed;
 }
 
@@ -3161,12 +3161,15 @@ button,
   text-transform: uppercase;
 }
 
-.engine-definition-row[data-support='recognition'] .engine-definition-copy > div:first-child span {
+.engine-definition-row[data-maturity='recognizable']
+  .engine-definition-copy
+  > div:first-child
+  span {
   color: var(--warning);
   background: rgb(var(--warning-rgb) / 10%);
 }
 
-.engine-definition-row[data-support='planned'] .engine-definition-copy > div:first-child span {
+.engine-definition-row[data-maturity='planned'] .engine-definition-copy > div:first-child span {
   color: #b99aff;
   background: rgb(162 123 255 / 10%);
 }
