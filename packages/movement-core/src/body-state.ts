@@ -322,18 +322,17 @@ function seatedPostureConfidence(frame: PoseFrame, hipCenter: { readonly y: numb
   const leftKnee = frame.landmarks.get('left_knee');
   const rightKnee = frame.landmarks.get('right_knee');
 
-  if (!leftKnee && !rightKnee) {
+  if (!leftKnee || !rightKnee) {
     return 0;
   }
 
-  const kneeY = average(
-    [leftKnee, rightKnee]
-      .filter((landmark): landmark is PoseLandmark => landmark !== undefined)
-      .map((landmark) => landmark.y),
-  );
-  const hipKneeVerticalGap = Math.abs(kneeY - hipCenter.y);
+  const kneeProximityScores = [leftKnee, rightKnee].map((landmark) => {
+    const hipKneeVerticalGap = Math.abs(landmark.y - hipCenter.y);
 
-  return clamp01((0.16 - hipKneeVerticalGap) / 0.16);
+    return clamp01((0.16 - hipKneeVerticalGap) / 0.16);
+  });
+
+  return Math.min(...kneeProximityScores);
 }
 
 function hangingPostureConfidence(

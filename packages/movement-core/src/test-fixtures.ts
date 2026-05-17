@@ -284,6 +284,19 @@ export function makeSquatFrame(options: SquatFrameOptions): PoseFrame {
   };
 }
 
+export function makePlankFrame(timestampMs: number): PoseFrame {
+  const visibility = 0.95;
+
+  return {
+    timestampMs,
+    landmarks: toLandmarkMap([
+      ...floorSideLandmarks('left', 0.49, visibility),
+      ...floorSideLandmarks('right', 0.51, visibility),
+    ]),
+    confidence: visibility,
+  };
+}
+
 function makeHighKneesFrame(options: {
   readonly timestampMs: number;
   readonly liftedSide: 'left' | 'right';
@@ -481,6 +494,21 @@ function sideLandmarks(
     landmark(names.hip, 0.5, hipY, visibility),
     landmark(names.knee, 0.68, hipY, visibility),
     landmark(names.ankle, 0.86, hipY, visibility),
+  ];
+}
+
+function floorSideLandmarks(
+  side: 'left' | 'right',
+  y: number,
+  visibility: number,
+): readonly PoseLandmark[] {
+  return [
+    landmark(`${side}_shoulder` as LandmarkName, 0.24, y, visibility),
+    landmark(`${side}_elbow` as LandmarkName, 0.18, y, visibility),
+    landmark(`${side}_wrist` as LandmarkName, 0.12, y, visibility),
+    landmark(`${side}_hip` as LandmarkName, 0.5, y, visibility),
+    landmark(`${side}_knee` as LandmarkName, 0.66, y, visibility),
+    landmark(`${side}_ankle` as LandmarkName, 0.82, y, visibility),
   ];
 }
 

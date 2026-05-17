@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { createMovementInterpreterForDefinition } from './movement-definition-interpreter.js';
 import { movementRegistry } from './movement-registry.js';
 import { createProfileMovementInterpreter } from './profile-movement-interpreters.js';
+import { makePlankFrame } from './test-fixtures.js';
 
 describe('profile movement interpreters', () => {
   it('creates interpreters for every active movement definition through the shared factory', () => {
@@ -91,14 +92,6 @@ function makeStandingKneeLiftFrame({
   };
 }
 
-function makePlankFrame(timestampMs: number): PoseFrame {
-  return {
-    timestampMs,
-    confidence: 0.95,
-    landmarks: toLandmarkMap([...floorSide('left', 0.49), ...floorSide('right', 0.51)]),
-  };
-}
-
 function standingSide(side: 'left' | 'right', x: number, kneeY: number): readonly PoseLandmark[] {
   return [
     landmark(`${side}_shoulder`, x, 0.2),
@@ -107,17 +100,6 @@ function standingSide(side: 'left' | 'right', x: number, kneeY: number): readonl
     landmark(`${side}_hip`, x, 0.45),
     landmark(`${side}_knee`, x, kneeY),
     landmark(`${side}_ankle`, x, 0.86),
-  ];
-}
-
-function floorSide(side: 'left' | 'right', y: number): readonly PoseLandmark[] {
-  return [
-    landmark(`${side}_shoulder`, 0.24, y),
-    landmark(`${side}_elbow`, 0.18, y),
-    landmark(`${side}_wrist`, 0.12, y),
-    landmark(`${side}_hip`, 0.5, y),
-    landmark(`${side}_knee`, 0.66, y),
-    landmark(`${side}_ankle`, 0.82, y),
   ];
 }
 

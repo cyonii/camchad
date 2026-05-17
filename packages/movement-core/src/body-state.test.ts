@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { toLandmarkMap, type PoseFrame, type PoseLandmark } from '@camchad/pose-core';
 
 import { extractBodyState } from './body-state.js';
-import { makePushUpFrame, makeSquatFrame } from './test-fixtures.js';
+import { makeHighKneesSequence, makePushUpFrame, makeSquatFrame } from './test-fixtures.js';
 
 describe('extractBodyState', () => {
   it('normalizes standing body landmarks around the torso center', () => {
@@ -60,6 +60,12 @@ describe('extractBodyState', () => {
       extractBodyState(raiseWrists(makeSquatFrame({ timestampMs: 0, kneeAngle: 160 })))?.orientation
         .kind,
     ).toBe('hanging');
+  });
+
+  it('does not classify one lifted knee as seated posture', () => {
+    const firstFrame = makeHighKneesSequence(0)[0];
+
+    expect(extractBodyState(firstFrame)?.orientation.kind).toBe('standing');
   });
 
   it('reports region coverage separately for visible and occluded sides', () => {

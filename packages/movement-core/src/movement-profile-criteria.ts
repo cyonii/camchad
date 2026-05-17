@@ -6,7 +6,12 @@ import type {
   MovementRegion,
 } from './movement-registry.js';
 import type { MovementProfileEvaluationContext } from './movement-profile-evaluation-context.js';
-import { ankleSpanRatio, bodyLineDeviation, wristSpanRatio } from './movement-profile-signals.js';
+import {
+  ankleSpanRatio,
+  bodyLineDeviation,
+  maxKneeLiftRatio,
+  wristSpanRatio,
+} from './movement-profile-signals.js';
 
 export interface MovementCriterionEvaluation {
   readonly key: string;
@@ -112,6 +117,18 @@ function evaluateCriterion(
   context: MovementProfileEvaluationContext,
 ): MovementCriterionEvaluation {
   const key = criterion.key;
+  const specificScore = evaluateSpecificCriterion(key, context);
+
+  if (specificScore !== undefined) {
+    return {
+      key: criterion.key,
+      label: criterion.label,
+      passed: specificScore >= 0.45,
+      score: clamp01(specificScore),
+      evidence: criterion.key,
+    };
+  }
+
   const bodyState = context.bodyState;
   const window = context.window;
   let score = bodyState.confidence;
@@ -146,6 +163,73 @@ function evaluateCriterion(
     score: clamp01(score),
     evidence: criterion.key,
   };
+}
+
+function evaluateSpecificCriterion(
+  key: string,
+  context: MovementProfileEvaluationContext,
+): number | undefined {
+  switch (key) {
+    case 'alternating_knee_lift':
+      return scoreHighKneeLift(context);
+    case 'vertical_cadence':
+      return scoreVerticalCadence(context);
+    case 'horizontal_body_line':
+      return scoreHorizontalBodyLine(context);
+    case 'static_hold_stability':
+      return scoreStaticHoldStability(context);
+    default:
+      return undefined;
+  }
+}
+
+function scoreHighKneeLift(context: MovementProfileEvaluationContext): number {
+  const ratio = maxKneeLiftRatio(context);
+
+  return ratio === undefined ? 0 : ratioScore(ratio, 0.35, 0.65);
+}
+
+function scoreVerticalCadence(context: MovementProfileEvaluationContext): number {
+  const sideLiftDeltas = context.window.validSamples
+    .map((sample) => kneeLiftSideDelta({ ...context, bodyState: sample.bodyState }))
+    .filter((value): value is number => value !== undefined);
+
+  if (sideLiftDeltas.length >= 3) {
+    const range = Math.max(...sideLiftDeltas) - Math.min(...sideLiftDeltas);
+
+    return ratioScore(range, 0.45, 0.95);
+  }
+
+  return scoreHighKneeLift(context);
+}
+
+function scoreHorizontalBodyLine(context: MovementProfileEvaluationContext): number {
+  const deviation = bodyLineDeviation(context);
+
+  return deviation === undefined ? 0 : 1 - ratioScore(deviation, 0.08, 0.32);
+}
+
+function scoreStaticHoldStability(context: MovementProfileEvaluationContext): number {
+  const bodyLineScore = scoreHorizontalBodyLine(context);
+  const trackingScore = 1 - context.window.missingSampleRatio;
+  const confidenceScore = context.window.averageConfidence || context.bodyState.confidence;
+
+  return bodyLineScore * 0.5 + trackingScore * 0.25 + confidenceScore * 0.25;
+}
+
+function kneeLiftSideDelta(context: MovementProfileEvaluationContext): number | undefined {
+  const leftHip = context.bodyState.landmarks.get('left_hip');
+  const leftKnee = context.bodyState.landmarks.get('left_knee');
+  const rightHip = context.bodyState.landmarks.get('right_hip');
+  const rightKnee = context.bodyState.landmarks.get('right_knee');
+
+  if (!leftHip || !leftKnee || !rightHip || !rightKnee) {
+    return undefined;
+  }
+
+  return (
+    leftHip.normalizedY - leftKnee.normalizedY - (rightHip.normalizedY - rightKnee.normalizedY)
+  );
 }
 
 function regionCoverage(bodyState: BodyState, region: MovementRegion): number {
@@ -184,6 +268,14 @@ function average(values: readonly number[]): number {
   }
 
   return clamp01(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function ratioScore(value: number, min: number, full: number): number {
+  if (full <= min) {
+    return value >= full ? 1 : 0;
+  }
+
+  return clamp01((value - min) / (full - min));
 }
 
 function clamp01(value: number): number {

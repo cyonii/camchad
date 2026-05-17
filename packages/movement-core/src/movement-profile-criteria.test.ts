@@ -6,7 +6,13 @@ import {
   evaluateMovementProfileFrame,
 } from './movement-profile-evaluation-context.js';
 import { evaluateMovementRecognitionCriteria } from './movement-profile-criteria.js';
-import { makePushUpFrame, makeSquatFrame } from './test-fixtures.js';
+import {
+  makeHighKneesSequence,
+  makePlankFrame,
+  makePushUpFrame,
+  makeSquatFrame,
+  type PoseSequence,
+} from './test-fixtures.js';
 
 describe('evaluateMovementRecognitionCriteria', () => {
   it('passes push-up declarative criteria for a floor-oriented push-up frame', () => {
@@ -49,6 +55,60 @@ describe('evaluateMovementRecognitionCriteria', () => {
     expect(evaluation.confidence).toBeGreaterThan(0.58);
   });
 
+  it('uses high-knees-specific geometry instead of broad standing criteria', () => {
+    const context = contextForSequence(makeHighKneesSequence(0));
+    const evaluation = evaluateMovementRecognitionCriteria({
+      definition: movementDefinitionFor('high_knees'),
+      context,
+      cameraAngle: 'front',
+    });
+
+    expect(evaluation).toMatchObject({
+      passed: true,
+      evidence: expect.arrayContaining(['alternating_knee_lift', 'vertical_cadence']),
+    });
+    expect(
+      evaluation.evaluations.find((candidate) => candidate.key === 'alternating_knee_lift'),
+    ).toMatchObject({
+      passed: true,
+    });
+  });
+
+  it('rejects high-knees criteria when a standing frame lacks knee lift evidence', () => {
+    const context = contextFor(makeSquatFrame({ timestampMs: 0, kneeAngle: 170 }));
+    const evaluation = evaluateMovementRecognitionCriteria({
+      definition: movementDefinitionFor('high_knees'),
+      context,
+      cameraAngle: 'front',
+    });
+
+    expect(evaluation.passed).toBe(false);
+    expect(
+      evaluation.evaluations.find((candidate) => candidate.key === 'alternating_knee_lift'),
+    ).toMatchObject({
+      passed: false,
+    });
+  });
+
+  it('uses plank-specific body-line and hold-stability criteria', () => {
+    const context = contextForSequence([makePlankFrame(0), makePlankFrame(700)]);
+    const evaluation = evaluateMovementRecognitionCriteria({
+      definition: movementDefinitionFor('plank'),
+      context,
+      cameraAngle: 'side',
+    });
+
+    expect(evaluation).toMatchObject({
+      passed: true,
+      evidence: expect.arrayContaining(['horizontal_body_line', 'static_hold_stability']),
+    });
+    expect(
+      evaluation.evaluations.find((candidate) => candidate.key === 'horizontal_body_line'),
+    ).toMatchObject({
+      passed: true,
+    });
+  });
+
   it('surfaces orientation mismatch instead of passing the wrong profile', () => {
     const context = contextFor(makeSquatFrame({ timestampMs: 0, kneeAngle: 132 }));
     const evaluation = evaluateMovementRecognitionCriteria({
@@ -75,6 +135,24 @@ function contextFor(frame: Parameters<typeof evaluateMovementProfileFrame>[0]['f
 
   if (!context) {
     throw new Error('Expected test fixture to produce a movement profile context.');
+  }
+
+  return context;
+}
+
+function contextForSequence(sequence: PoseSequence) {
+  const window = createMovementProfileWindow();
+  let context: ReturnType<typeof evaluateMovementProfileFrame> | undefined;
+
+  for (const frame of sequence) {
+    context = evaluateMovementProfileFrame({
+      frame,
+      window,
+    });
+  }
+
+  if (!context) {
+    throw new Error('Expected test fixture sequence to produce a movement profile context.');
   }
 
   return context;
