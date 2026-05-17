@@ -20,6 +20,7 @@
     "clean": "tsc -b --clean packages/pose-core packages/movement-core packages/activity-history packages/ui apps/web apps/desktop || true && rm -rf apps/*/dist apps/*/dist-electron apps/*/dist-types packages/*/dist apps/*/*.tsbuildinfo packages/*/*.tsbuildinfo coverage",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "report:bundle": "node scripts/write-bundle-size-report.mjs",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.eslint.json --noEmit",
     "test": "vitest run --passWithNoTests",
