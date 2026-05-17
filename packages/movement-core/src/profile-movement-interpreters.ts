@@ -7,6 +7,7 @@ import type {
   MovementType,
   RepEvent,
 } from './movement-interpreter.js';
+import { HoldStateMachine, type HoldStateMachineState } from './hold-state-machine.js';
 import {
   createMovementProfileWindow,
   evaluateMovementProfileFrame,
@@ -346,18 +347,22 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
 class HoldProfileMovementInterpreter implements MovementInterpreter {
   public readonly movementType: ProfileMovementType;
 
-  private phase: MovementPhase = 'setup_needed';
   private reps = 0;
   private validReps = 0;
   private lastRep?: RepEvent;
-  private holdStartedAt?: number;
   private warnings: FormWarning[] = [];
   private metrics: Record<string, number> = {};
   private recognition: MovementRecognition = trackingLostRecognition;
   private readonly window = createMovementProfileWindow();
+  private readonly holdMachine: HoldStateMachine;
 
   public constructor(private readonly config: HoldMovementInterpreterConfig) {
     this.movementType = config.movementType;
+    this.holdMachine = new HoldStateMachine({
+      minHoldMs: config.minHoldMs,
+      enterConfidence: 0.58,
+      exitConfidence: 0.42,
+    });
   }
 
   public processPose(
@@ -371,7 +376,7 @@ class HoldProfileMovementInterpreter implements MovementInterpreter {
     });
 
     if (!context) {
-      this.phase = 'tracking_lost';
+      this.holdMachine.reset();
       this.warnings = [trackingLostWarning];
       this.recognition = trackingLostRecognition;
       return this.getState();
@@ -383,7 +388,7 @@ class HoldProfileMovementInterpreter implements MovementInterpreter {
     const metric = this.config.primaryMetric(context);
 
     if (metric === undefined) {
-      this.phase = 'tracking_lost';
+      this.holdMachine.reset();
       this.warnings = [lowConfidenceWarning];
       this.recognition = trackingLostRecognition;
       return this.getState();
@@ -393,7 +398,10 @@ class HoldProfileMovementInterpreter implements MovementInterpreter {
     const confidence = orientationMatches
       ? clamp01(this.config.recognitionScore(context, metric))
       : 0.12;
-    const isHeld = confidence >= 0.58;
+    const holdState = this.holdMachine.update({
+      timestampMs,
+      holdConfidence: orientationMatches ? confidence : 0,
+    });
 
     this.metrics = {
       [this.config.primaryMetricKey]: metric,
@@ -405,16 +413,11 @@ class HoldProfileMovementInterpreter implements MovementInterpreter {
       poseConfidence: bodyState.confidence,
       temporalConfidence: window.averageConfidence,
       missingSampleRatio: window.missingSampleRatio,
-      holdSeconds:
-        this.holdStartedAt === undefined
-          ? 0
-          : Math.max(0, (timestampMs - this.holdStartedAt) / 1000),
+      holdSeconds: Math.max(0, holdState.holdDurationMs / 1000),
     };
     this.warnings = confidence < 0.42 ? [lowConfidenceWarning] : [];
 
-    if (!orientationMatches || !isHeld) {
-      this.phase = 'setup_needed';
-      this.holdStartedAt = undefined;
+    if (!orientationMatches || holdState.phase === 'setup_needed' || holdState.phase === 'broken') {
       this.recognition = {
         movementType: this.movementType,
         confidence,
@@ -424,15 +427,11 @@ class HoldProfileMovementInterpreter implements MovementInterpreter {
       return this.getState();
     }
 
-    this.holdStartedAt ??= timestampMs;
-    this.phase = 'bottom';
-    const hasSatisfiedHold = timestampMs - this.holdStartedAt >= this.config.minHoldMs;
-
-    if (this.validReps === 0 && hasSatisfiedHold) {
-      this.reps = 1;
-      this.validReps = 1;
+    if (holdState.completedHoldCount > this.validReps) {
+      this.reps = holdState.completedHoldCount;
+      this.validReps = holdState.completedHoldCount;
       this.lastRep = {
-        repNumber: 1,
+        repNumber: this.validReps,
         timestampMs,
         qualityScore: Math.round(confidence * 100),
         depthScore: confidence,
@@ -444,7 +443,7 @@ class HoldProfileMovementInterpreter implements MovementInterpreter {
     this.recognition = {
       movementType: this.movementType,
       confidence,
-      status: hasSatisfiedHold ? 'active' : 'candidate',
+      status: holdState.phase === 'completed' ? 'active' : 'candidate',
       evidence: this.config.evidence,
     };
 
@@ -452,14 +451,13 @@ class HoldProfileMovementInterpreter implements MovementInterpreter {
   }
 
   public reset(): void {
-    this.phase = 'setup_needed';
     this.reps = 0;
     this.validReps = 0;
     this.lastRep = undefined;
-    this.holdStartedAt = undefined;
     this.warnings = [];
     this.metrics = {};
     this.recognition = trackingLostRecognition;
+    this.holdMachine.reset();
     this.window.reset();
   }
 
@@ -467,7 +465,7 @@ class HoldProfileMovementInterpreter implements MovementInterpreter {
     return {
       movementType: this.movementType,
       recognition: this.recognition,
-      phase: this.phase,
+      phase: phaseForHoldState(this.holdMachine.getState(), this.recognition.status),
       reps: this.reps,
       validReps: this.validReps,
       partialReps: 0,
@@ -476,6 +474,21 @@ class HoldProfileMovementInterpreter implements MovementInterpreter {
       metrics: this.metrics,
     };
   }
+}
+
+function phaseForHoldState(
+  holdState: HoldStateMachineState,
+  recognitionStatus: MovementRecognition['status'],
+): MovementPhase {
+  if (recognitionStatus === 'tracking_lost') {
+    return 'tracking_lost';
+  }
+
+  if (holdState.phase === 'holding' || holdState.phase === 'completed') {
+    return 'bottom';
+  }
+
+  return 'setup_needed';
 }
 
 const profileMovementConfigs: Record<

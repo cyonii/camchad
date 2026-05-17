@@ -25,6 +25,11 @@ describe('HoldStateMachine', () => {
       holdDurationMs: 1000,
       completedHoldCount: 1,
     });
+    expect(machine.update({ timestampMs: 1600, holdConfidence: 0.8 })).toMatchObject({
+      phase: 'completed',
+      holdDurationMs: 1600,
+      completedHoldCount: 1,
+    });
   });
 
   it('breaks a hold when confidence falls below the exit threshold', () => {

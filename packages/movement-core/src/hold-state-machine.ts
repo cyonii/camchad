@@ -38,7 +38,6 @@ export class HoldStateMachine {
     switch (this.phase) {
       case 'setup_needed':
       case 'broken':
-      case 'completed':
         if (input.holdConfidence >= this.config.enterConfidence) {
           this.phase = 'holding';
           this.holdStartedAt = input.timestampMs;
@@ -60,8 +59,19 @@ export class HoldStateMachine {
         if (this.holdDurationMs >= this.config.minHoldMs) {
           this.phase = 'completed';
           this.completedHoldCount += 1;
-          this.holdStartedAt = undefined;
         }
+        break;
+
+      case 'completed':
+        if (input.holdConfidence < this.config.exitConfidence) {
+          this.phase = 'broken';
+          this.holdStartedAt = undefined;
+          this.holdDurationMs = 0;
+          break;
+        }
+
+        this.holdDurationMs =
+          this.holdStartedAt === undefined ? 0 : input.timestampMs - this.holdStartedAt;
         break;
     }
 
