@@ -1,6 +1,8 @@
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 
+import { camChadManualChunks } from '../../vite.manual-chunks.js';
+
 const root = fileURLToPath(new URL('../..', import.meta.url));
 
 export default {
@@ -24,5 +26,12 @@ export default {
   server: {
     port: 5173,
     strictPort: true,
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: camChadManualChunks,
+      },
+    },
   },
 };
