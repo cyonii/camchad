@@ -3384,7 +3384,7 @@ button,
 .settings-primary-column {
   display: grid;
   align-content: start;
-  gap: 34px;
+  gap: 46px;
   padding-right: 2px;
 }
 
@@ -3440,7 +3440,7 @@ button,
 
 .settings-section {
   display: grid;
-  gap: 18px;
+  gap: 24px;
 }
 
 .settings-section-header {
@@ -3470,7 +3470,7 @@ button,
 
 .settings-section-body {
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 
 .settings-control-row {
