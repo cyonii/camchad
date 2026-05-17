@@ -1640,7 +1640,7 @@ button,
 
 .bottom-command-deck {
   display: grid;
-  grid-template-columns: minmax(360px, 1fr) auto max-content;
+  grid-template-columns: max-content auto max-content;
   gap: 10px;
   align-items: center;
   padding: 8px;
@@ -1683,12 +1683,13 @@ button,
 .command-module-session {
   justify-self: end;
   width: max-content;
-  min-width: 280px;
+  min-width: 0;
 }
 
 .command-module-guidance {
-  width: 100%;
-  min-width: min(420px, 100%);
+  width: max-content;
+  max-width: min(56ch, 100%);
+  min-width: 0;
 }
 
 .command-module-trace {
@@ -1712,7 +1713,8 @@ button,
 
 .camera-guidance {
   display: grid;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   gap: 4px;
   min-width: 0;
   padding: 10px 12px;
@@ -1794,6 +1796,7 @@ button,
 .control-row {
   display: flex;
   justify-content: flex-end;
+  width: max-content;
   gap: 8px;
   min-width: 0;
 }
@@ -1802,9 +1805,9 @@ button,
 .secondary-action,
 .danger-action {
   flex: 0 0 auto;
-  min-height: 38px;
-  min-width: 150px;
-  padding: 0 18px;
+  min-height: 46px;
+  padding: 0 26px;
+  font-size: 0.82rem;
 }
 
 .compact-action {
