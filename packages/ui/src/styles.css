@@ -3604,6 +3604,33 @@ button,
   list-style: none;
 }
 
+.validation-gap-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.validation-gap-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgb(var(--warning-rgb) / 14%);
+  border-radius: 7px;
+  color: var(--text-muted);
+  background: rgb(var(--warning-rgb) / 5%);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.validation-gap-list svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--warning);
+}
+
 .analysis-signal-list li,
 .telemetry-channel-grid span {
   display: flex;

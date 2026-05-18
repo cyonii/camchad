@@ -3372,6 +3372,7 @@ function MovementDefinitionInspector({
   const guide = exerciseGuideFor(definition.type, exerciseGuideAssetBasePath);
   const maturitySteps = movementMaturitySteps(definition);
   const readinessChecklist = movementReadinessChecklist(definition);
+  const validationGapReasons = movementValidationGapReasons(definition, readinessChecklist);
 
   return (
     <aside className="movement-inspector" aria-label="Movement definition details">
@@ -3440,6 +3441,25 @@ function MovementDefinitionInspector({
           ))}
         </ul>
       </section>
+
+      {validationGapReasons.length > 0 ? (
+        <section className="movement-inspector-card">
+          <div className="exercise-panel-heading">
+            <div>
+              <span>Validation gap</span>
+              <h3>Why not fully validated yet</h3>
+            </div>
+          </div>
+          <ul className="validation-gap-list">
+            {validationGapReasons.map((reason) => (
+              <li key={reason}>
+                <CircleAlert size={14} aria-hidden="true" />
+                <span>{reason}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="movement-inspector-grid">
         <div>
@@ -4401,6 +4421,43 @@ function movementMaturitySteps(
     { label: 'Validated', active: movementMaturityRank(definition.maturity) >= 4 },
     { label: 'Quality', active: movementMaturityRank(definition.maturity) >= 5 },
   ];
+}
+
+function movementValidationGapReasons(
+  definition: MovementDefinition,
+  readinessChecklist: ReturnType<typeof movementReadinessChecklist>,
+): readonly string[] {
+  if (movementMaturityRank(definition.maturity) >= movementMaturityRank('rep_validating')) {
+    return [];
+  }
+
+  const failedReadiness = readinessChecklist
+    .filter((item) => !item.passed)
+    .map((item) => `${item.label}: ${item.detail}`);
+  const plannedCriteria = [
+    ...definition.profile.recognitionCriteria,
+    ...definition.profile.validationCriteria,
+  ]
+    .filter((criterion) => criterion.source === 'planned')
+    .map((criterion) => criterion.label);
+  const plannedTelemetry = definition.profile.telemetryExtractors
+    .filter((extractor) => extractor.source === 'planned')
+    .map((extractor) => extractor.label);
+  const failureCriteria =
+    definition.profile.failureCriteria.length > 0
+      ? definition.profile.failureCriteria.map((criterion) => `Failure rule pending: ${criterion}`)
+      : ['Failure rules are not defined yet.'];
+
+  return uniqueStrings([
+    ...failedReadiness,
+    ...plannedCriteria,
+    ...plannedTelemetry,
+    ...failureCriteria,
+  ]);
+}
+
+function uniqueStrings(values: readonly string[]): readonly string[] {
+  return [...new Set(values.filter((value) => value.length > 0))];
 }
 
 function movementMaturityRank(level: MovementDefinition['maturity']): number {
