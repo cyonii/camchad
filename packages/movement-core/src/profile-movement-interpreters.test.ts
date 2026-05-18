@@ -84,6 +84,31 @@ describe('profile movement interpreters', () => {
         status: 'active',
       },
     });
+    expect(state.metrics.alternationScore).toBe(1);
+  });
+
+  it('marks repeated same-side high-knees cycles as missed alternation', () => {
+    const interpreter = createProfileMovementInterpreter('high_knees');
+
+    interpreter.processPose(makeStandingKneeLiftFrame({ timestampMs: 0, kneeY: 0.66 }));
+    interpreter.processPose(makeStandingKneeLiftFrame({ timestampMs: 100, kneeY: 0.5 }));
+    interpreter.processPose(makeStandingKneeLiftFrame({ timestampMs: 220, kneeY: 0.33 }));
+    interpreter.processPose(makeStandingKneeLiftFrame({ timestampMs: 340, kneeY: 0.5 }));
+    interpreter.processPose(makeStandingKneeLiftFrame({ timestampMs: 460, kneeY: 0.66 }));
+    interpreter.processPose(makeStandingKneeLiftFrame({ timestampMs: 580, kneeY: 0.5 }));
+    interpreter.processPose(makeStandingKneeLiftFrame({ timestampMs: 700, kneeY: 0.33 }));
+    interpreter.processPose(makeStandingKneeLiftFrame({ timestampMs: 820, kneeY: 0.5 }));
+    const state = interpreter.processPose(
+      makeStandingKneeLiftFrame({ timestampMs: 940, kneeY: 0.66 }),
+    );
+
+    expect(state.reps).toBe(2);
+    expect(state.validReps).toBe(1);
+    expect(state.partialReps).toBe(1);
+    expect(state.lastRep?.warnings.some((warning) => warning.code === 'missed_alternation')).toBe(
+      true,
+    );
+    expect(state.metrics.missedAlternationCount).toBe(1);
   });
 
   it('promotes a stable plank hold only after the hold window is satisfied', () => {
@@ -110,16 +135,18 @@ describe('profile movement interpreters', () => {
 function makeStandingKneeLiftFrame({
   timestampMs,
   kneeY,
+  liftedSide = 'left',
 }: {
   readonly timestampMs: number;
   readonly kneeY: number;
+  readonly liftedSide?: 'left' | 'right';
 }): PoseFrame {
   return {
     timestampMs,
     confidence: 0.95,
     landmarks: toLandmarkMap([
-      ...standingSide('left', 0.49, kneeY),
-      ...standingSide('right', 0.51, 0.66),
+      ...standingSide('left', 0.49, liftedSide === 'left' ? kneeY : 0.66),
+      ...standingSide('right', 0.51, liftedSide === 'right' ? kneeY : 0.66),
     ]),
   };
 }

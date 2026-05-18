@@ -56,6 +56,7 @@ export interface FormWarning {
     | 'hand_position'
     | 'posture_alignment'
     | 'lower_body_visibility'
+    | 'missed_alternation'
     | 'partial_depth'
     | 'range_of_motion'
     | 'camera_angle_experimental';

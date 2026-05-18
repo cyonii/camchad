@@ -43,6 +43,7 @@ export type ProfileMovementType =
   | 'yoga_hold';
 
 type MovementDirection = 'increase' | 'decrease';
+type MovementSide = 'left' | 'right';
 
 interface CycleMovementInterpreterConfig {
   readonly movementType: ProfileMovementType;
@@ -55,6 +56,8 @@ interface CycleMovementInterpreterConfig {
   readonly minPeakHoldMs: number;
   readonly primaryMetricKey: string;
   readonly primaryMetric: (context: MovementProfileEvaluationContext) => number | undefined;
+  readonly activeSide?: (context: MovementProfileEvaluationContext) => MovementSide | undefined;
+  readonly requiresAlternation?: boolean;
   readonly recognitionScore: (context: MovementProfileEvaluationContext, metric: number) => number;
   readonly evidence: readonly string[];
 }
@@ -105,6 +108,9 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
   private lastRep?: RepEvent;
   private peakEnteredAt?: number;
   private extremeMetric: number;
+  private currentPeakSide?: MovementSide;
+  private lastCompletedPeakSide?: MovementSide;
+  private missedAlternationCount = 0;
   private warnings: FormWarning[] = [];
   private metrics: Record<string, number> = {};
   private recognition: MovementRecognition = trackingLostRecognition;
@@ -135,6 +141,7 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
     const timestampMs = context.bodyState.timestampMs;
     const orientation = bodyOrientationSignal(context.bodyState.orientation.kind);
     const metric = this.config.primaryMetric(context);
+    const activeSide = this.config.activeSide?.(context);
 
     if (metric === undefined) {
       this.phase = 'tracking_lost';
@@ -159,6 +166,10 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
     const confidence = clamp01(this.config.recognitionScore(context, metric));
     const reachedRest = this.reachedRest(metric);
     const reachedPeak = this.reachedPeak(metric);
+
+    if (reachedPeak && activeSide) {
+      this.currentPeakSide = activeSide;
+    }
 
     this.extremeMetric =
       this.config.direction === 'increase'
@@ -208,7 +219,17 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
 
       case 'ascending':
         if (reachedRest) {
-          this.recordValidRep(timestampMs);
+          const completedPeakSide = this.currentPeakSide;
+
+          if (this.hasMissedAlternation()) {
+            this.recordPartialRep(timestampMs, [missedAlternationWarning]);
+            this.missedAlternationCount += 1;
+          } else {
+            this.recordValidRep(timestampMs);
+          }
+          if (completedPeakSide) {
+            this.lastCompletedPeakSide = completedPeakSide;
+          }
           this.phase = 'top';
         } else if (reachedPeak) {
           this.phase = 'bottom';
@@ -216,6 +237,12 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
         }
         break;
     }
+
+    this.metrics = {
+      ...this.metrics,
+      alternationScore: this.alternationScore(),
+      missedAlternationCount: this.missedAlternationCount,
+    };
 
     this.recognition = {
       movementType: this.movementType,
@@ -235,6 +262,9 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
     this.lastRep = undefined;
     this.peakEnteredAt = undefined;
     this.extremeMetric = this.config.direction === 'increase' ? 0 : 180;
+    this.currentPeakSide = undefined;
+    this.lastCompletedPeakSide = undefined;
+    this.missedAlternationCount = 0;
     this.warnings = [];
     this.metrics = {};
     this.recognition = trackingLostRecognition;
@@ -300,7 +330,25 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
       bodyOrientationScore: bodyOrientationScore(context),
       temporalConfidence: window.averageConfidence,
       missingSampleRatio: window.missingSampleRatio,
+      alternationScore: this.alternationScore(),
+      missedAlternationCount: this.missedAlternationCount,
     };
+  }
+
+  private hasMissedAlternation(): boolean {
+    return (
+      this.config.requiresAlternation === true &&
+      this.currentPeakSide !== undefined &&
+      this.lastCompletedPeakSide === this.currentPeakSide
+    );
+  }
+
+  private alternationScore(): number {
+    if (!this.config.requiresAlternation || this.lastCompletedPeakSide === undefined) {
+      return 1;
+    }
+
+    return this.hasMissedAlternation() ? 0 : 1;
   }
 
   private recordValidRep(timestampMs: number): void {
@@ -310,7 +358,7 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
     this.resetCycle();
   }
 
-  private recordPartialRep(timestampMs: number): void {
+  private recordPartialRep(timestampMs: number, warnings: readonly FormWarning[] = []): void {
     const depthScore = this.depthScore();
 
     if (depthScore < 0.22) {
@@ -322,6 +370,7 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
     this.partialReps += 1;
     this.lastRep = this.repEvent(timestampMs, depthScore, [
       ...this.warnings,
+      ...warnings,
       {
         code: 'range_of_motion',
         message: 'Movement pattern was detected, but the range was incomplete.',
@@ -350,6 +399,7 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
   private resetCycle(): void {
     this.peakEnteredAt = undefined;
     this.extremeMetric = this.config.direction === 'increase' ? 0 : 180;
+    this.currentPeakSide = undefined;
   }
 }
 
@@ -644,6 +694,8 @@ const profileMovementConfigs: Record<
     minPeakHoldMs: 40,
     primaryMetricKey: 'kneeLiftRatio',
     primaryMetric: (context) => maxKneeLiftRatio(context) ?? kneeLiftRatio(context),
+    activeSide: kneeLiftSide,
+    requiresAlternation: true,
     recognitionScore: (context, metric) =>
       confidenceBlend(context, metric >= 0.18 ? 0.76 : 0.42, bodyOrientationScore(context)),
     evidence: ['standing_body_orientation', 'knee_lift_height', 'alternating_cadence'],
@@ -712,6 +764,26 @@ function shoulderHeightScore(value: number | undefined): number {
   return clamp01(1 - Math.abs(value) / 0.55);
 }
 
+function kneeLiftSide(context: MovementProfileEvaluationContext): MovementSide | undefined {
+  const leftHip = context.bodyState.landmarks.get('left_hip');
+  const leftKnee = context.bodyState.landmarks.get('left_knee');
+  const rightHip = context.bodyState.landmarks.get('right_hip');
+  const rightKnee = context.bodyState.landmarks.get('right_knee');
+
+  if (!leftHip || !leftKnee || !rightHip || !rightKnee) {
+    return undefined;
+  }
+
+  const leftLift = leftHip.normalizedY - leftKnee.normalizedY;
+  const rightLift = rightHip.normalizedY - rightKnee.normalizedY;
+
+  if (Math.abs(leftLift - rightLift) < 0.06) {
+    return undefined;
+  }
+
+  return leftLift > rightLift ? 'left' : 'right';
+}
+
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
@@ -730,4 +802,9 @@ const trackingLostWarning: FormWarning = {
 const lowConfidenceWarning: FormWarning = {
   code: 'low_confidence',
   message: 'Tracking confidence is low. Improve lighting or adjust camera placement.',
+};
+
+const missedAlternationWarning: FormWarning = {
+  code: 'missed_alternation',
+  message: 'Alternate sides cleanly so the movement rhythm stays valid.',
 };
