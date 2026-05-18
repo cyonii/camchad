@@ -66,7 +66,7 @@ describe('deriveCameraFrameFeedback', () => {
     ).toEqual(
       expect.objectContaining({
         tone: 'locked',
-        label: 'Tracking locked',
+        label: 'Signal stable',
       }),
     );
   });

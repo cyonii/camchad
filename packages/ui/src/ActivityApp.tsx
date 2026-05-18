@@ -1592,7 +1592,7 @@ function SidebarTelemetryPanel({
 
       <div className="rep-counter telemetry-block">
         <div>
-          <span>Validated reps</span>
+          <span>{repCountTelemetryLabel(movementDefinition)}</span>
           <strong>{detectorState.validReps}</strong>
           <small>{detectorState.partialReps} partial reps</small>
         </div>
@@ -1716,7 +1716,7 @@ function MirrorTelemetryOverlay({
 
       <dl className="mirror-telemetry-readout">
         <div className="mirror-primary-metric">
-          <dt>Validated reps</dt>
+          <dt>{repCountTelemetryLabel(movementDefinition)}</dt>
           <dd>{detectorState.validReps}</dd>
         </div>
         <div>
@@ -4122,6 +4122,18 @@ function formatMaturityLevel(level: MovementDefinition['maturity']): string {
   return 'Planned';
 }
 
+function repCountTelemetryLabel(definition: MovementDefinition): string {
+  if (definition.maturity === 'rep_validating' || definition.maturity === 'quality_validating') {
+    return 'Validated reps';
+  }
+
+  if (definition.maturity === 'rep_counting') {
+    return 'Counted reps';
+  }
+
+  return 'Observed reps';
+}
+
 interface ExerciseGuide {
   readonly label: string;
   readonly src: string;
@@ -4440,7 +4452,7 @@ function recordSessionTimelineState(
       activityState: telemetry.activityState,
       recognitionConfidence: telemetry.recognitionConfidence,
       competingMovementTypes: telemetry.competingMovementTypes,
-      message: `${movementDefinitionFor(telemetry.movementType).label} candidate recognized.`,
+      message: `${movementDefinitionFor(telemetry.movementType).label} candidate detected.`,
     });
     refs.lastRecordedCandidateRef.current = telemetry.movementType;
   }

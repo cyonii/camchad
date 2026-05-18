@@ -28,7 +28,7 @@ describe('liveTelemetryStateFor', () => {
     });
   });
 
-  it('promotes a completed clean rep into a user-facing valid rep state', () => {
+  it('labels a completed validating-profile rep as validated', () => {
     expect(
       liveTelemetryStateFor(
         state({
@@ -49,8 +49,35 @@ describe('liveTelemetryStateFor', () => {
         telemetry({ mode: 'moving' }),
       ),
     ).toEqual({
-      label: 'Valid rep recorded',
+      label: 'Validated rep',
       detail: 'Rep 3',
+    });
+  });
+
+  it('labels a completed count-ready profile rep without implying validation', () => {
+    expect(
+      liveTelemetryStateFor(
+        state({
+          movementType: 'high_knees',
+          phase: 'top',
+          stateKind: 'setup',
+          lastRep: {
+            repNumber: 2,
+            timestampMs: 2400,
+            qualityScore: 78,
+            rangeScore: 0.84,
+            alignmentScore: 0.78,
+            rhythmScore: 0.82,
+            confidenceScore: 0.75,
+            trackingQualityScore: 0.9,
+            warnings: [],
+          },
+        }),
+        telemetry({ mode: 'moving' }),
+      ),
+    ).toEqual({
+      label: 'Rep counted',
+      detail: 'Rep 2',
     });
   });
 

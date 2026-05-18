@@ -1,4 +1,10 @@
-import type { ActivitySessionTelemetry, MovementInterpreterState } from '@camchad/movement-core';
+import { movementDefinitionFor } from '@camchad/movement-core';
+
+import type {
+  ActivitySessionTelemetry,
+  MovementDefinition,
+  MovementInterpreterState,
+} from '@camchad/movement-core';
 
 export interface LiveTelemetryState {
   readonly label: string;
@@ -36,9 +42,10 @@ export function liveTelemetryStateFor(
 
   if (state.lastRep && state.phase === 'top') {
     const hasWarnings = state.lastRep.warnings.length > 0;
+    const definition = movementDefinitionFor(state.movementType);
 
     return {
-      label: hasWarnings ? 'Partial rep' : 'Valid rep recorded',
+      label: hasWarnings ? 'Partial rep' : completedRepLabel(definition),
       detail: `Rep ${state.lastRep.repNumber}`,
     };
   }
@@ -66,7 +73,7 @@ export function liveTelemetryStateFor(
 
   if (state.recognition.status === 'active') {
     return {
-      label: 'Movement recognized',
+      label: 'Pattern recognized',
       detail: formatPhase(state.phase),
     };
   }
@@ -82,6 +89,14 @@ export function liveTelemetryStateFor(
     label: 'Preparing',
     detail: state.stateKind === 'setup' ? 'Setup posture detected' : formatPhase(state.phase),
   };
+}
+
+function completedRepLabel(definition: MovementDefinition): string {
+  if (definition.maturity === 'rep_validating' || definition.maturity === 'quality_validating') {
+    return 'Validated rep';
+  }
+
+  return 'Rep counted';
 }
 
 function firstWarningMessage(state: MovementInterpreterState): string | undefined {

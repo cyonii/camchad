@@ -130,7 +130,7 @@ export function deriveCameraFrameFeedback(input: CameraFrameFeedbackInput): Came
       tone: 'locked',
       intensity,
       confidence,
-      label: 'Tracking locked',
+      label: 'Signal stable',
     };
   }
 
