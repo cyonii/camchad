@@ -1,5 +1,6 @@
 import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import { dirname, extname, join, relative } from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { readFile } from 'node:fs/promises';
@@ -7,6 +8,11 @@ import { readFile } from 'node:fs/promises';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, '..');
 const reportPath = join(repoRoot, '.dev', 'reports', 'bundle-size.json');
+const shouldCheck = process.argv.includes('--check');
+const budgets = {
+  maxTotalGzipBytes: 650_000,
+  maxAssetGzipBytes: 150_000,
+};
 const apps = [
   { name: 'web', distPath: join(repoRoot, 'apps', 'web', 'dist') },
   { name: 'desktop', distPath: join(repoRoot, 'apps', 'desktop', 'dist') },
@@ -35,6 +41,22 @@ for (const app of report.apps) {
 }
 
 console.log(`Wrote ${reportPath}`);
+
+if (shouldCheck) {
+  const violations = bundleBudgetViolations(report);
+
+  if (violations.length > 0) {
+    console.error('Bundle budget check failed:');
+    for (const violation of violations) {
+      console.error(`- ${violation}`);
+    }
+    process.exitCode = 1;
+  } else {
+    console.log(
+      `Bundle budget check passed: total gzip <= ${budgets.maxTotalGzipBytes}, asset gzip <= ${budgets.maxAssetGzipBytes}`,
+    );
+  }
+}
 
 async function measureApp(app) {
   const assets = (await measureDirectory(app.distPath))
@@ -84,4 +106,26 @@ async function measureDirectory(directory) {
 
 function sum(values) {
   return values.reduce((total, value) => total + value, 0);
+}
+
+function bundleBudgetViolations(bundleReport) {
+  return bundleReport.apps.flatMap((app) => {
+    const violations = [];
+
+    if (app.totalGzipBytes > budgets.maxTotalGzipBytes) {
+      violations.push(
+        `${app.name} total gzip is ${app.totalGzipBytes} bytes, above ${budgets.maxTotalGzipBytes}`,
+      );
+    }
+
+    for (const asset of app.assets) {
+      if (asset.gzipBytes > budgets.maxAssetGzipBytes) {
+        violations.push(
+          `${app.name}/${asset.path} gzip is ${asset.gzipBytes} bytes, above ${budgets.maxAssetGzipBytes}`,
+        );
+      }
+    }
+
+    return violations;
+  });
 }
