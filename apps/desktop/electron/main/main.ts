@@ -12,10 +12,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  mergeActivitySessions,
   normalizeActivityHistory,
   persistedActivityHistory,
-  normalizeActivitySessions,
   type ActivitySession,
+  type ActivitySessionMergeSummary,
   type ActivitySummary,
   type PersistedActivityHistory,
 } from '@camchad/activity-history';
@@ -247,9 +248,14 @@ ipcMain.handle('history:clear', async (): Promise<void> => {
 });
 
 ipcMain.handle(
-  'history:replace',
-  async (_event, sessions: readonly ActivitySession[]): Promise<void> => {
-    await writeHistory(persistedActivityHistory(normalizeActivitySessions(sessions)));
+  'history:merge',
+  async (_event, sessions: readonly ActivitySession[]): Promise<ActivitySessionMergeSummary> => {
+    const history = await readHistory();
+    const result = mergeActivitySessions(history.sessions, sessions);
+
+    await writeHistory(persistedActivityHistory(result.sessions));
+
+    return result.summary;
   },
 );
 

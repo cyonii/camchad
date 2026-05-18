@@ -1,7 +1,8 @@
 import {
+  mergeActivitySessions,
   normalizeActivityHistory,
-  normalizeActivitySessions,
   persistedActivityHistory,
+  type ActivitySessionMergeSummary,
   type ActivitySession,
   type ActivitySummary,
 } from '@camchad/activity-history';
@@ -26,7 +27,7 @@ export interface HistoryClient {
   save(session: ActivitySession): Promise<void>;
   summary(): Promise<ActivitySummary>;
   clear(): Promise<void>;
-  replace(sessions: readonly ActivitySession[]): Promise<void>;
+  merge(sessions: readonly ActivitySession[]): Promise<ActivitySessionMergeSummary>;
   storageInfo(): Promise<HistoryStorageInfo>;
 }
 
@@ -121,9 +122,10 @@ export const localBrowserHistoryClient: HistoryClient = {
     localStorage.removeItem('camchad:sessions');
   },
 
-  async replace(sessions: readonly ActivitySession[]): Promise<void> {
-    const normalizedSessions = normalizeActivitySessions(sessions);
-    writeLocalSessions(normalizedSessions);
+  async merge(sessions: readonly ActivitySession[]): Promise<ActivitySessionMergeSummary> {
+    const result = mergeActivitySessions(readLocalSessions(), sessions);
+    writeLocalSessions(result.sessions);
+    return result.summary;
   },
 
   async storageInfo(): Promise<HistoryStorageInfo> {

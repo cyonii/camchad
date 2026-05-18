@@ -8,7 +8,7 @@ declare global {
         save(session: unknown): Promise<void>;
         summary(): Promise<unknown>;
         clear(): Promise<void>;
-        replace(sessions: unknown): Promise<void>;
+        merge(sessions: unknown): Promise<unknown>;
         storageInfo(): Promise<unknown>;
       };
       camera: {

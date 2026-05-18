@@ -17,6 +17,19 @@ export interface PersistedActivityHistory {
   readonly sessions: readonly ActivitySession[];
 }
 
+export interface ActivitySessionMergeSummary {
+  readonly importedSessions: number;
+  readonly addedSessions: number;
+  readonly updatedSessions: number;
+  readonly unchangedSessions: number;
+  readonly totalSessions: number;
+}
+
+export interface ActivitySessionMergeResult {
+  readonly sessions: readonly ActivitySession[];
+  readonly summary: ActivitySessionMergeSummary;
+}
+
 export function persistedActivityHistory(
   sessions: readonly ActivitySession[],
 ): PersistedActivityHistory {
@@ -46,6 +59,69 @@ export function normalizeActivitySessions(value: unknown): readonly ActivitySess
   }
 
   return value.flatMap((session) => normalizeActivitySession(session));
+}
+
+export function mergeActivitySessions(
+  existing: readonly ActivitySession[],
+  incoming: readonly ActivitySession[],
+): ActivitySessionMergeResult {
+  const existingSessions = normalizeActivitySessions(existing);
+  const incomingSessions = normalizeActivitySessions(incoming);
+  const sessionsById = new Map<string, ActivitySession>();
+  const importedSessionsById = new Map<string, ActivitySession>();
+
+  for (const session of existingSessions) {
+    const current = sessionsById.get(session.id);
+    sessionsById.set(session.id, current ? selectPreferredSession(current, session) : session);
+  }
+
+  for (const session of incomingSessions) {
+    const current = importedSessionsById.get(session.id);
+    importedSessionsById.set(
+      session.id,
+      current ? selectPreferredSession(current, session) : session,
+    );
+  }
+
+  let addedSessions = 0;
+  let updatedSessions = 0;
+  let unchangedSessions = 0;
+
+  for (const importedSession of importedSessionsById.values()) {
+    const existingSession = sessionsById.get(importedSession.id);
+
+    if (!existingSession) {
+      sessionsById.set(importedSession.id, importedSession);
+      addedSessions += 1;
+      continue;
+    }
+
+    const selectedSession = selectPreferredSession(existingSession, importedSession);
+    sessionsById.set(importedSession.id, selectedSession);
+
+    if (sessionsAreEquivalent(existingSession, importedSession)) {
+      unchangedSessions += 1;
+    } else if (selectedSession === importedSession) {
+      updatedSessions += 1;
+    } else {
+      unchangedSessions += 1;
+    }
+  }
+
+  const sessions = [...sessionsById.values()].sort((a, b) =>
+    b.startedAt.localeCompare(a.startedAt),
+  );
+
+  return {
+    sessions,
+    summary: {
+      importedSessions: incomingSessions.length,
+      addedSessions,
+      updatedSessions,
+      unchangedSessions,
+      totalSessions: sessions.length,
+    },
+  };
 }
 
 export function normalizeActivitySession(value: unknown): readonly ActivitySession[] {
@@ -377,6 +453,58 @@ function clamp01(value: number): number {
 
 function clampQuality(value: number): number {
   return Math.max(0, Math.min(100, value));
+}
+
+function selectPreferredSession(
+  existing: ActivitySession,
+  incoming: ActivitySession,
+): ActivitySession {
+  const existingScore = scoreSessionCompleteness(existing);
+  const incomingScore = scoreSessionCompleteness(incoming);
+
+  if (incomingScore > existingScore) {
+    return incoming;
+  }
+
+  if (incomingScore < existingScore) {
+    return existing;
+  }
+
+  if (sessionsAreEquivalent(existing, incoming)) {
+    return existing;
+  }
+
+  return incoming;
+}
+
+function scoreSessionCompleteness(session: ActivitySession): number {
+  const movementDetailScore = session.movements.reduce((score, movement) => {
+    return (
+      score +
+      movement.repEvents.length * 100 +
+      (movement.guidanceEvents?.length ?? 0) * 30 +
+      movement.formWarnings.length * 30 +
+      Object.keys(movement.telemetryMetrics ?? {}).length * 20 +
+      movement.validReps * 10 +
+      movement.partialReps * 5 +
+      movement.reps * 2 +
+      (movement.setSummary ? 15 : 0) +
+      (movement.endedAt ? 5 : 0)
+    );
+  }, 0);
+
+  return (
+    session.movements.length * 1_000 +
+    movementDetailScore +
+    session.timeline.length * 50 +
+    (session.durationSeconds ?? 0) +
+    (session.endedAt ? 20 : 0) +
+    (session.notes ? 10 : 0)
+  );
+}
+
+function sessionsAreEquivalent(left: ActivitySession, right: ActivitySession): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

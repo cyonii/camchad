@@ -2477,10 +2477,12 @@ function SettingsView({
       return;
     }
 
-    await platform.history.replace(importedSessions);
+    const mergeSummary = await platform.history.merge(importedSessions);
     await onHistoryChanged();
     await refreshStorageInfo();
-    setDataStatus(`Imported ${importedSessions.length} local sessions.`);
+    setDataStatus(
+      `Merged ${mergeSummary.importedSessions} imported sessions: ${mergeSummary.addedSessions} added, ${mergeSummary.updatedSessions} updated, ${mergeSummary.unchangedSessions} unchanged. ${mergeSummary.totalSessions} sessions stored locally.`,
+    );
   };
 
   const clearAllSessions = async (): Promise<void> => {
@@ -2728,7 +2730,7 @@ function SettingsView({
           />
           <SettingsActionRow
             label="Import backup"
-            description="Replace local sessions with a CamChad JSON export after validation."
+            description="Merge a CamChad JSON export into existing local sessions after validation."
             actionLabel="Import"
             icon={<Upload size={16} aria-hidden="true" />}
             onAction={() => importInputRef.current?.click()}

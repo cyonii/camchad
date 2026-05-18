@@ -11,7 +11,11 @@ import type {
 } from '@camchad/ui';
 import { ActivityApp } from '@camchad/ui';
 import '@camchad/ui/styles.css';
-import type { ActivitySession, ActivitySummary } from '@camchad/activity-history';
+import type {
+  ActivitySession,
+  ActivitySessionMergeSummary,
+  ActivitySummary,
+} from '@camchad/activity-history';
 import type { PoseTrace } from '@camchad/pose-core';
 
 const desktopApi = window.camChad;
@@ -30,8 +34,8 @@ const platform: ActivityPlatform = {
     async clear(): Promise<void> {
       await desktopApi.history.clear();
     },
-    async replace(sessions: readonly ActivitySession[]): Promise<void> {
-      await desktopApi.history.replace(sessions);
+    async merge(sessions: readonly ActivitySession[]): Promise<ActivitySessionMergeSummary> {
+      return (await desktopApi.history.merge(sessions)) as ActivitySessionMergeSummary;
     },
     async storageInfo(): Promise<HistoryStorageInfo> {
       return (await desktopApi.history.storageInfo()) as HistoryStorageInfo;

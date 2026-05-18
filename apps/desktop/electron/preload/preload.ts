@@ -6,7 +6,7 @@ const api = {
     save: (session: unknown): Promise<void> => ipcRenderer.invoke('history:save', session),
     summary: (): Promise<unknown> => ipcRenderer.invoke('history:summary'),
     clear: (): Promise<void> => ipcRenderer.invoke('history:clear'),
-    replace: (sessions: unknown): Promise<void> => ipcRenderer.invoke('history:replace', sessions),
+    merge: (sessions: unknown): Promise<unknown> => ipcRenderer.invoke('history:merge', sessions),
     storageInfo: (): Promise<unknown> => ipcRenderer.invoke('history:storage-info'),
   },
   camera: {

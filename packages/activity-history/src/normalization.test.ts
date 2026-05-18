@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeActivityHistory, normalizeActivitySessions } from './normalization.js';
+import {
+  mergeActivitySessions,
+  normalizeActivityHistory,
+  normalizeActivitySessions,
+} from './normalization.js';
+import type { ActivitySession } from './models.js';
 
 describe('activity history normalization', () => {
   it('normalizes movement collections', () => {
@@ -182,4 +187,110 @@ describe('activity history normalization', () => {
       },
     ]);
   });
+
+  it('merges imported sessions into existing history without replacing local data', () => {
+    const result = mergeActivitySessions(
+      [
+        sessionFixture({
+          id: 'existing',
+          startedAt: '2026-05-12T07:00:00.000Z',
+          movementId: 'movement_existing',
+          validReps: 6,
+        }),
+      ],
+      [
+        sessionFixture({
+          id: 'imported',
+          startedAt: '2026-05-13T07:00:00.000Z',
+          movementId: 'movement_imported',
+          validReps: 10,
+        }),
+      ],
+    );
+
+    expect(result.summary).toEqual({
+      importedSessions: 1,
+      addedSessions: 1,
+      updatedSessions: 0,
+      unchangedSessions: 0,
+      totalSessions: 2,
+    });
+    expect(result.sessions.map((session) => session.id)).toEqual(['imported', 'existing']);
+  });
+
+  it('keeps the richer record when imported history overlaps an existing session', () => {
+    const result = mergeActivitySessions(
+      [
+        sessionFixture({
+          id: 'same',
+          startedAt: '2026-05-12T07:00:00.000Z',
+          movementId: 'movement_local',
+          validReps: 4,
+          repEventCount: 1,
+        }),
+      ],
+      [
+        sessionFixture({
+          id: 'same',
+          startedAt: '2026-05-12T07:00:00.000Z',
+          movementId: 'movement_imported',
+          validReps: 8,
+          repEventCount: 4,
+        }),
+      ],
+    );
+
+    expect(result.summary).toEqual({
+      importedSessions: 1,
+      addedSessions: 0,
+      updatedSessions: 1,
+      unchangedSessions: 0,
+      totalSessions: 1,
+    });
+    expect(result.sessions[0]?.movements[0]?.id).toBe('movement_imported');
+    expect(result.sessions[0]?.movements[0]?.validReps).toBe(8);
+    expect(result.sessions[0]?.movements[0]?.repEvents).toHaveLength(4);
+  });
 });
+
+function sessionFixture(options: {
+  readonly id: string;
+  readonly startedAt: string;
+  readonly movementId: string;
+  readonly validReps: number;
+  readonly repEventCount?: number;
+}): ActivitySession {
+  const session = {
+    id: options.id,
+    startedAt: options.startedAt,
+    endedAt: options.startedAt,
+    durationSeconds: 60,
+    timeline: [],
+    movements: [
+      {
+        id: options.movementId,
+        movementType: 'squat',
+        cameraAngle: 'front',
+        startedAt: options.startedAt,
+        endedAt: options.startedAt,
+        reps: options.validReps,
+        validReps: options.validReps,
+        partialReps: 0,
+        formWarnings: [],
+        repEvents: Array.from({ length: options.repEventCount ?? 0 }, (_value, index) => ({
+          repNumber: index + 1,
+          timestampMs: index * 1_000,
+          qualityScore: 90,
+          rangeScore: 0.9,
+          alignmentScore: 0.9,
+          rhythmScore: 0.9,
+          confidenceScore: 0.9,
+          trackingQualityScore: 0.9,
+          warnings: [],
+        })),
+      },
+    ],
+  };
+
+  return normalizeActivitySessions([session])[0] as ActivitySession;
+}
