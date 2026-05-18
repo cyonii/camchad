@@ -158,6 +158,65 @@ describe('diagnoseMovement', () => {
 
     expect(diagnostics.events.some((event) => event.code === 'camera_too_low')).toBe(true);
   });
+
+  it('surfaces camera distance and frame-edge guidance from body environment', () => {
+    const bodyState = extractBodyState(makePushUpFrame({ timestampMs: 0, elbowAngle: 150 }));
+
+    if (!bodyState) {
+      throw new Error('Expected fixture to produce body state.');
+    }
+
+    const diagnostics = diagnoseMovement({
+      activityState: {
+        state: 'idle',
+        confidence: 0.82,
+        motionMagnitude: 0.01,
+        evidence: ['stable_body'],
+      },
+      window: snapshotWithBodyState({
+        ...bodyState,
+        environment: {
+          ...bodyState.environment,
+          cameraDistance: 'too_close',
+          edgeProximityRisk: 0.8,
+        },
+      }),
+    });
+
+    expect(diagnostics.events.some((event) => event.code === 'camera_too_close')).toBe(true);
+    expect(diagnostics.events.some((event) => event.code === 'body_near_edge')).toBe(true);
+  });
+
+  it('surfaces unstable temporal environment guidance from the movement window', () => {
+    const bodyState = extractBodyState(makePushUpFrame({ timestampMs: 0, elbowAngle: 150 }));
+
+    if (!bodyState) {
+      throw new Error('Expected fixture to produce body state.');
+    }
+
+    const diagnostics = diagnoseMovement({
+      activityState: {
+        state: 'idle',
+        confidence: 0.82,
+        motionMagnitude: 0.01,
+        evidence: ['stable_body'],
+      },
+      window: {
+        ...snapshotWithBodyState(bodyState),
+        environment: {
+          scaleStability: 0.5,
+          centerStability: 0.4,
+          landmarkJitter: 0.12,
+        },
+      },
+    });
+
+    expect(diagnostics.events.some((event) => event.code === 'unstable_camera_distance')).toBe(
+      true,
+    );
+    expect(diagnostics.events.some((event) => event.code === 'frame_drift')).toBe(true);
+    expect(diagnostics.events.some((event) => event.code === 'landmark_jitter')).toBe(true);
+  });
 });
 
 function snapshotWithBodyState(

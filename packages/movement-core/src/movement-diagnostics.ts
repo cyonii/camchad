@@ -10,6 +10,12 @@ export type MovementGuidanceCode =
   | 'hands_missing'
   | 'feet_missing'
   | 'camera_too_low'
+  | 'camera_too_close'
+  | 'camera_too_far'
+  | 'body_near_edge'
+  | 'unstable_camera_distance'
+  | 'frame_drift'
+  | 'landmark_jitter'
   | 'side_angle_recommended'
   | 'front_angle_recommended'
   | 'low_confidence'
@@ -71,6 +77,44 @@ function trackingEvents(input: MovementDiagnosticsInput): readonly MovementGuida
       title: 'Full body not visible',
       message: 'Step back or adjust the camera so the required joints stay in view.',
       confidence: 1 - latestBody.coverage.fullBody,
+    });
+  }
+
+  if (latestBody && latestBody.environment.edgeProximityRisk > 0.6) {
+    events.push({
+      code: 'body_near_edge',
+      severity: 'warning',
+      title: 'Body near frame edge',
+      message: 'Re-center or step back so joints do not leave the camera frame during movement.',
+      confidence: latestBody.environment.edgeProximityRisk,
+    });
+  }
+
+  if (
+    latestBody &&
+    (latestBody.environment.cameraDistance === 'too_close' ||
+      latestBody.environment.cameraDistance === 'near')
+  ) {
+    events.push({
+      code: 'camera_too_close',
+      severity: latestBody.environment.cameraDistance === 'too_close' ? 'warning' : 'info',
+      title: 'Camera too close',
+      message: 'Step back slightly so the full movement range remains visible.',
+      confidence: latestBody.environment.cameraDistance === 'too_close' ? 0.9 : 0.62,
+    });
+  }
+
+  if (
+    latestBody &&
+    (latestBody.environment.cameraDistance === 'too_far' ||
+      latestBody.environment.cameraDistance === 'far')
+  ) {
+    events.push({
+      code: 'camera_too_far',
+      severity: latestBody.environment.cameraDistance === 'too_far' ? 'warning' : 'info',
+      title: 'Camera too far',
+      message: 'Move closer or increase lighting so joint positions remain stable.',
+      confidence: latestBody.environment.cameraDistance === 'too_far' ? 0.9 : 0.62,
     });
   }
 
@@ -137,6 +181,36 @@ function trackingEvents(input: MovementDiagnosticsInput): readonly MovementGuida
       title: 'Tracking gaps detected',
       message: 'Reduce occlusion, improve lighting, or slow down until tracking stabilizes.',
       confidence: input.window.missingSampleRatio,
+    });
+  }
+
+  if (input.window && input.window.environment.scaleStability < 0.72) {
+    events.push({
+      code: 'unstable_camera_distance',
+      severity: 'warning',
+      title: 'Camera distance unstable',
+      message: 'Keep your distance from the camera consistent before counting reps.',
+      confidence: 1 - input.window.environment.scaleStability,
+    });
+  }
+
+  if (input.window && input.window.environment.centerStability < 0.55) {
+    events.push({
+      code: 'frame_drift',
+      severity: 'warning',
+      title: 'Body drifting in frame',
+      message: 'Stay centered so the engine can compare joint motion consistently over time.',
+      confidence: 1 - input.window.environment.centerStability,
+    });
+  }
+
+  if (input.window && input.window.environment.landmarkJitter > 0.08) {
+    events.push({
+      code: 'landmark_jitter',
+      severity: 'warning',
+      title: 'Tracking jitter detected',
+      message: 'Improve lighting, reduce motion blur, or slow the movement until landmarks settle.',
+      confidence: Math.min(1, input.window.environment.landmarkJitter / 0.2),
     });
   }
 
