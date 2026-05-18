@@ -7,6 +7,7 @@ import type {
   MovementType,
   RepEvent,
 } from './movement-interpreter.js';
+import type { MovementFamilyPrimitive } from './movement-definition-types.js';
 import { HoldStateMachine, type HoldStateMachineState } from './hold-state-machine.js';
 import {
   createMovementProfileWindow,
@@ -45,6 +46,7 @@ type MovementDirection = 'increase' | 'decrease';
 
 interface CycleMovementInterpreterConfig {
   readonly movementType: ProfileMovementType;
+  readonly family: MovementFamilyPrimitive;
   readonly minVisibility: number;
   readonly expectedOrientations: readonly BodyOrientationSignal[];
   readonly restThreshold: number;
@@ -59,6 +61,7 @@ interface CycleMovementInterpreterConfig {
 
 interface HoldMovementInterpreterConfig {
   readonly movementType: ProfileMovementType;
+  readonly family: MovementFamilyPrimitive;
   readonly minVisibility: number;
   readonly expectedOrientations: readonly BodyOrientationSignal[];
   readonly minHoldMs: number;
@@ -84,6 +87,12 @@ export function isProfileMovementType(
   movementType: MovementType,
 ): movementType is ProfileMovementType {
   return movementType in profileMovementConfigs;
+}
+
+export function movementFamilyForProfile(
+  movementType: ProfileMovementType,
+): MovementFamilyPrimitive {
+  return profileMovementConfigs[movementType].family;
 }
 
 class CycleProfileMovementInterpreter implements MovementInterpreter {
@@ -499,6 +508,7 @@ const profileMovementConfigs: Record<
   sit_up: {
     kind: 'cycle',
     movementType: 'sit_up',
+    family: 'cyclic_joint_flexion',
     minVisibility: 0.45,
     expectedOrientations: ['horizontal', 'diagonal'],
     restThreshold: 132,
@@ -514,6 +524,7 @@ const profileMovementConfigs: Record<
   lunge: {
     kind: 'cycle',
     movementType: 'lunge',
+    family: 'asymmetrical_stance',
     minVisibility: 0.45,
     expectedOrientations: ['vertical', 'diagonal'],
     restThreshold: 156,
@@ -533,6 +544,7 @@ const profileMovementConfigs: Record<
   jumping_jack: {
     kind: 'cycle',
     movementType: 'jumping_jack',
+    family: 'span_oscillation',
     minVisibility: 0.45,
     expectedOrientations: ['vertical'],
     restThreshold: 1.05,
@@ -553,6 +565,7 @@ const profileMovementConfigs: Record<
   plank: {
     kind: 'hold',
     movementType: 'plank',
+    family: 'static_hold',
     minVisibility: 0.45,
     expectedOrientations: ['horizontal'],
     minHoldMs: 1200,
@@ -565,6 +578,7 @@ const profileMovementConfigs: Record<
   pull_up: {
     kind: 'cycle',
     movementType: 'pull_up',
+    family: 'cyclic_joint_flexion',
     minVisibility: 0.45,
     expectedOrientations: ['vertical'],
     restThreshold: 152,
@@ -584,6 +598,7 @@ const profileMovementConfigs: Record<
   burpee: {
     kind: 'cycle',
     movementType: 'burpee',
+    family: 'compound_transition',
     minVisibility: 0.45,
     expectedOrientations: ['vertical', 'diagonal', 'horizontal'],
     restThreshold: 0.34,
@@ -604,6 +619,7 @@ const profileMovementConfigs: Record<
   mountain_climber: {
     kind: 'cycle',
     movementType: 'mountain_climber',
+    family: 'alternating_limb_drive',
     minVisibility: 0.45,
     expectedOrientations: ['horizontal', 'diagonal'],
     restThreshold: 0.08,
@@ -619,6 +635,7 @@ const profileMovementConfigs: Record<
   high_knees: {
     kind: 'cycle',
     movementType: 'high_knees',
+    family: 'alternating_limb_drive',
     minVisibility: 0.45,
     expectedOrientations: ['vertical', 'diagonal'],
     restThreshold: 0.05,
@@ -634,6 +651,7 @@ const profileMovementConfigs: Record<
   lateral_raise: {
     kind: 'cycle',
     movementType: 'lateral_raise',
+    family: 'span_oscillation',
     minVisibility: 0.45,
     expectedOrientations: ['vertical'],
     restThreshold: 0.9,
@@ -653,6 +671,7 @@ const profileMovementConfigs: Record<
   yoga_hold: {
     kind: 'hold',
     movementType: 'yoga_hold',
+    family: 'static_hold',
     minVisibility: 0.45,
     expectedOrientations: ['vertical', 'diagonal', 'horizontal'],
     minHoldMs: 1500,

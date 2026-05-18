@@ -34,6 +34,14 @@ export type MovementRegion = 'head' | 'torso' | 'arms' | 'hands' | 'hips' | 'leg
 
 export type MovementRhythmType = 'cyclic' | 'hold' | 'compound' | 'unknown';
 
+export type MovementFamilyPrimitive =
+  | 'cyclic_joint_flexion'
+  | 'alternating_limb_drive'
+  | 'span_oscillation'
+  | 'static_hold'
+  | 'compound_transition'
+  | 'asymmetrical_stance';
+
 export type MovementCameraSensitivity = 'low' | 'medium' | 'high';
 
 export interface MovementProfileMetadata {
@@ -41,6 +49,7 @@ export interface MovementProfileMetadata {
   readonly primaryJoints: readonly string[];
   readonly phaseModel: readonly string[];
   readonly rhythm: MovementRhythmType;
+  readonly family: MovementFamilyPrimitive;
   readonly maturity: MovementMaturityLevel;
   readonly cameraSensitivity: MovementCameraSensitivity;
   readonly recognitionCriteria: readonly MovementProfileCriterion[];

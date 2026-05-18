@@ -8,7 +8,11 @@ import { describe, expect, it } from 'vitest';
 
 import { createMovementInterpreterForDefinition } from './movement-definition-interpreter.js';
 import { movementRegistry } from './movement-registry.js';
-import { createProfileMovementInterpreter } from './profile-movement-interpreters.js';
+import {
+  createProfileMovementInterpreter,
+  isProfileMovementType,
+  movementFamilyForProfile,
+} from './profile-movement-interpreters.js';
 import { makePlankFrame } from './test-fixtures.js';
 
 describe('profile movement interpreters', () => {
@@ -32,6 +36,32 @@ describe('profile movement interpreters', () => {
     expect(
       movementRegistry.filter((definition) => definition.maturity === 'planned').length,
     ).toBeGreaterThan(0);
+  });
+
+  it('keeps profile interpreter families aligned with movement definitions', () => {
+    const profileDefinitions = movementRegistry.filter(
+      (definition) => definition.maturity === 'rep_counting',
+    );
+
+    expect(profileDefinitions.length).toBeGreaterThan(0);
+    for (const definition of profileDefinitions) {
+      expect(isProfileMovementType(definition.type)).toBe(true);
+      if (!isProfileMovementType(definition.type)) {
+        throw new Error(`Missing profile interpreter for ${definition.type}.`);
+      }
+
+      expect(movementFamilyForProfile(definition.type)).toBe(definition.profile.family);
+    }
+    expect(new Set(profileDefinitions.map((definition) => definition.profile.family))).toEqual(
+      new Set([
+        'cyclic_joint_flexion',
+        'alternating_limb_drive',
+        'span_oscillation',
+        'static_hold',
+        'compound_transition',
+        'asymmetrical_stance',
+      ]),
+    );
   });
 
   it('counts a high-knees cycle from knee lift rhythm', () => {

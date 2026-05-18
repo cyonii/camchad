@@ -6,6 +6,7 @@ import type {
   MovementProfileCriterion,
   MovementProfileCriterionSource,
   MovementProfileMetadata,
+  MovementFamilyPrimitive,
   MovementRegion,
   MovementTelemetryExtractorDefinition,
   MovementTelemetryExtractorSource,
@@ -17,6 +18,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     primaryJoints: ['elbow', 'shoulder', 'hip'],
     phaseModel: ['top', 'descending', 'bottom', 'ascending'],
     rhythm: 'cyclic',
+    family: 'cyclic_joint_flexion',
     maturity: 'rep_validating',
     cameraSensitivity: 'high',
     recognitionCriteria: [
@@ -68,6 +70,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     primaryJoints: ['knee', 'hip', 'ankle'],
     phaseModel: ['standing', 'lowering', 'bottom', 'rising'],
     rhythm: 'cyclic',
+    family: 'cyclic_joint_flexion',
     maturity: 'rep_validating',
     cameraSensitivity: 'medium',
     recognitionCriteria: [
@@ -121,6 +124,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     primaryJoints: ['hip', 'spine', 'shoulder'],
     phaseModel: ['supine', 'curl', 'upright', 'return'],
     rhythm: 'cyclic',
+    family: 'cyclic_joint_flexion',
     cameraSensitivity: 'medium',
     recognitionCriteria: [
       ['torso_curl_trajectory', 'Torso curl trajectory'],
@@ -136,6 +140,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     primaryJoints: ['hip', 'knee', 'ankle'],
     phaseModel: ['standing', 'lowering', 'bottom', 'rising'],
     rhythm: 'cyclic',
+    family: 'asymmetrical_stance',
     cameraSensitivity: 'medium',
     recognitionCriteria: [
       ['split_stance', 'Split stance'],
@@ -152,6 +157,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     primaryJoints: ['shoulder', 'hip', 'ankle'],
     phaseModel: ['closed stance', 'abducting', 'open stance', 'returning'],
     rhythm: 'cyclic',
+    family: 'span_oscillation',
     cameraSensitivity: 'medium',
     recognitionCriteria: [
       ['arm_leg_abduction_rhythm', 'Arm-leg abduction rhythm'],
@@ -167,6 +173,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     primaryJoints: ['shoulder', 'hip', 'knee'],
     phaseModel: ['setup', 'hold', 'release'],
     rhythm: 'hold',
+    family: 'static_hold',
     cameraSensitivity: 'high',
     recognitionCriteria: [
       ['horizontal_body_line', 'Horizontal body line'],
@@ -182,6 +189,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     primaryJoints: ['shoulder', 'elbow', 'wrist'],
     phaseModel: ['dead hang', 'pulling', 'top', 'lowering'],
     rhythm: 'cyclic',
+    family: 'cyclic_joint_flexion',
     cameraSensitivity: 'high',
     recognitionCriteria: [
       ['vertical_hanging_posture', 'Vertical hanging posture'],
@@ -198,6 +206,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     primaryJoints: ['shoulder', 'elbow', 'hip', 'knee'],
     phaseModel: ['standing', 'floor transition', 'floor position', 'standing return'],
     rhythm: 'compound',
+    family: 'compound_transition',
     cameraSensitivity: 'high',
     recognitionCriteria: [
       ['standing_floor_standing_transition', 'Standing-floor-standing transition'],
@@ -213,6 +222,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     primaryJoints: ['hip', 'knee', 'shoulder'],
     phaseModel: ['plank base', 'left drive', 'switch', 'right drive'],
     rhythm: 'cyclic',
+    family: 'alternating_limb_drive',
     cameraSensitivity: 'high',
     recognitionCriteria: [
       ['plank_base', 'Plank base'],
@@ -228,6 +238,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     primaryJoints: ['hip', 'knee', 'ankle'],
     phaseModel: ['standing', 'left drive', 'switch', 'right drive'],
     rhythm: 'cyclic',
+    family: 'alternating_limb_drive',
     cameraSensitivity: 'medium',
     recognitionCriteria: [
       ['alternating_knee_lift', 'Alternating knee lift'],
@@ -243,6 +254,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     primaryJoints: ['shoulder', 'elbow', 'wrist'],
     phaseModel: ['arms down', 'raising', 'top', 'lowering'],
     rhythm: 'cyclic',
+    family: 'span_oscillation',
     cameraSensitivity: 'medium',
     recognitionCriteria: [
       ['shoulder_abduction', 'Shoulder abduction'],
@@ -258,6 +270,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     primaryJoints: ['shoulder', 'elbow', 'hip', 'knee'],
     phaseModel: ['setup', 'hold', 'release'],
     rhythm: 'hold',
+    family: 'static_hold',
     cameraSensitivity: 'medium',
     recognitionCriteria: [
       ['static_pose_geometry', 'Static pose geometry'],
@@ -340,6 +353,7 @@ function generatedProfile(
     phaseModel:
       category === 'hold' ? ['setup', 'hold', 'release'] : ['setup', 'active movement', 'return'],
     rhythm: category === 'hold' ? 'hold' : category === 'compound' ? 'compound' : 'cyclic',
+    family: familyForGeneratedProfile(category, bodyOrientation, analysisSignals),
     maturity,
     cameraSensitivity: maturity === 'planned' ? 'high' : 'medium',
     recognitionCriteria: analysisSignals.map((signal) =>
@@ -377,6 +391,41 @@ function generatedProfile(
   };
 }
 
+function familyForGeneratedProfile(
+  category: MovementCategory,
+  bodyOrientation: MovementBodyOrientation,
+  analysisSignals: readonly string[],
+): MovementFamilyPrimitive {
+  const signalText = analysisSignals.join(' ').toLowerCase();
+
+  if (category === 'hold') {
+    return 'static_hold';
+  }
+
+  if (category === 'compound' || bodyOrientation === 'mixed' || signalText.includes('transition')) {
+    return 'compound_transition';
+  }
+
+  if (signalText.includes('alternating') || signalText.includes('single-leg')) {
+    return 'alternating_limb_drive';
+  }
+
+  if (
+    signalText.includes('span') ||
+    signalText.includes('raise') ||
+    signalText.includes('elevation') ||
+    signalText.includes('lift')
+  ) {
+    return 'span_oscillation';
+  }
+
+  if (signalText.includes('split stance') || signalText.includes('stance')) {
+    return 'asymmetrical_stance';
+  }
+
+  return 'cyclic_joint_flexion';
+}
+
 function implementedProfile(input: {
   readonly category: MovementCategory;
   readonly bodyOrientation: MovementBodyOrientation;
@@ -384,6 +433,7 @@ function implementedProfile(input: {
   readonly primaryJoints: readonly string[];
   readonly phaseModel: readonly string[];
   readonly rhythm: MovementProfileMetadata['rhythm'];
+  readonly family: MovementFamilyPrimitive;
   readonly cameraSensitivity: MovementProfileMetadata['cameraSensitivity'];
   readonly recognitionCriteria: readonly (readonly [key: string, label: string])[];
   readonly telemetrySignals: readonly string[];
@@ -394,6 +444,7 @@ function implementedProfile(input: {
     primaryJoints: input.primaryJoints,
     phaseModel: input.phaseModel,
     rhythm: input.rhythm,
+    family: input.family,
     maturity: 'rep_counting',
     cameraSensitivity: input.cameraSensitivity,
     recognitionCriteria: input.recognitionCriteria.map(([key, label]) =>

@@ -10,6 +10,7 @@ describe('movementRegistry profiles', () => {
       expect(movement.profile.requiredRegions.length).toBeGreaterThan(0);
       expect(movement.profile.primaryJoints.length).toBeGreaterThan(0);
       expect(movement.profile.phaseModel.length).toBeGreaterThan(0);
+      expect(movement.profile.family).toBeTruthy();
       expect(movement.profile.recognitionCriteria.length).toBeGreaterThan(0);
       expect(movement.profile.validationCriteria.length).toBeGreaterThan(0);
       expect(movement.profile.telemetrySignals.length).toBeGreaterThan(0);
