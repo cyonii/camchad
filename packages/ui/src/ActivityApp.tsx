@@ -2094,6 +2094,39 @@ function HistoryView({
             <section className="history-detail-card">
               <div className="history-section-heading">
                 <div>
+                  <span>Tracking quality</span>
+                  <h2>Camera and calibration</h2>
+                </div>
+              </div>
+
+              <div className="detail-metric-grid">
+                <Metric label="Camera angles" value={formatSessionCameraAngles(selectedSession)} />
+                <Metric
+                  label="Tracking gaps"
+                  value={String(sessionTimelineCount(selectedSession, 'tracking_lost'))}
+                />
+                <Metric
+                  label="Recovered"
+                  value={String(sessionTimelineCount(selectedSession, 'tracking_recovered'))}
+                />
+                <Metric
+                  label="Camera guidance"
+                  value={String(sessionTimelineCount(selectedSession, 'camera_guidance'))}
+                />
+              </div>
+
+              {sessionCameraGuidanceMessages(selectedSession).length > 0 ? (
+                <div className="tracking-quality-list" aria-label="Camera guidance history">
+                  {sessionCameraGuidanceMessages(selectedSession).map((message) => (
+                    <span key={message}>{message}</span>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+
+            <section className="history-detail-card">
+              <div className="history-section-heading">
+                <div>
                   <span>Fatigue trend</span>
                   <h2>Session degradation</h2>
                 </div>
@@ -4066,6 +4099,31 @@ function sessionAverageRecognitionConfidence(session: ActivitySession): number |
   }
 
   return confidences.reduce((sum, value) => sum + value, 0) / confidences.length;
+}
+
+function formatSessionCameraAngles(session: ActivitySession): string {
+  const angles = [
+    ...new Set(session.movements.map((movement) => formatCameraAngle(movement.cameraAngle))),
+  ];
+
+  return angles.length === 0 ? 'n/a' : angles.join(', ');
+}
+
+function sessionTimelineCount(
+  session: ActivitySession,
+  kind: ActivitySession['timeline'][number]['kind'],
+): number {
+  return session.timeline.filter((event) => event.kind === kind).length;
+}
+
+function sessionCameraGuidanceMessages(session: ActivitySession): readonly string[] {
+  return [
+    ...new Set(
+      session.timeline
+        .filter((event) => event.kind === 'camera_guidance' && event.message)
+        .map((event) => event.message!),
+    ),
+  ].slice(0, 4);
 }
 
 function averageMovementQuality(movement: MovementSegment): number | undefined {

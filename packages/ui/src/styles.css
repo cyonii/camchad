@@ -2627,6 +2627,22 @@ button,
   text-transform: uppercase;
 }
 
+.tracking-quality-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.tracking-quality-list span {
+  padding: 8px 10px;
+  border: 1px solid rgb(var(--primary-rgb) / 11%);
+  border-radius: 6px;
+  color: var(--text-muted);
+  background: rgb(var(--primary-rgb) / 5%);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
 .movement-breakdown-list {
   display: grid;
   gap: 10px;
