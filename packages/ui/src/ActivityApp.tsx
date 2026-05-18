@@ -129,6 +129,13 @@ interface AppSettingsPreferences {
   readonly autoSaveSessions: boolean;
 }
 
+interface CameraStreamInfo {
+  readonly width?: number;
+  readonly height?: number;
+  readonly frameRate?: number;
+  readonly deviceId?: string;
+}
+
 export interface ActivityAssets {
   readonly logoAssetPath?: string;
   readonly exerciseGuideAssetBasePath: string;
@@ -657,6 +664,7 @@ function ActivityView({
   const [isStarting, setIsStarting] = useState(false);
   const [isPreviewActive, setIsPreviewActive] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
+  const [cameraStreamInfo, setCameraStreamInfo] = useState<CameraStreamInfo | undefined>();
   const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState(0);
   const [sessionTelemetry, setSessionTelemetry] =
     useState<ActivitySessionTelemetry>(initialSessionTelemetry);
@@ -950,9 +958,11 @@ function ActivityView({
         video: cameraCaptureConstraints(settingsPreferences),
         audio: false,
       });
+      setCameraStreamInfo(cameraStreamInfoFor(stream));
       const video = videoRef.current;
 
       if (!video) {
+        setCameraStreamInfo(undefined);
         stopMediaStream(stream);
         throw new Error('Video element is not available.');
       }
@@ -971,6 +981,7 @@ function ActivityView({
       await waitForVideoFrame(video);
 
       if (startTokenRef.current !== startToken) {
+        setCameraStreamInfo(undefined);
         stopMediaStream(stream);
         return;
       }
@@ -1042,6 +1053,7 @@ function ActivityView({
       stopCamera(videoRef.current);
       poseTraceRecorderRef.current = undefined;
       setIsPreviewActive(false);
+      setCameraStreamInfo(undefined);
       const message = describeCameraStartupError(error);
       setCameraError(message);
       setStatus('Setup needed');
@@ -1229,6 +1241,7 @@ function ActivityView({
     estimatorRef.current = null;
     lastInferenceAtRef.current = 0;
     stopCamera(videoRef.current);
+    setCameraStreamInfo(undefined);
     clearCanvas(canvasRef.current);
 
     const sessionService = sessionServiceRef.current;
@@ -1325,6 +1338,7 @@ function ActivityView({
             <StageTelemetryChrome
               status={status}
               isTracking={isTracking}
+              cameraStreamInfo={cameraStreamInfo}
               feedback={cameraFrameFeedback}
             />
             {activeGuide && detectorState.recognition.status === 'active' ? (
@@ -1355,6 +1369,7 @@ function ActivityView({
             status={status}
             detectorState={detectorState}
             sessionTelemetry={sessionTelemetry}
+            cameraStreamInfo={cameraStreamInfo}
             telemetryMode={telemetryMode}
             onTelemetryModeChange={onTelemetryModeChange}
           />
@@ -1503,10 +1518,12 @@ function useCameraFrameImpulse(
 function StageTelemetryChrome({
   status,
   isTracking,
+  cameraStreamInfo,
   feedback,
 }: {
   readonly status: string;
   readonly isTracking: boolean;
+  readonly cameraStreamInfo: CameraStreamInfo | undefined;
   readonly feedback: CameraFrameFeedback;
 }): ReactElement {
   return (
@@ -1515,7 +1532,7 @@ function StageTelemetryChrome({
         <span className={isTracking ? 'status-dot active' : 'status-dot'} />
         Live feed
       </div>
-      <div className="stage-resolution-label">1280p / 30 FPS</div>
+      <div className="stage-resolution-label">{formatCameraStreamInfo(cameraStreamInfo)}</div>
       <div className="stage-status-rail">
         <span>{status}</span>
       </div>
@@ -1541,6 +1558,7 @@ interface SidebarTelemetryProps {
   readonly status: string;
   readonly detectorState: MovementInterpreterState;
   readonly sessionTelemetry: ActivitySessionTelemetry;
+  readonly cameraStreamInfo?: CameraStreamInfo;
   readonly telemetryMode: TelemetryMode;
   readonly onTelemetryModeChange: (mode: TelemetryMode) => void;
 }
@@ -1549,6 +1567,7 @@ function SidebarTelemetryPanel({
   status,
   detectorState,
   sessionTelemetry,
+  cameraStreamInfo,
   telemetryMode,
   onTelemetryModeChange,
 }: SidebarTelemetryProps): ReactElement {
@@ -1599,6 +1618,7 @@ function SidebarTelemetryPanel({
         />
         <Metric label="Movement state" value={liveState.label} />
         <Metric label="State detail" value={liveState.detail} />
+        <Metric label="Capture" value={formatCameraStreamInfo(cameraStreamInfo)} />
         {telemetryMetrics.map((metric) => (
           <Metric key={metric.label} label={metric.label} value={metric.value} />
         ))}
@@ -3770,6 +3790,28 @@ function cameraCaptureConstraints(preferences: AppSettingsPreferences): MediaTra
       ? { deviceId: { exact: preferences.cameraDeviceId } }
       : { facingMode: 'user' }),
   };
+}
+
+function cameraStreamInfoFor(stream: MediaStream): CameraStreamInfo {
+  const [track] = stream.getVideoTracks();
+  const settings = track?.getSettings();
+
+  return {
+    width: settings?.width,
+    height: settings?.height,
+    frameRate: settings?.frameRate,
+    deviceId: settings?.deviceId,
+  };
+}
+
+function formatCameraStreamInfo(info: CameraStreamInfo | undefined): string {
+  if (!info?.width || !info.height) {
+    return 'Capture pending';
+  }
+
+  const frameRate = info.frameRate ? ` / ${Math.round(info.frameRate)} FPS` : '';
+
+  return `${info.width} x ${info.height}${frameRate}`;
 }
 
 function clampNumber(
