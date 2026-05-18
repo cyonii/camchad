@@ -16,6 +16,8 @@ export interface HistoryStorageInfo {
   readonly bytes: number;
   readonly sessionCount: number;
   readonly locationLabel: string;
+  readonly poseTraceLocationLabel?: string;
+  readonly benchmarkReportLocationLabel?: string;
   readonly lastActivityAt?: string;
 }
 
@@ -133,6 +135,8 @@ export const localBrowserHistoryClient: HistoryClient = {
       bytes: new TextEncoder().encode(raw).byteLength,
       sessionCount: sessions.length,
       locationLabel: 'Browser local storage',
+      poseTraceLocationLabel: 'Downloaded manually from developer tools',
+      benchmarkReportLocationLabel: 'Downloaded manually from developer tools',
       lastActivityAt: sessions[0]?.startedAt,
     };
   },

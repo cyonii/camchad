@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   CircleAlert,
   Cpu,
-  Database,
   Download,
   Dumbbell,
   Filter,
@@ -2285,6 +2284,8 @@ function SettingsView({
     bytes: 0,
     sessionCount: sessions.length,
     locationLabel: 'Local device',
+    poseTraceLocationLabel: 'Not checked',
+    benchmarkReportLocationLabel: 'Not checked',
     lastActivityAt: summary.lastActivityAt,
   });
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -2753,11 +2754,21 @@ function SettingsView({
             All session data stays on this device. No account, server sync, cloud model upload, or
             remote analytics pipeline is used.
           </p>
+          <div className="settings-storage-locations" aria-label="Local storage locations">
+            <div>
+              <span>History</span>
+              <strong>{storageInfo.locationLabel}</strong>
+            </div>
+            <div>
+              <span>Pose traces</span>
+              <strong>{storageInfo.poseTraceLocationLabel ?? 'Not enabled'}</strong>
+            </div>
+            <div>
+              <span>Benchmark reports</span>
+              <strong>{storageInfo.benchmarkReportLocationLabel ?? 'Not enabled'}</strong>
+            </div>
+          </div>
           <p className="setting-note">{dataStatus}</p>
-          <small className="settings-location-label">
-            <Database size={14} aria-hidden="true" />
-            {storageInfo.locationLabel}
-          </small>
         </section>
       </aside>
     </section>

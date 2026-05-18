@@ -33,6 +33,8 @@ interface HistoryStorageInfo {
   readonly bytes: number;
   readonly sessionCount: number;
   readonly locationLabel: string;
+  readonly poseTraceLocationLabel?: string;
+  readonly benchmarkReportLocationLabel?: string;
   readonly lastActivityAt?: string;
 }
 
@@ -267,6 +269,8 @@ ipcMain.handle('history:storage-info', async (): Promise<HistoryStorageInfo> => 
     bytes,
     sessionCount: history.sessions.length,
     locationLabel: app.getPath('userData'),
+    poseTraceLocationLabel: developerTraceDirectory(),
+    benchmarkReportLocationLabel: developerReportDirectory(),
     lastActivityAt: [...history.sessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]
       ?.startedAt,
   };

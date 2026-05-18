@@ -4053,6 +4053,34 @@ button,
   background: rgb(var(--primary-rgb) / 5%);
 }
 
+.settings-storage-locations {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-storage-locations > div {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgb(var(--primary-rgb) / 9%);
+  border-radius: 7px;
+  background: rgb(var(--surface-rgb) / 24%);
+}
+
+.settings-storage-locations span {
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.settings-storage-locations strong {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
 .settings-location-label {
   min-width: 0;
   overflow-wrap: anywhere;
