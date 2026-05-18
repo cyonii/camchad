@@ -10,6 +10,12 @@
   --surface-video: #bccbc3;
   --surface-glass: rgb(238 245 241 / 88%);
   --surface-glass-strong: rgb(247 251 248 / 94%);
+  --card-surface: rgb(255 255 255 / 82%);
+  --card-surface-strong: rgb(255 255 255 / 94%);
+  --card-surface-muted: rgb(249 253 250 / 72%);
+  --card-border: rgb(49 92 72 / 22%);
+  --card-border-strong: rgb(var(--primary-rgb) / 40%);
+  --selected-surface: rgb(220 246 230 / 92%);
   --text: #13201c;
   --text-muted: #4b5b55;
   --text-subtle: #6b7a74;
@@ -64,6 +70,12 @@
     --surface-video: #020504;
     --surface-glass: rgb(9 18 15 / 84%);
     --surface-glass-strong: rgb(12 24 20 / 92%);
+    --card-surface: rgb(var(--surface-rgb) / 58%);
+    --card-surface-strong: rgb(var(--surface-rgb) / 72%);
+    --card-surface-muted: rgb(var(--surface-rgb) / 38%);
+    --card-border: rgb(var(--primary-rgb) / 13%);
+    --card-border-strong: rgb(var(--primary-rgb) / 34%);
+    --selected-surface: rgb(var(--primary-rgb) / 12%);
     --text: #eef7f2;
     --text-muted: #a7b9b0;
     --text-subtle: #788d83;
@@ -116,6 +128,12 @@
   --surface-video: #020504;
   --surface-glass: rgb(9 18 15 / 84%);
   --surface-glass-strong: rgb(12 24 20 / 92%);
+  --card-surface: rgb(var(--surface-rgb) / 58%);
+  --card-surface-strong: rgb(var(--surface-rgb) / 72%);
+  --card-surface-muted: rgb(var(--surface-rgb) / 38%);
+  --card-border: rgb(var(--primary-rgb) / 13%);
+  --card-border-strong: rgb(var(--primary-rgb) / 34%);
+  --selected-surface: rgb(var(--primary-rgb) / 12%);
   --text: #eef7f2;
   --text-muted: #a7b9b0;
   --text-subtle: #788d83;
@@ -1247,9 +1265,9 @@ button,
   min-width: 0;
   width: 100%;
   max-width: 100%;
-  border: 1px solid rgb(var(--primary-rgb) / 22%);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
-  background: var(--surface-glass);
+  background: var(--card-surface);
   opacity: var(--activity-hud-opacity, 1);
   backdrop-filter: blur(var(--activity-hud-blur, 18px)) saturate(1.18);
 }
@@ -1428,10 +1446,10 @@ button,
   justify-content: center;
   gap: 6px;
   padding: 0 9px;
-  border: 1px solid rgb(var(--primary-rgb) / 18%);
+  border: 1px solid var(--card-border);
   border-radius: 4px;
   color: var(--text-muted);
-  background: rgb(var(--surface-rgb) / 54%);
+  background: var(--card-surface-strong);
   font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
   font-size: 0.68rem;
   letter-spacing: 0.04em;
@@ -1461,9 +1479,11 @@ button,
   gap: 14px;
   align-items: center;
   padding: 18px;
-  border: 1px solid rgb(var(--primary-rgb) / 22%);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
-  background: var(--surface-glass-strong);
+  background:
+    linear-gradient(90deg, rgb(var(--primary-rgb) / 10%), transparent 78%),
+    var(--card-surface-strong);
 }
 
 .rep-counter span,
@@ -1491,7 +1511,7 @@ button,
   place-items: center;
   border-radius: 999px;
   border: 3px solid var(--primary);
-  background: var(--surface);
+  background: var(--card-surface-strong);
 }
 
 .quality-dial strong {
@@ -1523,9 +1543,9 @@ button,
   min-width: 0;
   min-height: 88px;
   padding: 14px;
-  border: 1px solid rgb(var(--primary-rgb) / 16%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: var(--surface-raised);
+  background: var(--card-surface-muted);
 }
 
 .metric strong {
@@ -1542,9 +1562,9 @@ button,
   display: grid;
   gap: 9px;
   padding: 14px;
-  border: 1px solid rgb(var(--primary-rgb) / 14%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: var(--surface-glass-strong);
+  background: var(--card-surface-strong);
 }
 
 .form-feedback p {
@@ -1565,14 +1585,18 @@ button,
   display: grid;
   gap: 8px;
   padding: 14px;
-  border: 1px solid rgb(var(--primary-rgb) / 14%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: var(--surface-glass-strong);
+  background:
+    linear-gradient(90deg, rgb(var(--primary-rgb) / 13%), transparent 74%),
+    var(--card-surface-strong);
 }
 
 .camera-advice[data-severity='warning'] {
-  border-color: rgb(var(--warning-rgb) / 28%);
-  background: var(--surface-glass-strong);
+  border-color: rgb(var(--warning-rgb) / 46%);
+  background:
+    linear-gradient(90deg, rgb(var(--warning-rgb) / 18%), transparent 74%),
+    var(--card-surface-strong);
 }
 
 .camera-advice[data-severity='warning'] > span {
@@ -1590,9 +1614,9 @@ button,
   display: grid;
   gap: 12px;
   padding: 14px;
-  border: 1px solid rgb(var(--primary-rgb) / 14%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: var(--surface-glass-strong);
+  background: var(--card-surface-strong);
 }
 
 .rep-history-strip div {
@@ -1626,7 +1650,7 @@ button,
   padding: 8px;
   border: 1px solid rgb(var(--primary-rgb) / 18%);
   border-radius: 8px;
-  background: rgb(var(--surface-rgb) / 72%);
+  background: var(--card-surface-strong);
   backdrop-filter: blur(14px) saturate(1.08);
 }
 
@@ -1712,16 +1736,20 @@ button,
   max-width: min(58ch, 100%);
   gap: 4px;
   min-width: 0;
-  padding: 11px 13px;
-  border: 1px solid rgb(var(--primary-rgb) / 24%);
-  border-left-width: 3px;
+  padding: 13px 15px;
+  border: 1px solid rgb(var(--primary-rgb) / 42%);
+  border-left-width: 4px;
   border-radius: 6px;
-  background: rgb(var(--primary-rgb) / 7%);
+  background:
+    linear-gradient(90deg, rgb(var(--primary-rgb) / 18%), transparent 72%),
+    var(--card-surface-strong);
 }
 
 .camera-guidance[data-severity='warning'] {
-  border-color: rgb(var(--warning-rgb) / 36%);
-  background: rgb(var(--warning-rgb) / 8%);
+  border-color: rgb(var(--warning-rgb) / 52%);
+  background:
+    linear-gradient(90deg, rgb(var(--warning-rgb) / 22%), transparent 72%),
+    var(--card-surface-strong);
 }
 
 .camera-guidance strong {
@@ -1732,7 +1760,7 @@ button,
 }
 
 .camera-guidance small {
-  color: var(--text-muted);
+  color: var(--text);
   font-size: 0.78rem;
   line-height: 1.42;
 }
@@ -1967,18 +1995,18 @@ button,
 
 .chart-panel {
   padding: 18px;
-  border: 1px solid rgb(var(--primary-rgb) / 16%);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   background:
-    linear-gradient(180deg, rgb(var(--surface-rgb) / 74%), rgb(var(--surface-rgb) / 48%)),
+    linear-gradient(180deg, var(--card-surface-strong), var(--card-surface)),
     radial-gradient(circle at 68% 10%, rgb(var(--primary-rgb) / 9%), transparent 36%);
 }
 
 .exercise-catalog-panel {
   padding: 18px;
-  border: 1px solid rgb(var(--primary-rgb) / 16%);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
-  background: var(--surface-glass);
+  background: var(--card-surface);
 }
 
 .exercise-definition-list {
@@ -2110,7 +2138,7 @@ button,
   padding: 10px;
   border: 1px solid rgb(var(--primary-rgb) / 10%);
   border-radius: 7px;
-  background: rgb(var(--surface-rgb) / 30%);
+  background: var(--card-surface-muted);
 }
 
 .exercise-definition-row[data-maturity='planned'] .exercise-definition-details div {
@@ -2222,7 +2250,7 @@ button,
   padding: 12px;
   border: 1px solid rgb(var(--primary-rgb) / 13%);
   border-radius: 7px;
-  background: rgb(var(--surface-rgb) / 42%);
+  background: var(--card-surface-muted);
 }
 
 .chart-breakdown-grid span,
@@ -2308,7 +2336,7 @@ button,
 .exercise-heading-row,
 .history-section-heading {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 22px;
@@ -2349,9 +2377,9 @@ button,
 .history-stat-card,
 .history-table-panel,
 .history-detail-card {
-  border: 1px solid rgb(var(--primary-rgb) / 13%);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
-  background: rgb(var(--surface-rgb) / 54%);
+  background: var(--card-surface);
 }
 
 .history-stat-card {
@@ -2432,7 +2460,7 @@ button,
   display: grid;
   max-width: 100%;
   overflow: hidden;
-  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
 }
 
@@ -2486,7 +2514,7 @@ button,
 .history-table-head {
   min-height: 38px;
   color: var(--text-subtle);
-  background: rgb(var(--primary-rgb) / 4%);
+  background: var(--card-surface-muted);
   font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
   font-size: 0.68rem;
   font-weight: 700;
@@ -2550,9 +2578,9 @@ button,
   gap: 3px 10px;
   align-items: center;
   padding: 10px;
-  border: 1px solid rgb(var(--primary-rgb) / 11%);
+  border: 1px solid var(--card-border);
   border-radius: 6px;
-  background: rgb(var(--primary-rgb) / 5%);
+  background: var(--card-surface-muted);
 }
 
 .session-flow-node > span {
@@ -2583,10 +2611,10 @@ button,
 
 .session-transition-list span {
   padding: 5px 8px;
-  border: 1px solid rgb(var(--primary-rgb) / 14%);
+  border: 1px solid var(--card-border);
   border-radius: 999px;
   color: var(--text-muted);
-  background: rgb(0 0 0 / 8%);
+  background: var(--card-surface-muted);
   font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
   font-size: 0.64rem;
   font-weight: 700;
@@ -2601,10 +2629,10 @@ button,
 
 .tracking-quality-list span {
   padding: 8px 10px;
-  border: 1px solid rgb(var(--primary-rgb) / 11%);
+  border: 1px solid var(--card-border);
   border-radius: 6px;
   color: var(--text-muted);
-  background: rgb(var(--primary-rgb) / 5%);
+  background: var(--card-surface-muted);
   font-size: 0.76rem;
   line-height: 1.35;
 }
@@ -2619,9 +2647,9 @@ button,
   min-width: 0;
   gap: 10px;
   padding: 14px;
-  border: 1px solid rgb(var(--primary-rgb) / 11%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(var(--surface-rgb) / 38%);
+  background: var(--card-surface-muted);
 }
 
 .movement-breakdown-summary {
@@ -2689,7 +2717,7 @@ button,
   padding: 10px;
   border: 1px solid rgb(var(--primary-rgb) / 9%);
   border-radius: 6px;
-  background: rgb(0 0 0 / 10%);
+  background: var(--card-surface-strong);
 }
 
 .movement-breakdown-metrics small,
@@ -2737,9 +2765,9 @@ button,
 
 .detail-metric-grid .metric {
   min-height: 78px;
-  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(var(--surface-rgb) / 34%);
+  background: var(--card-surface-muted);
 }
 
 .segment-telemetry-list {
@@ -2751,9 +2779,9 @@ button,
   display: grid;
   gap: 10px;
   padding: 14px;
-  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(var(--surface-rgb) / 30%);
+  background: var(--card-surface-muted);
 }
 
 .segment-telemetry-list strong {
@@ -2796,9 +2824,9 @@ button,
   align-items: center;
   gap: 12px;
   padding: 11px 12px;
-  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(var(--surface-rgb) / 30%);
+  background: var(--card-surface-muted);
 }
 
 .fatigue-timeline-row strong,
@@ -2877,7 +2905,7 @@ button,
   border: 1px dashed rgb(var(--primary-rgb) / 16%);
   border-radius: 7px;
   color: var(--text-muted);
-  background: rgb(var(--surface-rgb) / 26%);
+  background: var(--card-surface-muted);
 }
 
 .exercise-observatory {
@@ -2916,9 +2944,9 @@ button,
 .exercise-definition-panel,
 .movement-inspector,
 .movement-inspector-card {
-  border: 1px solid rgb(var(--primary-rgb) / 12%);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
-  background: rgb(var(--surface-rgb) / 58%);
+  background: var(--card-surface);
 }
 
 .exercise-panel-heading span,
@@ -2959,7 +2987,7 @@ button,
   padding: 16px;
   border: 1px solid rgb(var(--primary-rgb) / 12%);
   border-radius: 8px;
-  background: rgb(var(--surface-rgb) / 46%);
+  background: var(--card-surface-muted);
 }
 
 .exercise-system-strip span,
@@ -3031,9 +3059,9 @@ button,
 .exercise-search,
 .exercise-filter-button {
   min-height: 44px;
-  border: 1px solid rgb(var(--primary-rgb) / 14%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(0 0 0 / 18%);
+  background: var(--card-surface-strong);
 }
 
 .exercise-search {
@@ -3117,7 +3145,7 @@ button,
   border: 1px solid rgb(var(--primary-rgb) / 14%);
   border-radius: 7px;
   color: var(--text-muted);
-  background: rgb(var(--surface-rgb) / 46%);
+  background: var(--card-surface-muted);
   font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
   font-size: 0.74rem;
   text-transform: uppercase;
@@ -3151,7 +3179,7 @@ button,
   color: var(--text-muted);
   border: 1px dashed rgb(var(--primary-rgb) / 14%);
   border-radius: 7px;
-  background: rgb(0 0 0 / 12%);
+  background: var(--card-surface-muted);
   text-align: center;
 }
 
@@ -3167,18 +3195,17 @@ button,
   width: 100%;
   min-height: 188px;
   padding: 14px 16px;
-  border: 1px solid rgb(var(--primary-rgb) / 11%);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   color: var(--text);
-  background: rgb(var(--surface-rgb) / 44%);
+  background: var(--card-surface-muted);
   text-align: left;
 }
 
 .engine-definition-card[aria-pressed='true'] {
-  border: 1px solid rgb(var(--primary-rgb) / 34%);
+  border: 1px solid var(--card-border-strong);
   background:
-    linear-gradient(180deg, rgb(var(--primary-rgb) / 9%), transparent 58%),
-    rgb(var(--surface-rgb) / 54%);
+    linear-gradient(180deg, rgb(var(--primary-rgb) / 16%), transparent 70%), var(--selected-surface);
 }
 
 .engine-definition-card[data-maturity='planned'] {
@@ -3319,10 +3346,10 @@ button,
 
 .engine-definition-tags span {
   padding: 5px 8px;
-  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border: 1px solid var(--card-border);
   border-radius: 5px;
   color: var(--text-muted);
-  background: rgb(0 0 0 / 12%);
+  background: var(--card-surface-strong);
   font-size: 0.62rem;
 }
 
@@ -3339,7 +3366,7 @@ button,
   place-items: center;
   border-radius: 999px;
   border: 2px solid var(--primary);
-  background: rgb(var(--surface-rgb) / 92%);
+  background: var(--card-surface-strong);
 }
 
 .mini-signal-ring span {
@@ -3425,7 +3452,7 @@ button,
   height: 12px;
   border: 1px solid rgb(var(--primary-rgb) / 18%);
   border-radius: 999px;
-  background: rgb(var(--surface-rgb) / 70%);
+  background: var(--card-surface-strong);
 }
 
 .maturity-rail div[data-active='true'] {
@@ -3451,9 +3478,9 @@ button,
   gap: 10px;
   align-items: start;
   padding: 10px;
-  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(0 0 0 / 12%);
+  background: var(--card-surface-muted);
 }
 
 .readiness-checklist svg {
@@ -3490,9 +3517,9 @@ button,
 .movement-inspector-grid div {
   min-height: 74px;
   padding: 12px;
-  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(0 0 0 / 14%);
+  background: var(--card-surface-muted);
 }
 
 .movement-inspector-grid span {
@@ -3516,9 +3543,9 @@ button,
 .movement-watch-grid > div,
 .movement-watch-list > div {
   min-width: 0;
-  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(0 0 0 / 14%);
+  background: var(--card-surface-muted);
 }
 
 .movement-watch-grid > div {
@@ -3694,9 +3721,9 @@ button,
 }
 
 .settings-preview-card {
-  border: 1px solid rgb(var(--primary-rgb) / 12%);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
-  background: rgb(var(--surface-rgb) / 58%);
+  background: var(--card-surface);
 }
 
 .settings-section {
@@ -3741,13 +3768,13 @@ button,
   align-items: center;
   min-height: 76px;
   padding: 16px 18px;
-  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
-  background: rgb(var(--surface-rgb) / 42%);
+  background: var(--card-surface-muted);
 }
 
 .settings-control-row:last-child {
-  border-bottom: 1px solid rgb(var(--primary-rgb) / 10%);
+  border-bottom: 1px solid var(--card-border);
 }
 
 .settings-control-copy {
@@ -3778,7 +3805,7 @@ button,
   border: 1px solid rgb(var(--primary-rgb) / 16%);
   border-radius: 6px;
   color: var(--text);
-  background: rgb(var(--surface-rgb) / 72%);
+  background: var(--card-surface-strong);
   font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
   font-size: 0.78rem;
 }
@@ -3824,7 +3851,7 @@ button,
   border-radius: 999px;
   padding: 0 12px;
   color: var(--text-muted);
-  background: rgb(var(--surface-rgb) / 48%);
+  background: var(--card-surface-muted);
   font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
   font-size: 0.68rem;
   text-transform: uppercase;
@@ -3836,7 +3863,7 @@ button,
   height: 28px;
   border: 1px solid rgb(var(--primary-rgb) / 20%);
   border-radius: 999px;
-  background: rgb(var(--surface-rgb) / 80%);
+  background: var(--card-surface-strong);
 }
 
 .settings-toggle span {
@@ -3886,9 +3913,9 @@ button,
   grid-auto-flow: column;
   gap: 6px;
   padding: 4px;
-  border: 1px solid rgb(var(--primary-rgb) / 12%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(0 0 0 / 16%);
+  background: var(--card-surface-muted);
 }
 
 .settings-segmented-control button {
@@ -3901,8 +3928,8 @@ button,
 
 .settings-segmented-control button[aria-pressed='true'] {
   color: var(--primary);
-  border-color: rgb(var(--primary-rgb) / 28%);
-  background: rgb(var(--primary-rgb) / 12%);
+  border-color: var(--card-border-strong);
+  background: var(--selected-surface);
 }
 
 .settings-preview-card {
@@ -4121,9 +4148,9 @@ button,
 .guidance-panel > div {
   padding: 12px;
   color: var(--primary);
-  border: 1px solid rgb(var(--primary-rgb) / 13%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(var(--primary-rgb) / 6%);
+  background: var(--card-surface-muted);
 }
 
 .settings-storage-grid {
@@ -4134,16 +4161,16 @@ button,
 
 .settings-storage-grid .metric {
   min-height: 74px;
-  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(var(--surface-rgb) / 34%);
+  background: var(--card-surface-strong);
 }
 
 .settings-storage-note {
   padding: 12px;
-  border: 1px solid rgb(var(--primary-rgb) / 11%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(var(--primary-rgb) / 5%);
+  background: var(--card-surface-muted);
 }
 
 .settings-storage-locations {
@@ -4155,9 +4182,9 @@ button,
   display: grid;
   gap: 4px;
   padding: 10px 12px;
-  border: 1px solid rgb(var(--primary-rgb) / 9%);
+  border: 1px solid var(--card-border);
   border-radius: 7px;
-  background: rgb(var(--surface-rgb) / 24%);
+  background: var(--card-surface-muted);
 }
 
 .settings-storage-locations span {
@@ -4299,10 +4326,6 @@ button,
 
   .telemetry-panel-fixed {
     min-height: 320px;
-  }
-
-  .bottom-command-deck {
-    grid-template-columns: 1fr;
   }
 
   .history-command-center {
