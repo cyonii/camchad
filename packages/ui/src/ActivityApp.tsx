@@ -43,6 +43,7 @@ import {
   extractBodyState,
   movementDefinitionFor,
   movementRegistry,
+  movementReadinessChecklist,
   MovementWindow,
 } from '@camchad/movement-core';
 import {
@@ -3189,6 +3190,7 @@ function MovementDefinitionInspector({
 }): ReactElement {
   const guide = exerciseGuideFor(definition.type, exerciseGuideAssetBasePath);
   const maturitySteps = movementMaturitySteps(definition);
+  const readinessChecklist = movementReadinessChecklist(definition);
 
   return (
     <aside className="movement-inspector" aria-label="Movement definition details">
@@ -3229,6 +3231,33 @@ function MovementDefinitionInspector({
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="movement-inspector-card">
+        <div className="exercise-panel-heading">
+          <div>
+            <span>Promotion gates</span>
+            <h3>Validation readiness</h3>
+          </div>
+          <strong>
+            {readinessChecklist.filter((item) => item.passed).length}/{readinessChecklist.length}
+          </strong>
+        </div>
+        <ul className="readiness-checklist">
+          {readinessChecklist.map((item) => (
+            <li key={item.stage} data-passed={item.passed}>
+              {item.passed ? (
+                <CheckCircle2 size={14} aria-hidden="true" />
+              ) : (
+                <CircleAlert size={14} aria-hidden="true" />
+              )}
+              <span>
+                <strong>{item.label}</strong>
+                <small>{item.detail}</small>
+              </span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="movement-inspector-grid">

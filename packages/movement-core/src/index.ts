@@ -10,6 +10,7 @@ export * from './movement-profile-evaluation-context.js';
 export * from './movement-profile-criteria.js';
 export * from './movement-profile-signals.js';
 export * from './movement-recognition-engine.js';
+export * from './movement-readiness.js';
 export * from './movement-registry.js';
 export * from './movement-temporal-tracker.js';
 export * from './movement-window.js';

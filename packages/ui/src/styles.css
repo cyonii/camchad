@@ -3329,6 +3329,50 @@ button,
   box-shadow: 0 0 14px rgb(var(--primary-rgb) / 36%);
 }
 
+.readiness-checklist {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.readiness-checklist li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border-radius: 7px;
+  background: rgb(0 0 0 / 12%);
+}
+
+.readiness-checklist svg {
+  margin-top: 2px;
+  color: var(--warning);
+}
+
+.readiness-checklist li[data-passed='true'] svg {
+  color: var(--primary);
+}
+
+.readiness-checklist strong,
+.readiness-checklist small {
+  display: block;
+}
+
+.readiness-checklist strong {
+  font-size: 0.76rem;
+}
+
+.readiness-checklist small {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  line-height: 1.45;
+}
+
 .movement-inspector-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
