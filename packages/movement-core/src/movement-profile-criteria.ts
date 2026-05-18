@@ -28,6 +28,43 @@ export interface MovementProfileCriteriaEvaluation {
   readonly evidence: readonly string[];
 }
 
+type CriterionEvaluator = (context: MovementProfileEvaluationContext) => number;
+
+const criterionEvaluators = {
+  alternating_knee_drive: scoreHighKneeLift,
+  alternating_knee_lift: scoreHighKneeLift,
+  arm_elevation_symmetry: scoreWristSpan,
+  arm_leg_abduction_rhythm: scoreAppendageSpanOscillation,
+  body_line_quality: scoreHorizontalBodyLine,
+  body_line_signal: scoreHorizontalBodyLine,
+  compound_motion_rhythm: scoreMovementRhythm,
+  elbow_flexion: scoreElbowSignal,
+  elbow_flexion_signal: scoreElbowSignal,
+  floor_orientation: scoreBodyOrientation,
+  front_knee_flexion: scoreKneeSignal,
+  hip_anchor_stability: scoreHipSignal,
+  hip_drop: scoreHipSignal,
+  hip_level_change: scoreHipSignal,
+  hold_stability: scoreStaticHoldStability,
+  horizontal_body_line: scoreHorizontalBodyLine,
+  knee_flexion_signal: scoreKneeSignal,
+  plank_base: scoreHorizontalBodyLine,
+  push_up_depth: scoreElbowSignal,
+  shoulder_abduction: scoreWristSpan,
+  shoulder_elevation_change: scoreElbowSignal,
+  split_stance: scoreAnkleSpan,
+  squat_depth: scoreKneeSignal,
+  standing_floor_standing_transition: scoreMovementRhythm,
+  standing_orientation: scoreBodyOrientation,
+  static_hold_stability: scoreStaticHoldStability,
+  static_pose_geometry: scoreStaticHoldStability,
+  torso_control: scoreTorsoControl,
+  torso_curl_trajectory: scoreHipSignal,
+  vertical_cadence: scoreVerticalCadence,
+  vertical_hanging_posture: scoreBodyOrientation,
+  wrist_and_ankle_span_oscillation: scoreAppendageSpanOscillation,
+} satisfies Record<string, CriterionEvaluator>;
+
 export function evaluateMovementRecognitionCriteria(input: {
   readonly definition: MovementDefinition;
   readonly context: MovementProfileEvaluationContext;
@@ -116,45 +153,12 @@ function evaluateCriterion(
   criterion: MovementProfileCriterion,
   context: MovementProfileEvaluationContext,
 ): MovementCriterionEvaluation {
-  const key = criterion.key;
-  const specificScore = evaluateSpecificCriterion(key, context);
+  const evaluator = criterionEvaluators[criterion.key as keyof typeof criterionEvaluators];
 
-  if (specificScore !== undefined) {
-    return {
-      key: criterion.key,
-      label: criterion.label,
-      passed: specificScore >= 0.45,
-      score: clamp01(specificScore),
-      evidence: criterion.key,
-    };
+  if (!evaluator) {
+    throw new Error(`Unsupported movement recognition criterion: ${criterion.key}`);
   }
-
-  const bodyState = context.bodyState;
-  const window = context.window;
-  let score = bodyState.confidence;
-
-  if (key.includes('elbow')) {
-    score = angleSignalScore(bodyState.jointAngles.leftElbow, bodyState.jointAngles.rightElbow);
-  } else if (key.includes('knee')) {
-    score = angleSignalScore(bodyState.jointAngles.leftKnee, bodyState.jointAngles.rightKnee);
-  } else if (key.includes('hip') || key.includes('torso')) {
-    score = Math.max(
-      angleSignalScore(bodyState.jointAngles.leftHip, bodyState.jointAngles.rightHip),
-      bodyState.coverage.regions.torso,
-    );
-  } else if (key.includes('body_line') || key.includes('stability')) {
-    const deviation = bodyLineDeviation(context);
-    score =
-      deviation === undefined
-        ? bodyState.orientation.confidence
-        : 1 - Math.min(1, deviation / 0.35);
-  } else if (key.includes('span') || key.includes('abduction')) {
-    score = wristSpanRatio(context) !== undefined || ankleSpanRatio(context) !== undefined ? 1 : 0;
-  } else if (key.includes('hold') || key.includes('static')) {
-    score = Math.max(0, 1 - window.missingSampleRatio);
-  } else if (key.includes('orientation')) {
-    score = bodyState.orientation.confidence;
-  }
+  const score = evaluator(context);
 
   return {
     key: criterion.key,
@@ -165,28 +169,55 @@ function evaluateCriterion(
   };
 }
 
-function evaluateSpecificCriterion(
-  key: string,
-  context: MovementProfileEvaluationContext,
-): number | undefined {
-  switch (key) {
-    case 'alternating_knee_lift':
-      return scoreHighKneeLift(context);
-    case 'vertical_cadence':
-      return scoreVerticalCadence(context);
-    case 'horizontal_body_line':
-      return scoreHorizontalBodyLine(context);
-    case 'static_hold_stability':
-      return scoreStaticHoldStability(context);
-    default:
-      return undefined;
-  }
-}
-
 function scoreHighKneeLift(context: MovementProfileEvaluationContext): number {
   const ratio = maxKneeLiftRatio(context);
 
   return ratio === undefined ? 0 : ratioScore(ratio, 0.35, 0.65);
+}
+
+function scoreElbowSignal(context: MovementProfileEvaluationContext): number {
+  return angleSignalScore(
+    context.bodyState.jointAngles.leftElbow,
+    context.bodyState.jointAngles.rightElbow,
+  );
+}
+
+function scoreKneeSignal(context: MovementProfileEvaluationContext): number {
+  return angleSignalScore(
+    context.bodyState.jointAngles.leftKnee,
+    context.bodyState.jointAngles.rightKnee,
+  );
+}
+
+function scoreHipSignal(context: MovementProfileEvaluationContext): number {
+  return Math.max(
+    angleSignalScore(context.bodyState.jointAngles.leftHip, context.bodyState.jointAngles.rightHip),
+    context.bodyState.coverage.regions.torso,
+  );
+}
+
+function scoreTorsoControl(context: MovementProfileEvaluationContext): number {
+  return Math.max(scoreHipSignal(context), context.bodyState.orientation.confidence);
+}
+
+function scoreBodyOrientation(context: MovementProfileEvaluationContext): number {
+  return context.bodyState.orientation.confidence;
+}
+
+function scoreWristSpan(context: MovementProfileEvaluationContext): number {
+  return wristSpanRatio(context) === undefined ? 0 : 1;
+}
+
+function scoreAnkleSpan(context: MovementProfileEvaluationContext): number {
+  return ankleSpanRatio(context) === undefined ? 0 : 1;
+}
+
+function scoreAppendageSpanOscillation(context: MovementProfileEvaluationContext): number {
+  return wristSpanRatio(context) !== undefined || ankleSpanRatio(context) !== undefined ? 1 : 0;
+}
+
+function scoreMovementRhythm(context: MovementProfileEvaluationContext): number {
+  return Math.max(0, 1 - context.window.missingSampleRatio);
 }
 
 function scoreVerticalCadence(context: MovementProfileEvaluationContext): number {

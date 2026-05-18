@@ -125,6 +125,32 @@ describe('evaluateMovementRecognitionCriteria', () => {
       evidence: 'body_orientation_mismatch',
     });
   });
+
+  it('fails loudly when a declarative criterion has no evaluator', () => {
+    const context = contextFor(makeSquatFrame({ timestampMs: 0, kneeAngle: 132 }));
+    const definition = movementDefinitionFor('squat');
+
+    expect(() =>
+      evaluateMovementRecognitionCriteria({
+        definition: {
+          ...definition,
+          profile: {
+            ...definition.profile,
+            recognitionCriteria: [
+              ...definition.profile.recognitionCriteria,
+              {
+                key: 'unsupported_test_criterion',
+                label: 'Unsupported test criterion',
+                source: 'declarative',
+              },
+            ],
+          },
+        },
+        context,
+        cameraAngle: 'side',
+      }),
+    ).toThrow(/Unsupported movement recognition criterion/);
+  });
 });
 
 function contextFor(frame: Parameters<typeof evaluateMovementProfileFrame>[0]['frame']) {
