@@ -40,6 +40,33 @@ describe('MovementWindow', () => {
     expect(snapshot.averageConfidence).toBeCloseTo(0.8);
   });
 
+  it('summarizes body scale, center, and landmark stability across the window', () => {
+    const stableWindow = new MovementWindow({ maxAgeMs: 1000 });
+
+    stableWindow.add(requiredBodyState(0, 168));
+    const stableSnapshot = stableWindow.add(requiredBodyState(120, 166));
+
+    const unstableWindow = new MovementWindow({ maxAgeMs: 1000 });
+
+    unstableWindow.add(requiredBodyState(0, 168));
+    const unstableSnapshot = unstableWindow.add(
+      requiredBodyState(120, 166, 0.95, {
+        scale: 1.7,
+        offsetX: 0.08,
+        offsetY: 0.04,
+        leftWristJitterY: 0.24,
+      }),
+    );
+
+    expect(stableSnapshot.environment.scaleStability).toBeGreaterThan(
+      unstableSnapshot.environment.scaleStability,
+    );
+    expect(stableSnapshot.environment.centerStability).toBeGreaterThan(
+      unstableSnapshot.environment.centerStability,
+    );
+    expect(unstableSnapshot.environment.landmarkJitter).toBeGreaterThan(0.05);
+  });
+
   it('calculates signal velocity and direction across valid samples', () => {
     const window = new MovementWindow({ maxAgeMs: 1000 });
 
@@ -103,8 +130,39 @@ describe('MovementWindow', () => {
   });
 });
 
-function requiredBodyState(timestampMs: number, kneeAngle: number, visibility = 0.95) {
-  const bodyState = extractBodyState(makeSquatFrame({ timestampMs, kneeAngle, visibility }));
+function requiredBodyState(
+  timestampMs: number,
+  kneeAngle: number,
+  visibility = 0.95,
+  transform: {
+    readonly scale?: number;
+    readonly offsetX?: number;
+    readonly offsetY?: number;
+    readonly leftWristJitterY?: number;
+  } = {},
+) {
+  const frame = makeSquatFrame({ timestampMs, kneeAngle, visibility });
+  const bodyState = extractBodyState(
+    transform.scale || transform.offsetX || transform.offsetY || transform.leftWristJitterY
+      ? {
+          ...frame,
+          landmarks: new Map(
+            [...frame.landmarks.entries()].map(([name, landmark]) => [
+              name,
+              {
+                ...landmark,
+                x: 0.5 + (landmark.x - 0.5) * (transform.scale ?? 1) + (transform.offsetX ?? 0),
+                y:
+                  0.5 +
+                  (landmark.y - 0.5) * (transform.scale ?? 1) +
+                  (transform.offsetY ?? 0) +
+                  (name === 'left_wrist' ? (transform.leftWristJitterY ?? 0) : 0),
+              },
+            ]),
+          ),
+        }
+      : frame,
+  );
 
   if (!bodyState) {
     throw new Error('Expected fixture to produce a body state.');

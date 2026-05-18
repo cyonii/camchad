@@ -80,6 +80,49 @@ describe('extractBodyState', () => {
     expect(state?.coverage.upperBody).toBeLessThan(0.75);
   });
 
+  it('reports one-sided asymmetry when one side is unreliable', () => {
+    const state = extractBodyState(
+      makePushUpFrame({
+        timestampMs: 0,
+        elbowAngle: 150,
+        leftVisibility: 0.95,
+        rightVisibility: 0.1,
+      }),
+    );
+
+    expect(state?.environment.missingSideAsymmetry).toBeGreaterThan(0.7);
+  });
+
+  it('reports cropped regions and edge proximity when landmarks are near frame edges', () => {
+    const state = extractBodyState(
+      mapLandmarks(makeSquatFrame({ timestampMs: 0, kneeAngle: 160 }), (landmark) => {
+        switch (landmark.name) {
+          case 'left_ankle':
+          case 'left_heel':
+          case 'left_foot_index':
+            return { ...landmark, y: 0.99 };
+          default:
+            return landmark;
+        }
+      }),
+    );
+
+    expect(state?.environment.croppedRegions).toContain('leftLeg');
+    expect(state?.environment.croppedRegions).toContain('leftFoot');
+    expect(state?.environment.edgeProximityRisk).toBeGreaterThan(0.8);
+  });
+
+  it('estimates camera distance from body scale', () => {
+    expect(
+      extractBodyState(scaleAroundTorso(makeSquatFrame({ timestampMs: 0, kneeAngle: 160 }), 0.7))
+        ?.environment.cameraDistance,
+    ).toBe('far');
+    expect(
+      extractBodyState(scaleAroundTorso(makeSquatFrame({ timestampMs: 0, kneeAngle: 160 }), 1.9))
+        ?.environment.cameraDistance,
+    ).toBe('near');
+  });
+
   it('returns undefined when torso anchors are unavailable', () => {
     const frame: PoseFrame = {
       timestampMs: 0,
@@ -144,4 +187,26 @@ function mapLandmarks(
     ...frame,
     landmarks: toLandmarkMap([...frame.landmarks.values()].map(mapper)),
   };
+}
+
+function scaleAroundTorso(frame: PoseFrame, factor: number): PoseFrame {
+  const leftShoulder = frame.landmarks.get('left_shoulder');
+  const rightShoulder = frame.landmarks.get('right_shoulder');
+  const leftHip = frame.landmarks.get('left_hip');
+  const rightHip = frame.landmarks.get('right_hip');
+
+  if (!leftShoulder || !rightShoulder || !leftHip || !rightHip) {
+    throw new Error('Expected torso landmarks.');
+  }
+
+  const center = {
+    x: (leftShoulder.x + rightShoulder.x + leftHip.x + rightHip.x) / 4,
+    y: (leftShoulder.y + rightShoulder.y + leftHip.y + rightHip.y) / 4,
+  };
+
+  return mapLandmarks(frame, (landmark) => ({
+    ...landmark,
+    x: center.x + (landmark.x - center.x) * factor,
+    y: center.y + (landmark.y - center.y) * factor,
+  }));
 }

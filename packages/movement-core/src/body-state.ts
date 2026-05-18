@@ -58,6 +58,11 @@ export interface BodyEnvironmentQuality {
   readonly fullBodyVisible: boolean;
   readonly occlusionRisk: number;
   readonly lowConfidenceRegions: readonly BodyRegion[];
+  readonly croppedRegions: readonly BodyRegion[];
+  readonly edgeProximityRisk: number;
+  readonly missingSideAsymmetry: number;
+  readonly centerFrameOffset: number;
+  readonly cameraDistance: 'too_close' | 'near' | 'usable' | 'far' | 'too_far' | 'unknown';
 }
 
 export interface BodyJointAngles {
@@ -128,7 +133,7 @@ export function extractBodyState(frame: PoseFrame | undefined): BodyState | unde
     landmarks: normalizedLandmarks,
     worldLandmarks: normalizedWorldLandmarks,
     coverage,
-    environment: computeEnvironmentQuality(coverage),
+    environment: computeEnvironmentQuality(frame, coverage, geometry, scale),
     orientation: estimateBodyOrientation(frame, shoulderCenter, hipCenter),
     viewOrientation: estimateViewOrientation(geometry),
     jointAngles: computeJointAngles(frame),
@@ -195,16 +200,107 @@ function computeBodyCoverage(frame: PoseFrame): BodyCoverage {
   };
 }
 
-function computeEnvironmentQuality(coverage: BodyCoverage): BodyEnvironmentQuality {
+function computeEnvironmentQuality(
+  frame: PoseFrame,
+  coverage: BodyCoverage,
+  geometry: BodyGeometrySignals,
+  scale: number,
+): BodyEnvironmentQuality {
   const lowConfidenceRegions = Object.entries(coverage.regions)
     .filter(([, score]) => score < 0.45)
     .map(([region]) => region as BodyRegion);
+  const croppedRegions = croppedBodyRegions(frame);
 
   return {
     fullBodyVisible: coverage.fullBody >= 0.72,
-    occlusionRisk: clamp01(lowConfidenceRegions.length / Object.keys(coverage.regions).length),
+    occlusionRisk: clamp01(
+      lowConfidenceRegions.length / Object.keys(coverage.regions).length +
+        croppedRegions.length / Object.keys(coverage.regions).length,
+    ),
     lowConfidenceRegions,
+    croppedRegions,
+    edgeProximityRisk: edgeProximityRisk(frame),
+    missingSideAsymmetry: sideVisibilityAsymmetry(coverage),
+    centerFrameOffset: distance(
+      { x: geometry.centerOfMassX, y: geometry.centerOfMassY },
+      { x: 0.5, y: 0.5 },
+    ),
+    cameraDistance: cameraDistanceEstimate(scale),
   };
+}
+
+function croppedBodyRegions(frame: PoseFrame): readonly BodyRegion[] {
+  const regions: [BodyRegion, readonly LandmarkName[]][] = [
+    ['head', ['nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear']],
+    ['torso', ['left_shoulder', 'right_shoulder', 'left_hip', 'right_hip']],
+    ['leftArm', ['left_shoulder', 'left_elbow', 'left_wrist']],
+    ['rightArm', ['right_shoulder', 'right_elbow', 'right_wrist']],
+    ['leftLeg', ['left_hip', 'left_knee', 'left_ankle']],
+    ['rightLeg', ['right_hip', 'right_knee', 'right_ankle']],
+    ['leftHand', ['left_wrist', 'left_pinky', 'left_index', 'left_thumb']],
+    ['rightHand', ['right_wrist', 'right_pinky', 'right_index', 'right_thumb']],
+    ['leftFoot', ['left_ankle', 'left_heel', 'left_foot_index']],
+    ['rightFoot', ['right_ankle', 'right_heel', 'right_foot_index']],
+  ];
+
+  return regions
+    .filter(([, names]) =>
+      names.some((name) => {
+        const landmark = frame.landmarks.get(name);
+
+        return landmark ? isNearFrameEdge(landmark) : false;
+      }),
+    )
+    .map(([region]) => region);
+}
+
+function edgeProximityRisk(frame: PoseFrame): number {
+  const distances = [...frame.landmarks.values()].map((landmark) =>
+    Math.min(landmark.x, landmark.y, 1 - landmark.x, 1 - landmark.y),
+  );
+
+  if (distances.length === 0) {
+    return 0;
+  }
+
+  return clamp01((0.08 - Math.min(...distances)) / 0.08);
+}
+
+function sideVisibilityAsymmetry(coverage: BodyCoverage): number {
+  return Math.max(
+    Math.abs(coverage.regions.leftArm - coverage.regions.rightArm),
+    Math.abs(coverage.regions.leftHand - coverage.regions.rightHand),
+    Math.abs(coverage.regions.leftLeg - coverage.regions.rightLeg),
+    Math.abs(coverage.regions.leftFoot - coverage.regions.rightFoot),
+  );
+}
+
+function cameraDistanceEstimate(scale: number): BodyEnvironmentQuality['cameraDistance'] {
+  if (!Number.isFinite(scale) || scale <= 0) {
+    return 'unknown';
+  }
+
+  if (scale < 0.12) {
+    return 'too_far';
+  }
+
+  if (scale < 0.18) {
+    return 'far';
+  }
+
+  if (scale > 0.42) {
+    return 'too_close';
+  }
+
+  if (scale > 0.34) {
+    return 'near';
+  }
+
+  return 'usable';
+}
+
+function isNearFrameEdge(landmark: PoseLandmark): boolean {
+  return landmark.x <= 0.03 || landmark.x >= 0.97 || landmark.y <= 0.03 || landmark.y >= 0.97;
 }
 
 function normalizeLandmarkMap(

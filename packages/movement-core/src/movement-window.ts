@@ -49,8 +49,15 @@ export interface MovementWindowSnapshot {
   readonly previousValid?: ValidMovementWindowSample;
   readonly durationMs: number;
   readonly averageConfidence: number;
+  readonly environment: MovementWindowEnvironment;
   readonly missingSampleCount: number;
   readonly missingSampleRatio: number;
+}
+
+export interface MovementWindowEnvironment {
+  readonly scaleStability: number;
+  readonly centerStability: number;
+  readonly landmarkJitter: number;
 }
 
 export class MovementWindow {
@@ -98,6 +105,7 @@ export class MovementWindow {
       previousValid,
       durationMs,
       averageConfidence: average(validSamples.map((sample) => sample.bodyState.confidence)),
+      environment: summarizeEnvironment(validSamples),
       missingSampleCount: this.samples.length - validSamples.length,
       missingSampleRatio:
         this.samples.length === 0
@@ -233,6 +241,92 @@ export class MovementWindow {
 
     return this.snapshot();
   }
+}
+
+function summarizeEnvironment(
+  validSamples: readonly ValidMovementWindowSample[],
+): MovementWindowEnvironment {
+  if (validSamples.length < 2) {
+    return {
+      scaleStability: 1,
+      centerStability: 1,
+      landmarkJitter: 0,
+    };
+  }
+
+  const scaleValues = validSamples.map((sample) => sample.bodyState.scale);
+  const centers = validSamples.map((sample) => sample.bodyState.center);
+  const scaleAverage = average(scaleValues);
+  const scaleRange = Math.max(...scaleValues) - Math.min(...scaleValues);
+  const centerTravel = pairwiseAverage(
+    centers.map((center) => ({ x: center.x, y: center.y })),
+    (a, b) => distance2D(a, b),
+  );
+  const landmarkJitter = averageLandmarkJitter(validSamples);
+
+  return {
+    scaleStability: scaleAverage <= 0 ? 0 : clamp01(1 - scaleRange / scaleAverage),
+    centerStability: clamp01(1 - centerTravel / 0.12),
+    landmarkJitter,
+  };
+}
+
+function averageLandmarkJitter(validSamples: readonly ValidMovementWindowSample[]): number {
+  const jitters: number[] = [];
+
+  for (let index = 1; index < validSamples.length; index += 1) {
+    const previous = validSamples[index - 1]?.bodyState;
+    const current = validSamples[index]?.bodyState;
+
+    if (!previous || !current) {
+      continue;
+    }
+
+    const sharedDistances = [...current.landmarks.entries()]
+      .map(([name, landmark]) => {
+        const previousLandmark = previous.landmarks.get(name);
+
+        return previousLandmark
+          ? distance2D(
+              { x: previousLandmark.normalizedX, y: previousLandmark.normalizedY },
+              { x: landmark.normalizedX, y: landmark.normalizedY },
+            )
+          : undefined;
+      })
+      .filter((value): value is number => value !== undefined && Number.isFinite(value));
+
+    if (sharedDistances.length > 0) {
+      jitters.push(average(sharedDistances));
+    }
+  }
+
+  return jitters.length === 0 ? 0 : average(jitters);
+}
+
+function pairwiseAverage<T>(values: readonly T[], measure: (a: T, b: T) => number): number {
+  if (values.length < 2) {
+    return 0;
+  }
+
+  const measurements: number[] = [];
+
+  for (let index = 1; index < values.length; index += 1) {
+    const previous = values[index - 1];
+    const current = values[index];
+
+    if (previous !== undefined && current !== undefined) {
+      measurements.push(measure(previous, current));
+    }
+  }
+
+  return measurements.length === 0 ? 0 : average(measurements);
+}
+
+function distance2D(
+  a: { readonly x: number; readonly y: number },
+  b: { readonly x: number; readonly y: number },
+): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function signalTurningPoints(

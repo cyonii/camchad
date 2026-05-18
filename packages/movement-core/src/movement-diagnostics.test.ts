@@ -36,6 +36,11 @@ describe('diagnoseMovement', () => {
         validSamples: [],
         durationMs: 300,
         averageConfidence: 0.8,
+        environment: {
+          scaleStability: 1,
+          centerStability: 1,
+          landmarkJitter: 0,
+        },
         missingSampleCount: 2,
         missingSampleRatio: 0.4,
       },
@@ -86,6 +91,11 @@ describe('diagnoseMovement', () => {
         validSamples: [],
         durationMs: 300,
         averageConfidence: 0.85,
+        environment: {
+          scaleStability: 1,
+          centerStability: 1,
+          landmarkJitter: 0,
+        },
         missingSampleCount: 0,
         missingSampleRatio: 0,
       },
@@ -165,6 +175,11 @@ function snapshotWithBodyState(
     latestValid: sample,
     durationMs: 0,
     averageConfidence: bodyState.confidence,
+    environment: {
+      scaleStability: 1,
+      centerStability: 1,
+      landmarkJitter: 0,
+    },
     missingSampleCount: 0,
     missingSampleRatio: 0,
   };
