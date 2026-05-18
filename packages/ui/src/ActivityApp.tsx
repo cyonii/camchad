@@ -3463,6 +3463,47 @@ function MovementDefinitionInspector({
       <section className="movement-inspector-card">
         <div className="exercise-panel-heading">
           <div>
+            <span>Engine watches</span>
+            <h3>Body model and rhythm</h3>
+          </div>
+        </div>
+        <div className="movement-watch-grid">
+          <div>
+            <span>Orientation</span>
+            <strong>{formatBodyOrientation(definition.bodyOrientation)}</strong>
+          </div>
+          <div>
+            <span>Rhythm</span>
+            <strong>{formatMovementRhythm(definition.profile.rhythm)}</strong>
+          </div>
+          <div>
+            <span>Primitive</span>
+            <strong>{formatMovementFamily(definition.profile.family)}</strong>
+          </div>
+          <div>
+            <span>Camera sensitivity</span>
+            <strong>{formatCameraSensitivity(definition.profile.cameraSensitivity)}</strong>
+          </div>
+        </div>
+        <div className="movement-watch-list">
+          <div>
+            <span>Required regions</span>
+            <p>{definition.profile.requiredRegions.map(formatMovementRegion).join(', ')}</p>
+          </div>
+          <div>
+            <span>Primary joints</span>
+            <p>{definition.profile.primaryJoints.join(', ')}</p>
+          </div>
+          <div>
+            <span>Phase model</span>
+            <p>{definition.profile.phaseModel.join(' -> ')}</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="movement-inspector-card">
+        <div className="exercise-panel-heading">
+          <div>
             <span>Analysis signals</span>
             <h3>Tracked movement relationships</h3>
           </div>
@@ -4401,6 +4442,33 @@ function formatBodyOrientation(orientation: MovementDefinition['bodyOrientation'
   }
 
   return `${orientation[0].toUpperCase()}${orientation.slice(1)}`;
+}
+
+function formatMovementRegion(
+  region: MovementDefinition['profile']['requiredRegions'][number],
+): string {
+  return `${region[0].toUpperCase()}${region.slice(1)}`;
+}
+
+function formatMovementRhythm(rhythm: MovementDefinition['profile']['rhythm']): string {
+  if (rhythm === 'unknown') {
+    return 'Not modeled';
+  }
+
+  return `${rhythm[0].toUpperCase()}${rhythm.slice(1)}`;
+}
+
+function formatMovementFamily(family: MovementDefinition['profile']['family']): string {
+  return family
+    .split('_')
+    .map((part) => `${part[0].toUpperCase()}${part.slice(1)}`)
+    .join(' ');
+}
+
+function formatCameraSensitivity(
+  sensitivity: MovementDefinition['profile']['cameraSensitivity'],
+): string {
+  return `${sensitivity[0].toUpperCase()}${sensitivity.slice(1)}`;
 }
 
 function formatMaturityLevel(level: MovementDefinition['maturity']): string {

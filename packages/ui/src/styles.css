@@ -2963,6 +2963,8 @@ button,
 .engine-definition-metadata span,
 .movement-inspector-heading span,
 .movement-inspector-grid span,
+.movement-watch-grid span,
+.movement-watch-list span,
 .analysis-signal-list li,
 .telemetry-channel-grid span {
   font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
@@ -3541,6 +3543,57 @@ button,
 .movement-inspector-grid strong {
   font-size: 0.92rem;
   font-weight: 600;
+}
+
+.movement-watch-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.movement-watch-grid > div,
+.movement-watch-list > div {
+  min-width: 0;
+  border: 1px solid rgb(var(--primary-rgb) / 10%);
+  border-radius: 7px;
+  background: rgb(0 0 0 / 14%);
+}
+
+.movement-watch-grid > div {
+  min-height: 76px;
+  padding: 12px;
+}
+
+.movement-watch-grid span,
+.movement-watch-list span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-muted);
+  font-size: 0.64rem;
+}
+
+.movement-watch-grid strong {
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.movement-watch-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.movement-watch-list > div {
+  padding: 12px 14px;
+}
+
+.movement-watch-list p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .analysis-signal-list {
