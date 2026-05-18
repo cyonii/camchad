@@ -52,6 +52,7 @@ export interface MovementRecognitionEngineOptions {
 const unknownConfidenceThreshold = 0.32;
 const ambiguityConfidenceGap = 0.08;
 const primarySwitchHysteresisGap = 0.12;
+const recognitionRankConfidenceTolerance = 0.12;
 
 export class MovementRecognitionEngine {
   private lastState: MovementRecognitionEngineState;
@@ -348,11 +349,20 @@ function compareMovementCandidates(
   a: MovementInterpreterState,
   b: MovementInterpreterState,
 ): number {
-  return (
-    recognitionRank(b) - recognitionRank(a) ||
-    b.recognition.confidence - a.recognition.confidence ||
-    b.validReps - a.validReps
-  );
+  const aRank = recognitionRank(a);
+  const bRank = recognitionRank(b);
+
+  if (aRank === 0 || bRank === 0) {
+    return bRank - aRank || b.recognition.confidence - a.recognition.confidence;
+  }
+
+  const confidenceGap = b.recognition.confidence - a.recognition.confidence;
+
+  if (Math.abs(confidenceGap) > recognitionRankConfidenceTolerance) {
+    return confidenceGap;
+  }
+
+  return bRank - aRank || confidenceGap || b.validReps - a.validReps;
 }
 
 function recognitionRank(state: MovementInterpreterState): number {

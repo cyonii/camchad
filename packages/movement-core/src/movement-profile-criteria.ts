@@ -9,6 +9,7 @@ import type { MovementProfileEvaluationContext } from './movement-profile-evalua
 import {
   ankleSpanRatio,
   bodyLineDeviation,
+  bodyOrientationSignal,
   maxKneeLiftRatio,
   wristSpanRatio,
 } from './movement-profile-signals.js';
@@ -37,9 +38,9 @@ const criterionEvaluators = {
   arm_leg_abduction_rhythm: scoreAppendageSpanOscillation,
   body_line_quality: scoreHorizontalBodyLine,
   body_line_signal: scoreHorizontalBodyLine,
-  compound_motion_rhythm: scoreMovementRhythm,
+  compound_motion_rhythm: scoreCompoundMotionRhythm,
   elbow_flexion: scoreElbowSignal,
-  elbow_flexion_signal: scoreElbowSignal,
+  elbow_flexion_signal: scoreElbowFlexionSignal,
   floor_orientation: scoreBodyOrientation,
   front_knee_flexion: scoreKneeSignal,
   hip_anchor_stability: scoreHipSignal,
@@ -54,7 +55,7 @@ const criterionEvaluators = {
   shoulder_elevation_change: scoreElbowSignal,
   split_stance: scoreSplitStance,
   squat_depth: scoreKneeSignal,
-  standing_floor_standing_transition: scoreMovementRhythm,
+  standing_floor_standing_transition: scoreStandingFloorTransition,
   standing_orientation: scoreBodyOrientation,
   static_hold_stability: scoreStaticHoldStability,
   static_pose_geometry: scoreStaticHoldStability,
@@ -182,6 +183,18 @@ function scoreElbowSignal(context: MovementProfileEvaluationContext): number {
   );
 }
 
+function scoreElbowFlexionSignal(context: MovementProfileEvaluationContext): number {
+  const stats = angleRangeStats(context, (bodyState) =>
+    averageDefined(bodyState.jointAngles.leftElbow, bodyState.jointAngles.rightElbow),
+  );
+
+  if (stats.sampleCount < 3) {
+    return scoreElbowSignal(context);
+  }
+
+  return ratioScore(stats.range, 12, 36);
+}
+
 function scoreKneeSignal(context: MovementProfileEvaluationContext): number {
   return angleSignalScore(
     context.bodyState.jointAngles.leftKnee,
@@ -210,16 +223,53 @@ function scoreWristSpan(context: MovementProfileEvaluationContext): number {
 
 function scoreSplitStance(context: MovementProfileEvaluationContext): number {
   const ratio = ankleSpanRatio(context);
+  const kneeLift = maxKneeLiftRatio(context) ?? 0;
+  const kneeLiftPenalty = kneeLift > 0.18 ? 0.25 : 1;
 
-  return ratio === undefined ? 0 : ratioScore(ratio, 0.45, 0.9);
+  return ratio === undefined ? 0 : ratioScore(ratio, 0.45, 0.9) * kneeLiftPenalty;
 }
 
 function scoreAppendageSpanOscillation(context: MovementProfileEvaluationContext): number {
-  return wristSpanRatio(context) !== undefined || ankleSpanRatio(context) !== undefined ? 1 : 0;
+  const wristSpan = wristSpanRatio(context);
+  const ankleSpan = ankleSpanRatio(context);
+
+  if (wristSpan === undefined || ankleSpan === undefined) {
+    return 0;
+  }
+
+  return Math.min(ratioScore(wristSpan, 0.75, 1.25), ratioScore(ankleSpan, 0.55, 0.95));
 }
 
-function scoreMovementRhythm(context: MovementProfileEvaluationContext): number {
-  return Math.max(0, 1 - context.window.missingSampleRatio);
+function scoreStandingFloorTransition(context: MovementProfileEvaluationContext): number {
+  const orientations = context.window.validSamples.map((sample) =>
+    bodyOrientationSignal(sample.bodyState.orientation.kind),
+  );
+  const hasVertical = orientations.includes('vertical');
+  const hasHorizontal = orientations.includes('horizontal');
+  const hasDiagonal = orientations.includes('diagonal');
+
+  if (orientations.length < 4) {
+    return 0;
+  }
+
+  if (hasVertical && hasHorizontal) {
+    return 1;
+  }
+
+  if (hasHorizontal && hasDiagonal) {
+    return 0.62;
+  }
+
+  return 0;
+}
+
+function scoreCompoundMotionRhythm(context: MovementProfileEvaluationContext): number {
+  const transitionScore = scoreStandingFloorTransition(context);
+  const verticalTravel = signalRange(context, (bodyState) => bodyState.geometry.centerOfMassY);
+  const travelScore = ratioScore(verticalTravel.range, 0.18, 0.42);
+  const trackingScore = Math.max(0, 1 - context.window.missingSampleRatio);
+
+  return transitionScore * 0.55 + travelScore * 0.3 + trackingScore * 0.15;
 }
 
 function scoreVerticalCadence(context: MovementProfileEvaluationContext): number {
@@ -246,8 +296,11 @@ function scoreStaticHoldStability(context: MovementProfileEvaluationContext): nu
   const bodyLineScore = scoreHorizontalBodyLine(context);
   const trackingScore = 1 - context.window.missingSampleRatio;
   const confidenceScore = context.window.averageConfidence || context.bodyState.confidence;
+  const jointStillness = scoreJointStillness(context);
 
-  return bodyLineScore * 0.5 + trackingScore * 0.25 + confidenceScore * 0.25;
+  return (
+    bodyLineScore * 0.34 + jointStillness * 0.32 + trackingScore * 0.17 + confidenceScore * 0.17
+  );
 }
 
 function kneeLiftSideDelta(context: MovementProfileEvaluationContext): number | undefined {
@@ -293,6 +346,68 @@ function angleSignalScore(a: number | undefined, b: number | undefined): number 
   }
 
   return 1;
+}
+
+function angleRangeStats(
+  context: MovementProfileEvaluationContext,
+  selector: (bodyState: BodyState) => number | undefined,
+): { readonly range: number; readonly sampleCount: number } {
+  return signalRange(context, selector);
+}
+
+function signalRange(
+  context: MovementProfileEvaluationContext,
+  selector: (bodyState: BodyState) => number | undefined,
+): { readonly range: number; readonly sampleCount: number } {
+  const values = context.window.validSamples
+    .map((sample) => selector(sample.bodyState))
+    .filter((value): value is number => value !== undefined && Number.isFinite(value));
+
+  if (values.length === 0) {
+    return {
+      range: 0,
+      sampleCount: 0,
+    };
+  }
+
+  return {
+    range: Math.max(...values) - Math.min(...values),
+    sampleCount: values.length,
+  };
+}
+
+function averageDefined(a: number | undefined, b: number | undefined): number | undefined {
+  if (a === undefined) {
+    return b;
+  }
+
+  if (b === undefined) {
+    return a;
+  }
+
+  return (a + b) / 2;
+}
+
+function scoreJointStillness(context: MovementProfileEvaluationContext): number {
+  const ranges = [
+    angleRangeStats(context, (bodyState) =>
+      averageDefined(bodyState.jointAngles.leftElbow, bodyState.jointAngles.rightElbow),
+    ),
+    angleRangeStats(context, (bodyState) =>
+      averageDefined(bodyState.jointAngles.leftKnee, bodyState.jointAngles.rightKnee),
+    ),
+    angleRangeStats(context, (bodyState) =>
+      averageDefined(bodyState.jointAngles.leftHip, bodyState.jointAngles.rightHip),
+    ),
+  ].filter((stats) => stats.sampleCount >= 3);
+
+  if (ranges.length === 0) {
+    return 1;
+  }
+
+  const averageRange = ranges.reduce((sum, stats) => sum + stats.range, 0) / ranges.length;
+
+  return clamp01(1 - averageRange / 28);
 }
 
 function average(values: readonly number[]): number {

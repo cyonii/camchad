@@ -73,6 +73,7 @@ interface HoldMovementInterpreterConfig {
   readonly primaryMetric: (context: MovementProfileEvaluationContext) => number | undefined;
   readonly recognitionScore: (context: MovementProfileEvaluationContext, metric: number) => number;
   readonly evidence: readonly string[];
+  readonly pendingHoldConfidenceScale?: number;
 }
 
 export function createProfileMovementInterpreter(
@@ -515,7 +516,10 @@ class HoldProfileMovementInterpreter implements MovementInterpreter {
 
     this.recognition = {
       movementType: this.movementType,
-      confidence,
+      confidence:
+        holdState.phase === 'completed'
+          ? confidence
+          : confidence * (this.config.pendingHoldConfidenceScale ?? 1),
       status: holdState.phase === 'completed' ? 'active' : 'candidate',
       evidence: this.config.evidence,
     };
@@ -600,7 +604,7 @@ const profileMovementConfigs: Record<
     recognitionScore: (context, metric) =>
       confidenceBlend(
         context,
-        metric <= 150 ? 0.72 : 0.42,
+        (maxKneeLiftRatio(context) ?? 0) > 0.18 ? 0.16 : metric <= 150 ? 0.72 : 0.42,
         spanScore(ankleSpanRatio(context), 0.52),
       ),
     evidence: ['split_stance_signal', 'single_leg_knee_flexion', 'hip_drop_range'],
@@ -622,8 +626,12 @@ const profileMovementConfigs: Record<
 
       return wristSpan === undefined || ankleSpan === undefined ? undefined : wristSpan + ankleSpan;
     },
-    recognitionScore: (context, metric) =>
-      confidenceBlend(context, metric >= 1.35 ? 0.76 : 0.46, bodyOrientationScore(context)),
+    recognitionScore: (context) =>
+      confidenceBlend(
+        context,
+        Math.min(spanScore(wristSpanRatio(context), 0.95), spanScore(ankleSpanRatio(context), 0.7)),
+        bodyOrientationScore(context),
+      ),
     evidence: ['standing_body_orientation', 'arm_leg_abduction', 'span_oscillation'],
   },
   plank: {
@@ -636,7 +644,11 @@ const profileMovementConfigs: Record<
     primaryMetricKey: 'bodyLineDeviation',
     primaryMetric: bodyLineDeviation,
     recognitionScore: (context, metric) =>
-      confidenceBlend(context, clamp01(1 - metric / 0.22), bodyOrientationScore(context)),
+      confidenceBlend(
+        context,
+        Math.min(clamp01(1 - metric / 0.22), staticPoseStabilityScore(context)),
+        bodyOrientationScore(context),
+      ),
     evidence: ['horizontal_body_orientation', 'body_line_stability', 'static_hold_signal'],
   },
   pull_up: {
@@ -742,10 +754,15 @@ const profileMovementConfigs: Record<
     expectedOrientations: ['vertical', 'diagonal', 'horizontal'],
     minHoldMs: 1500,
     primaryMetricKey: 'poseStabilityScore',
-    primaryMetric: movementConfidence,
+    primaryMetric: staticPoseStabilityScore,
     recognitionScore: (context, metric) =>
-      confidenceBlend(context, metric, bodyOrientationScore(context)),
+      confidenceBlend(
+        context,
+        metric >= 0.72 ? metric : metric * 0.45,
+        bodyOrientationScore(context),
+      ),
     evidence: ['static_pose_geometry', 'body_orientation_stability', 'hold_consistency'],
+    pendingHoldConfidenceScale: 0.35,
   },
 };
 
@@ -796,6 +813,65 @@ function kneeLiftSide(context: MovementProfileEvaluationContext): MovementSide |
   }
 
   return leftLift > rightLift ? 'left' : 'right';
+}
+
+function staticPoseStabilityScore(context: MovementProfileEvaluationContext): number {
+  const jointRanges = [
+    signalRange(context, (bodyState) =>
+      averageDefined(bodyState.jointAngles.leftElbow, bodyState.jointAngles.rightElbow),
+    ),
+    signalRange(context, (bodyState) =>
+      averageDefined(bodyState.jointAngles.leftKnee, bodyState.jointAngles.rightKnee),
+    ),
+    signalRange(context, (bodyState) =>
+      averageDefined(bodyState.jointAngles.leftHip, bodyState.jointAngles.rightHip),
+    ),
+  ].filter((range) => range.sampleCount >= 3);
+  const averageJointMotion =
+    jointRanges.length === 0
+      ? 0
+      : jointRanges.reduce((sum, range) => sum + range.range, 0) / jointRanges.length;
+  const jointStillness = clamp01(1 - averageJointMotion / 28);
+
+  return clamp01(
+    context.window.environment.centerStability * 0.34 +
+      context.window.environment.scaleStability * 0.2 +
+      jointStillness * 0.28 +
+      movementConfidence(context) * 0.18,
+  );
+}
+
+function signalRange(
+  context: MovementProfileEvaluationContext,
+  selector: (bodyState: MovementProfileEvaluationContext['bodyState']) => number | undefined,
+): { readonly range: number; readonly sampleCount: number } {
+  const values = context.window.validSamples
+    .map((sample) => selector(sample.bodyState))
+    .filter((value): value is number => value !== undefined && Number.isFinite(value));
+
+  if (values.length === 0) {
+    return {
+      range: 0,
+      sampleCount: 0,
+    };
+  }
+
+  return {
+    range: Math.max(...values) - Math.min(...values),
+    sampleCount: values.length,
+  };
+}
+
+function averageDefined(a: number | undefined, b: number | undefined): number | undefined {
+  if (a === undefined) {
+    return b;
+  }
+
+  if (b === undefined) {
+    return a;
+  }
+
+  return (a + b) / 2;
 }
 
 function clamp01(value: number): number {

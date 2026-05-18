@@ -5,7 +5,15 @@ import {
   createMovementRecognitionEngine,
   MovementRecognitionEngine,
 } from './movement-recognition-engine.js';
-import { makeHighKneesSequence, makePushUpFrame, makeSquatFrame } from './test-fixtures.js';
+import {
+  makeHighKneesSequence,
+  makeLungeLikeSequence,
+  makePlankFrame,
+  makePushUpFrame,
+  makePushUpRepSequence,
+  makeSquatFrame,
+  makeSquatRepSequence,
+} from './test-fixtures.js';
 
 describe('MovementRecognitionEngine', () => {
   it('selects the strongest recognized movement as the primary state', () => {
@@ -68,6 +76,51 @@ describe('MovementRecognitionEngine', () => {
 
     expect(squatState.movementType).toBe('squat');
     expect(pushUpState.movementType).toBe('push_up');
+  });
+
+  it('does not confuse squat repetitions with high-knees motion', () => {
+    const squatEngine = createMovementRecognitionEngine();
+    const highKneesEngine = createMovementRecognitionEngine();
+
+    const squatStates = makeSquatRepSequence().map((frame) => squatEngine.processPose(frame));
+    const highKneesStates = makeHighKneesSequence().map((frame) =>
+      highKneesEngine.processPose(frame),
+    );
+
+    expect(squatStates.at(-1)?.primary.movementType).toBe('squat');
+    expect(squatStates.map((state) => state.primary.movementType)).not.toContain('high_knees');
+    expect(highKneesStates.at(-1)?.primary.movementType).toBe('high_knees');
+    expect(highKneesStates.map((state) => state.primary.movementType)).not.toContain('squat');
+  });
+
+  it('keeps floor holds from being absorbed into push-up counting', () => {
+    const pushUpEngine = createMovementRecognitionEngine();
+    const plankEngine = createMovementRecognitionEngine();
+
+    const pushUpStates = makePushUpRepSequence().map((frame) => pushUpEngine.processPose(frame));
+    const plankStates = [0, 140, 280, 420, 560].map((timestampMs) =>
+      plankEngine.processPose(makePlankFrame(timestampMs)),
+    );
+
+    expect(pushUpStates.at(-1)?.primary).toMatchObject({
+      movementType: 'push_up',
+      validReps: 1,
+    });
+    expect(plankStates.at(-1)?.primary.movementType).toBe('plank');
+    expect(plankStates.at(-1)?.primary.validReps).toBe(0);
+  });
+
+  it('keeps split-stance lunges separate from squat recognition', () => {
+    const squatEngine = createMovementRecognitionEngine();
+    const lungeEngine = createMovementRecognitionEngine();
+
+    const squatStates = makeSquatRepSequence().map((frame) => squatEngine.processPose(frame));
+    const lungeStates = makeLungeLikeSequence().map((frame) => lungeEngine.processPose(frame));
+
+    expect(squatStates.at(-1)?.primary.movementType).toBe('squat');
+    expect(squatStates.map((state) => state.primary.movementType)).not.toContain('lunge');
+    expect(lungeStates.at(-1)?.primary.movementType).toBe('lunge');
+    expect(lungeStates.map((state) => state.primary.movementType)).not.toContain('squat');
   });
 
   it('uses temporal confidence instead of promoting a single-frame spike', () => {
