@@ -118,6 +118,7 @@ type ExerciseCatalogFilter =
   | MovementDefinition['category'];
 
 interface AppSettingsPreferences {
+  readonly cameraDeviceId?: string;
   readonly cameraResolution: SettingsResolution;
   readonly cameraFrameRate: SettingsFrameRate;
   readonly cameraMirror: boolean;
@@ -150,6 +151,7 @@ const poseInferenceIntervalMs = 80;
 const runtimeBenchmarkFrameCount = 60;
 const runtimeBenchmarkModelQualities: readonly PoseModelQuality[] = ['lite', 'full', 'heavy'];
 const defaultSettingsPreferences: AppSettingsPreferences = {
+  cameraDeviceId: undefined,
   cameraResolution: '720p',
   cameraFrameRate: '30',
   cameraMirror: false,
@@ -945,11 +947,7 @@ function ActivityView({
 
       setStatus('Requesting camera');
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          ...cameraResolutionConstraints(settingsPreferences.cameraResolution),
-          frameRate: { ideal: Number(settingsPreferences.cameraFrameRate) },
-          facingMode: 'user',
-        },
+        video: cameraCaptureConstraints(settingsPreferences),
         audio: false,
       });
       const video = videoRef.current;
@@ -1061,6 +1059,7 @@ function ActivityView({
     platform.cameraPermission,
     preferredCameraAngle,
     processFrame,
+    settingsPreferences.cameraDeviceId,
     settingsPreferences.cameraFrameRate,
     settingsPreferences.cameraResolution,
   ]);
@@ -2261,6 +2260,7 @@ function SettingsView({
   const [cameraStatus, setCameraStatus] = useState('Camera access has not been checked here.');
   const [dataStatus, setDataStatus] = useState('Local data controls are ready.');
   const [confirmClearSessions, setConfirmClearSessions] = useState(false);
+  const [cameraDevices, setCameraDevices] = useState<readonly MediaDeviceInfo[]>([]);
   const [storageInfo, setStorageInfo] = useState<HistoryStorageInfo>({
     bytes: 0,
     sessionCount: sessions.length,
@@ -2271,6 +2271,7 @@ function SettingsView({
   const canUseStartup = Boolean(platform.settings);
   const canUseNotifications = Boolean(platform.notifications);
   const canCheckCamera = Boolean(platform.cameraPermission);
+  const canEnumerateCameras = Boolean(navigator.mediaDevices?.enumerateDevices);
 
   const refreshStorageInfo = useCallback(async () => {
     setStorageInfo(await platform.history.storageInfo());
@@ -2290,6 +2291,35 @@ function SettingsView({
     });
   };
 
+  const refreshCameraDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setCameraStatus('Camera device enumeration is not available in this runtime.');
+      return;
+    }
+
+    const devices = (await navigator.mediaDevices.enumerateDevices()).filter(
+      (device) => device.kind === 'videoinput',
+    );
+    setCameraDevices(devices);
+
+    if (
+      preferences.cameraDeviceId &&
+      !devices.some((device) => device.deviceId === preferences.cameraDeviceId)
+    ) {
+      onPreferencesChange({ ...preferences, cameraDeviceId: undefined });
+    }
+
+    setCameraStatus(
+      devices.length > 0
+        ? `Detected ${devices.length} camera${devices.length === 1 ? '' : 's'}.`
+        : 'No camera devices were detected.',
+    );
+  }, [onPreferencesChange, preferences]);
+
+  useEffect(() => {
+    void refreshCameraDevices();
+  }, [refreshCameraDevices]);
+
   const toggleStartup = async (enabled: boolean) => {
     await platform.settings?.setStartupEnabled(enabled);
     onStartupEnabledChange(enabled);
@@ -2303,6 +2333,7 @@ function SettingsView({
         ? 'Camera access is available for this app.'
         : (permission?.reason ?? 'Camera permission could not be verified.'),
     );
+    await refreshCameraDevices();
   };
 
   const exportSessionData = async (): Promise<void> => {
@@ -2360,6 +2391,13 @@ function SettingsView({
     }
   };
 
+  const cameraDeviceOptions: readonly (readonly [string, string])[] = [
+    ['default', 'System default'],
+    ...cameraDevices.map(
+      (device, index) => [device.deviceId, device.label || `Camera ${index + 1}`] as const,
+    ),
+  ];
+
   return (
     <section className="settings-command-center">
       <div className="settings-primary-column">
@@ -2385,6 +2423,23 @@ function SettingsView({
           title="Camera Settings"
           description="Tune capture assumptions and check whether this app can access the camera."
         >
+          <SettingsRow
+            label="Camera source"
+            description={
+              canEnumerateCameras
+                ? 'Choose which local camera the Activity view should request.'
+                : 'Camera selection is not available in this runtime.'
+            }
+          >
+            <SettingsSelect
+              value={preferences.cameraDeviceId ?? 'default'}
+              disabled={!canEnumerateCameras}
+              onChange={(value) =>
+                updatePreference('cameraDeviceId', value === 'default' ? undefined : value)
+              }
+              options={cameraDeviceOptions}
+            />
+          </SettingsRow>
           <SettingsRow
             label="Resolution"
             description="Higher capture targets can improve analysis detail."
@@ -2444,9 +2499,14 @@ function SettingsView({
             disabled={!canCheckCamera}
             onAction={() => void checkCameraAccess()}
           />
-          <SettingsCapabilityRow
-            label="Camera source routing"
-            description="Planned. The app currently uses the browser/Electron default capture device until explicit device selection is wired into startup."
+          <SettingsActionRow
+            label="Device list"
+            description="Refresh available local video inputs after connecting or disconnecting a camera."
+            actionLabel="Refresh"
+            icon={<RadioTower size={16} aria-hidden="true" />}
+            variant="secondary"
+            disabled={!canEnumerateCameras}
+            onAction={() => void refreshCameraDevices()}
           />
           <SettingsCapabilityRow
             label="Low-light detection"
@@ -2802,15 +2862,18 @@ function SettingsSelect({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   readonly value: string;
   readonly options: readonly (readonly [string, string])[];
   readonly onChange: (value: string) => void;
+  readonly disabled?: boolean;
 }): ReactElement {
   return (
     <select
       className="settings-select"
       value={value}
+      disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
     >
       {options.map(([optionValue, label]) => (
@@ -3508,6 +3571,10 @@ function readSettingsPreferences(): AppSettingsPreferences {
     ) as Partial<AppSettingsPreferences>;
 
     return {
+      cameraDeviceId:
+        typeof parsed.cameraDeviceId === 'string' && parsed.cameraDeviceId.length > 0
+          ? parsed.cameraDeviceId
+          : undefined,
       cameraResolution: isSettingsResolution(parsed.cameraResolution)
         ? parsed.cameraResolution
         : defaultSettingsPreferences.cameraResolution,
@@ -3693,6 +3760,16 @@ function cameraResolutionConstraints(
   }
 
   return {};
+}
+
+function cameraCaptureConstraints(preferences: AppSettingsPreferences): MediaTrackConstraints {
+  return {
+    ...cameraResolutionConstraints(preferences.cameraResolution),
+    frameRate: { ideal: Number(preferences.cameraFrameRate) },
+    ...(preferences.cameraDeviceId
+      ? { deviceId: { exact: preferences.cameraDeviceId } }
+      : { facingMode: 'user' }),
+  };
 }
 
 function clampNumber(

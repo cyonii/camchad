@@ -3726,7 +3726,8 @@ button,
 }
 
 .settings-action-button:disabled,
-.settings-toggle:disabled {
+.settings-toggle:disabled,
+.settings-select:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
