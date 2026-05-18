@@ -13,8 +13,10 @@ export interface ActivitySessionTelemetry {
   readonly mode: ActivitySessionMode;
   readonly activityState?: ActivityStateKind;
   readonly activityConfidence?: number;
+  readonly inferenceStatus?: 'tracking_lost' | 'unknown' | 'ambiguous' | 'recognized';
   readonly guidanceEvents?: readonly MovementGuidanceEvent[];
   readonly movementType?: MovementType;
+  readonly competingMovementTypes?: readonly MovementType[];
   readonly recognitionConfidence: number;
   readonly activeSetStartedAtMs?: number;
   readonly lastMovementAtMs?: number;

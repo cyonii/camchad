@@ -645,6 +645,11 @@ function ActivityView({
   const activeMovementTypeRef = useRef<MovementType | undefined>(undefined);
   const hasRecordedRestRef = useRef(false);
   const hasRecordableActivityRef = useRef(false);
+  const lastRecordedInferenceStatusRef =
+    useRef<ActivitySessionTelemetry['inferenceStatus']>(undefined);
+  const lastRecordedCandidateRef = useRef<MovementType | undefined>(undefined);
+  const lastRecordedGuidanceCodeRef = useRef<string | undefined>(undefined);
+  const trackingWasLostRef = useRef(false);
   const startTokenRef = useRef(0);
   const startInFlightRef = useRef(false);
   const lastInferenceAtRef = useRef(0);
@@ -774,6 +779,13 @@ function ActivityView({
         return;
       }
 
+      recordSessionTimelineState(service, state, telemetry, {
+        lastRecordedInferenceStatusRef,
+        lastRecordedCandidateRef,
+        lastRecordedGuidanceCodeRef,
+        trackingWasLostRef,
+      });
+
       if (telemetry.mode === 'resting' || telemetry.mode === 'idle') {
         endActiveMovement();
 
@@ -802,6 +814,12 @@ function ActivityView({
         activeMovementTypeRef.current &&
         activeMovementTypeRef.current !== telemetry.movementType
       ) {
+        service.recordTransition({
+          activityState: telemetry.activityState,
+          recognitionConfidence: telemetry.recognitionConfidence,
+          competingMovementTypes: [activeMovementTypeRef.current, telemetry.movementType],
+          message: 'Movement pattern changed during the session.',
+        });
         endActiveMovement();
       }
 
@@ -814,6 +832,7 @@ function ActivityView({
         activityState: telemetry.activityState,
         recognitionConfidence: telemetry.recognitionConfidence,
         guidanceEvents: telemetry.guidanceEvents,
+        competingMovementTypes: telemetry.competingMovementTypes,
       });
       hasRecordableActivityRef.current =
         hasRecordableActivityRef.current || isRecordableMovement(updatedMovement);
@@ -859,7 +878,8 @@ function ActivityView({
         ? activityWindowRef.current.add(bodyState)
         : activityWindowRef.current.addMissing(timestampMs);
       const activityState = activityStateSegmenterRef.current.process(activityWindowSnapshot);
-      const nextState = recognitionEngineRef.current.processPose(smoothed).primary;
+      const recognitionState = recognitionEngineRef.current.processPose(smoothed);
+      const nextState = recognitionState.primary;
       if (nextState.recognition.movementType) {
         poseTraceMovementLabelsRef.current.add(nextState.recognition.movementType);
       }
@@ -872,6 +892,8 @@ function ActivityView({
         ...sessionOrchestratorRef.current.process(nextState, timestampMs),
         activityState: activityState.state,
         activityConfidence: activityState.confidence,
+        inferenceStatus: recognitionState.inference.status,
+        competingMovementTypes: recognitionState.inference.competingMovementTypes,
         guidanceEvents: diagnostics.events,
       };
       detectorStateRef.current = nextState;
@@ -956,6 +978,10 @@ function ActivityView({
       activeMovementTypeRef.current = undefined;
       hasRecordedRestRef.current = false;
       hasRecordableActivityRef.current = false;
+      lastRecordedInferenceStatusRef.current = undefined;
+      lastRecordedCandidateRef.current = undefined;
+      lastRecordedGuidanceCodeRef.current = undefined;
+      trackingWasLostRef.current = false;
       sessionServiceRef.current = new ActivitySessionService(
         createSessionRepository(onSessionSaved),
       );
@@ -4250,6 +4276,86 @@ function stopCamera(video: HTMLVideoElement | null): void {
 
 function stopMediaStream(stream: MediaStream | null): void {
   stream?.getTracks().forEach((track) => track.stop());
+}
+
+interface SessionTimelineRecordingRefs {
+  readonly lastRecordedInferenceStatusRef: { current: ActivitySessionTelemetry['inferenceStatus'] };
+  readonly lastRecordedCandidateRef: { current: MovementType | undefined };
+  readonly lastRecordedGuidanceCodeRef: { current: string | undefined };
+  readonly trackingWasLostRef: { current: boolean };
+}
+
+function recordSessionTimelineState(
+  service: ActivitySessionService,
+  state: MovementInterpreterState,
+  telemetry: ActivitySessionTelemetry,
+  refs: SessionTimelineRecordingRefs,
+): void {
+  const inferenceStatus = telemetry.inferenceStatus;
+  const trackingLost =
+    telemetry.activityState === 'tracking_lost' || inferenceStatus === 'tracking_lost';
+
+  if (trackingLost && !refs.trackingWasLostRef.current) {
+    service.recordTrackingLost({
+      activityState: telemetry.activityState,
+      recognitionConfidence: telemetry.recognitionConfidence,
+      message: 'Body tracking was interrupted.',
+    });
+    refs.trackingWasLostRef.current = true;
+  }
+
+  if (!trackingLost && refs.trackingWasLostRef.current) {
+    service.recordTrackingRecovered({
+      activityState: telemetry.activityState,
+      recognitionConfidence: telemetry.recognitionConfidence,
+      message: 'Body tracking recovered.',
+    });
+    refs.trackingWasLostRef.current = false;
+  }
+
+  if (
+    inferenceStatus === 'ambiguous' &&
+    refs.lastRecordedInferenceStatusRef.current !== 'ambiguous'
+  ) {
+    service.recordMovementAmbiguous({
+      activityState: telemetry.activityState,
+      recognitionConfidence: telemetry.recognitionConfidence,
+      competingMovementTypes: telemetry.competingMovementTypes,
+      message: 'Movement candidates are close.',
+    });
+  }
+
+  if (inferenceStatus === 'unknown' && refs.lastRecordedInferenceStatusRef.current !== 'unknown') {
+    service.recordMovementCandidate(state.recognition.movementType, {
+      activityState: telemetry.activityState,
+      recognitionConfidence: telemetry.recognitionConfidence,
+      competingMovementTypes: telemetry.competingMovementTypes,
+      message: 'Movement evidence is not stable enough to classify.',
+    });
+  }
+
+  if (
+    inferenceStatus === 'recognized' &&
+    telemetry.movementType &&
+    refs.lastRecordedCandidateRef.current !== telemetry.movementType
+  ) {
+    service.recordMovementCandidate(telemetry.movementType, {
+      activityState: telemetry.activityState,
+      recognitionConfidence: telemetry.recognitionConfidence,
+      competingMovementTypes: telemetry.competingMovementTypes,
+      message: `${movementDefinitionFor(telemetry.movementType).label} candidate recognized.`,
+    });
+    refs.lastRecordedCandidateRef.current = telemetry.movementType;
+  }
+
+  const primaryGuidance = primaryGuidanceFor(telemetry);
+
+  if (primaryGuidance && primaryGuidance.code !== refs.lastRecordedGuidanceCodeRef.current) {
+    service.recordCameraGuidance(primaryGuidance);
+    refs.lastRecordedGuidanceCodeRef.current = primaryGuidance.code;
+  }
+
+  refs.lastRecordedInferenceStatusRef.current = inferenceStatus;
 }
 
 function primaryGuidanceFor(
