@@ -156,6 +156,49 @@ const developerBenchmarkFlagStorageKey = 'camchad:developer-runtime-benchmark';
 const poseInferenceIntervalMs = 80;
 const runtimeBenchmarkFrameCount = 60;
 const runtimeBenchmarkModelQualities: readonly PoseModelQuality[] = ['lite', 'full', 'heavy'];
+const movementMaturityStates: readonly {
+  readonly value: MovementDefinition['maturity'];
+  readonly label: string;
+  readonly shortLabel: string;
+  readonly description: string;
+}[] = [
+  {
+    value: 'detected',
+    label: 'Detected',
+    shortLabel: 'Detected',
+    description: 'Setup pattern exists, but recognition is not stable yet',
+  },
+  {
+    value: 'recognized',
+    label: 'Recognized',
+    shortLabel: 'Recognized',
+    description: 'Movement pattern can be identified without rep counting',
+  },
+  {
+    value: 'rep_counting',
+    label: 'Count-ready',
+    shortLabel: 'Counted',
+    description: 'Reps or holds are counted with generic primitives',
+  },
+  {
+    value: 'rep_validating',
+    label: 'Rep-validating',
+    shortLabel: 'Validated',
+    description: 'Rep quality checks and warnings are active',
+  },
+  {
+    value: 'quality_validating',
+    label: 'Quality-validating',
+    shortLabel: 'Quality',
+    description: 'Full quality scoring is ready',
+  },
+  {
+    value: 'planned',
+    label: 'Planned',
+    shortLabel: 'Planned',
+    description: 'Registered as a future movement definition',
+  },
+];
 const defaultSettingsPreferences: AppSettingsPreferences = {
   cameraDeviceId: undefined,
   cameraResolution: '720p',
@@ -3044,16 +3087,9 @@ function SupportedExercisesView({
 }): ReactElement {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ExerciseCatalogFilter>('all');
-  const repValidatingDefinitions = movementRegistry.filter(
-    (definition) => definition.maturity === 'rep_validating',
+  const implementedDefinitions = movementRegistry.filter(
+    (definition) => definition.maturity !== 'planned',
   );
-  const countReadyDefinitions = movementRegistry.filter(
-    (definition) => definition.maturity === 'rep_counting',
-  );
-  const plannedDefinitions = movementRegistry.filter(
-    (definition) => definition.maturity === 'planned',
-  );
-  const activeDefinitionCount = repValidatingDefinitions.length + countReadyDefinitions.length;
   const selectedDefinition =
     movementRegistry.find((definition) => definition.type === selectedMovementType) ??
     movementRegistry[0];
@@ -3076,7 +3112,9 @@ function SupportedExercisesView({
         definition.maturity === catalogFilter ||
         definition.category === catalogFilter,
     ).length;
-  const activeCoverage = Math.round((activeDefinitionCount / movementRegistry.length) * 100);
+  const activeCoverage = Math.round(
+    (implementedDefinitions.length / movementRegistry.length) * 100,
+  );
 
   return (
     <section className="exercise-observatory">
@@ -3087,8 +3125,8 @@ function SupportedExercisesView({
               <span>Exercise library</span>
               <h1>Movement Profiles</h1>
               <p>
-                Browse the local movement profiles CamChad can validate today, count as movement
-                events, or keep as planned definitions for future tracking.
+                Browse the local movement profiles CamChad can detect, recognize, count, validate,
+                or keep as planned definitions for future tracking.
               </p>
             </div>
           </div>
@@ -3100,21 +3138,13 @@ function SupportedExercisesView({
         </div>
 
         <section className="exercise-system-strip" aria-label="Movement engine status">
-          <div>
-            <span>Rep-validating</span>
-            <strong>{repValidatingDefinitions.length}</strong>
-            <small>Full rep counting and quality checks</small>
-          </div>
-          <div>
-            <span>Count-ready</span>
-            <strong>{countReadyDefinitions.length}</strong>
-            <small>Counted with generic movement primitives</small>
-          </div>
-          <div>
-            <span>Planned</span>
-            <strong>{plannedDefinitions.length}</strong>
-            <small>Registered but not yet active</small>
-          </div>
+          {movementMaturityStates.map((state) => (
+            <div key={state.value} data-maturity={state.value}>
+              <span>{state.label}</span>
+              <strong>{filterCount(state.value)}</strong>
+              <small>{state.description}</small>
+            </div>
+          ))}
         </section>
 
         <section className="exercise-definition-panel" aria-labelledby="exercise-catalog-title">
@@ -3163,30 +3193,17 @@ function SupportedExercisesView({
             >
               All
             </ExerciseFilterPill>
-            <ExerciseFilterPill
-              value="rep_validating"
-              count={filterCount('rep_validating')}
-              activeFilter={filter}
-              onChange={setFilter}
-            >
-              Rep-validating
-            </ExerciseFilterPill>
-            <ExerciseFilterPill
-              value="rep_counting"
-              count={filterCount('rep_counting')}
-              activeFilter={filter}
-              onChange={setFilter}
-            >
-              Count-ready
-            </ExerciseFilterPill>
-            <ExerciseFilterPill
-              value="planned"
-              count={filterCount('planned')}
-              activeFilter={filter}
-              onChange={setFilter}
-            >
-              Planned
-            </ExerciseFilterPill>
+            {movementMaturityStates.map((state) => (
+              <ExerciseFilterPill
+                key={state.value}
+                value={state.value}
+                count={filterCount(state.value)}
+                activeFilter={filter}
+                onChange={setFilter}
+              >
+                {state.shortLabel}
+              </ExerciseFilterPill>
+            ))}
             <ExerciseFilterPill
               value="repetition"
               count={filterCount('repetition')}
