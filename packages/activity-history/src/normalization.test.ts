@@ -61,6 +61,20 @@ describe('activity history normalization', () => {
                   warnings: [],
                 },
               ],
+              setSummary: {
+                averageConfidence: 1.4,
+                minQualityScore: -2,
+                maxQualityScore: 104,
+                bestRepNumber: 1,
+                worstRepNumber: 1,
+                averageCadenceSeconds: 12.5,
+                restBeforeSeconds: 8,
+                restAfterSeconds: 20,
+                warningCounts: {
+                  partial_depth: 2,
+                  bad: 'drop',
+                },
+              },
             },
           ],
         },
@@ -86,6 +100,19 @@ describe('activity history normalization', () => {
           confidence: 1,
         },
       ],
+      setSummary: {
+        averageConfidence: 1,
+        minQualityScore: 0,
+        maxQualityScore: 100,
+        bestRepNumber: 1,
+        worstRepNumber: 1,
+        averageCadenceSeconds: 12.5,
+        restBeforeSeconds: 8,
+        restAfterSeconds: 20,
+        warningCounts: {
+          partial_depth: 2,
+        },
+      },
     });
     expect(history.sessions[0]?.timeline).toEqual([
       {

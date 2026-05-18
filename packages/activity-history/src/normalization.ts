@@ -133,8 +133,43 @@ export function normalizeMovementSegment(value: unknown): readonly MovementSegme
       repEvents: Array.isArray(value.repEvents)
         ? value.repEvents.flatMap((event) => normalizeRepEvent(event))
         : [],
+      setSummary: normalizeMovementSetSummary(value.setSummary),
     },
   ];
+}
+
+function normalizeMovementSetSummary(value: unknown): MovementSegment['setSummary'] | undefined {
+  if (!isRecord(value) || !isRecord(value.warningCounts)) {
+    return undefined;
+  }
+
+  return {
+    averageConfidence:
+      typeof value.averageConfidence === 'number' ? clamp01(value.averageConfidence) : undefined,
+    minQualityScore:
+      typeof value.minQualityScore === 'number' ? clampQuality(value.minQualityScore) : undefined,
+    maxQualityScore:
+      typeof value.maxQualityScore === 'number' ? clampQuality(value.maxQualityScore) : undefined,
+    bestRepNumber: typeof value.bestRepNumber === 'number' ? value.bestRepNumber : undefined,
+    worstRepNumber: typeof value.worstRepNumber === 'number' ? value.worstRepNumber : undefined,
+    averageCadenceSeconds:
+      typeof value.averageCadenceSeconds === 'number' ? value.averageCadenceSeconds : undefined,
+    restBeforeSeconds:
+      typeof value.restBeforeSeconds === 'number' ? value.restBeforeSeconds : undefined,
+    restAfterSeconds:
+      typeof value.restAfterSeconds === 'number' ? value.restAfterSeconds : undefined,
+    warningCounts: normalizeWarningCounts(value.warningCounts),
+  };
+}
+
+function normalizeWarningCounts(value: Record<string, unknown>): Readonly<Record<string, number>> {
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, number] => {
+      const [key, count] = entry;
+
+      return key.length > 0 && typeof count === 'number' && Number.isFinite(count);
+    }),
+  );
 }
 
 function normalizeFormWarning(value: unknown): readonly FormWarning[] {
@@ -275,10 +310,23 @@ function isGuidanceCode(value: unknown): value is MovementGuidanceEvent['code'] 
   return (
     value === 'tracking_lost' ||
     value === 'full_body_not_visible' ||
+    value === 'torso_occluded' ||
+    value === 'hands_missing' ||
+    value === 'feet_missing' ||
+    value === 'camera_too_low' ||
+    value === 'camera_too_close' ||
+    value === 'camera_too_far' ||
+    value === 'body_near_edge' ||
+    value === 'unstable_camera_distance' ||
+    value === 'frame_drift' ||
+    value === 'landmark_jitter' ||
+    value === 'side_angle_recommended' ||
+    value === 'front_angle_recommended' ||
     value === 'low_confidence' ||
     value === 'recent_tracking_gap' ||
     value === 'orientation_mismatch' ||
     value === 'movement_uncertain' ||
+    value === 'movement_setup_hint' ||
     value === 'conditions_usable'
   );
 }
@@ -296,7 +344,10 @@ function isFormWarningCode(value: unknown): value is FormWarning['code'] {
     value === 'tracking_lost' ||
     value === 'low_confidence' ||
     value === 'body_alignment' ||
+    value === 'hand_position' ||
     value === 'posture_alignment' ||
+    value === 'lower_body_visibility' ||
+    value === 'missed_alternation' ||
     value === 'partial_depth' ||
     value === 'range_of_motion' ||
     value === 'camera_angle_experimental'
@@ -305,6 +356,10 @@ function isFormWarningCode(value: unknown): value is FormWarning['code'] {
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
+}
+
+function clampQuality(value: number): number {
+  return Math.max(0, Math.min(100, value));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

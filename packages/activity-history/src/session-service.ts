@@ -7,7 +7,12 @@ import type {
   RepEvent,
 } from '@camchad/movement-core';
 
-import type { ActivityTimelineEventKind, MovementSegment, ActivitySession } from './models.js';
+import type {
+  ActivityTimelineEventKind,
+  MovementSegment,
+  ActivitySession,
+  MovementSetSummary,
+} from './models.js';
 import type { ActivityRepository } from './activity-repository.js';
 import { summarizeActivitySession } from './session-summary.js';
 
@@ -83,11 +88,13 @@ export class ActivitySessionService {
     }
 
     this.recordedRepNumbers = new Set();
+    const startedAt = this.clock.now().toISOString();
+    this.activeSession = updateLastMovementRestAfter(this.activeSession, startedAt);
     this.activeSegment = {
       id: this.ids.createId('set'),
       movementType,
       cameraAngle,
-      startedAt: this.clock.now().toISOString(),
+      startedAt,
       reps: 0,
       validReps: 0,
       partialReps: 0,
@@ -178,6 +185,10 @@ export class ActivitySessionService {
     const completedSet: MovementSegment = {
       ...this.activeSegment,
       endedAt,
+      setSummary: summarizeMovementSet(
+        { ...this.activeSegment, endedAt },
+        this.activeSession.movements.at(-1),
+      ),
     };
 
     this.activeSession = {
@@ -355,6 +366,135 @@ function mergeWarnings(
   }
 
   return [...byCode.values()];
+}
+
+function updateLastMovementRestAfter(
+  session: ActivitySession,
+  nextMovementStartedAt: string,
+): ActivitySession {
+  const previousMovement = session.movements.at(-1);
+
+  if (!previousMovement?.endedAt) {
+    return session;
+  }
+
+  const restAfterSeconds = secondsBetween(previousMovement.endedAt, nextMovementStartedAt);
+
+  if (restAfterSeconds === undefined) {
+    return session;
+  }
+
+  const updatedPreviousMovement: MovementSegment = {
+    ...previousMovement,
+    setSummary: {
+      ...(previousMovement.setSummary ?? { warningCounts: {} }),
+      restAfterSeconds,
+    },
+  };
+
+  return {
+    ...session,
+    movements: [...session.movements.slice(0, -1), updatedPreviousMovement],
+  };
+}
+
+function summarizeMovementSet(
+  movement: MovementSegment,
+  previousMovement: MovementSegment | undefined,
+): MovementSetSummary {
+  const qualityEvents = movement.repEvents.filter((event) => Number.isFinite(event.qualityScore));
+  const bestRep = maxBy(qualityEvents, (event) => event.qualityScore);
+  const worstRep = minBy(qualityEvents, (event) => event.qualityScore);
+  const durationSeconds = movement.endedAt
+    ? secondsBetween(movement.startedAt, movement.endedAt)
+    : undefined;
+
+  return {
+    averageConfidence:
+      average([
+        movement.recognitionConfidence,
+        ...movement.repEvents.map((event) => event.confidenceScore),
+      ]) ?? undefined,
+    minQualityScore: worstRep?.qualityScore,
+    maxQualityScore: bestRep?.qualityScore,
+    bestRepNumber: bestRep?.repNumber,
+    worstRepNumber: worstRep?.repNumber,
+    averageCadenceSeconds:
+      durationSeconds !== undefined && movement.reps > 0
+        ? Number((durationSeconds / movement.reps).toFixed(2))
+        : undefined,
+    restBeforeSeconds: previousMovement?.endedAt
+      ? secondsBetween(previousMovement.endedAt, movement.startedAt)
+      : undefined,
+    warningCounts: warningCountsFor(movement),
+  };
+}
+
+function warningCountsFor(movement: MovementSegment): Readonly<Record<string, number>> {
+  const counts = new Map<string, number>();
+
+  for (const warning of movement.formWarnings) {
+    increment(counts, warning.code);
+  }
+
+  for (const event of movement.guidanceEvents ?? []) {
+    if (event.code !== 'conditions_usable') {
+      increment(counts, event.code);
+    }
+  }
+
+  for (const rep of movement.repEvents) {
+    for (const warning of rep.warnings) {
+      increment(counts, warning.code);
+    }
+  }
+
+  return Object.fromEntries([...counts.entries()].sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function increment(counts: Map<string, number>, key: string): void {
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+function secondsBetween(start: string, end: string): number | undefined {
+  const startMs = new Date(start).getTime();
+  const endMs = new Date(end).getTime();
+
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    return undefined;
+  }
+
+  return Math.max(0, Math.round((endMs - startMs) / 1000));
+}
+
+function average(values: readonly (number | undefined)[]): number | undefined {
+  const finiteValues = values.filter((value): value is number => Number.isFinite(value));
+
+  if (finiteValues.length === 0) {
+    return undefined;
+  }
+
+  return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
+}
+
+function maxBy<T>(values: readonly T[], selector: (value: T) => number): T | undefined {
+  return values.reduce<T | undefined>((best, value) => {
+    if (!best || selector(value) > selector(best)) {
+      return value;
+    }
+
+    return best;
+  }, undefined);
+}
+
+function minBy<T>(values: readonly T[], selector: (value: T) => number): T | undefined {
+  return values.reduce<T | undefined>((best, value) => {
+    if (!best || selector(value) < selector(best)) {
+      return value;
+    }
+
+    return best;
+  }, undefined);
 }
 
 export function repEvent(repNumber: number, overrides: Partial<RepEvent> = {}): RepEvent {

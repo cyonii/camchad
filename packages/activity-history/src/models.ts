@@ -83,7 +83,20 @@ export interface MovementSegment {
   readonly guidanceEvents?: readonly MovementGuidanceEvent[];
   readonly formWarnings: readonly FormWarning[];
   readonly repEvents: readonly RepEvent[];
+  readonly setSummary?: MovementSetSummary;
   readonly videoRecording?: VideoRecording;
+}
+
+export interface MovementSetSummary {
+  readonly averageConfidence?: number;
+  readonly minQualityScore?: number;
+  readonly maxQualityScore?: number;
+  readonly bestRepNumber?: number;
+  readonly worstRepNumber?: number;
+  readonly averageCadenceSeconds?: number;
+  readonly restBeforeSeconds?: number;
+  readonly restAfterSeconds?: number;
+  readonly warningCounts: Readonly<Record<string, number>>;
 }
 
 export interface VideoRecording {

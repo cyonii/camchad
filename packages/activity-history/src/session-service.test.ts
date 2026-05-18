@@ -94,6 +94,15 @@ describe('ActivitySessionService', () => {
         temporalMovementConfidence: 0.84,
         sampleWindowMs: 320,
       },
+      setSummary: {
+        averageConfidence: expect.closeTo(0.915, 3),
+        minQualityScore: 90,
+        maxQualityScore: 90,
+        bestRepNumber: 1,
+        worstRepNumber: 1,
+        averageCadenceSeconds: 110,
+        warningCounts: {},
+      },
     });
     expect(session.summary).toMatchObject({
       movementMix: [{ movementType: 'push_up', reps: 1, validReps: 1, durationSeconds: 110 }],
@@ -106,6 +115,36 @@ describe('ActivitySessionService', () => {
       validReps: 1,
       partialReps: 0,
       lastActivityAt: '2026-05-12T07:00:00.000Z',
+    });
+  });
+
+  it('stores rest timing between completed movement sets', async () => {
+    const service = new ActivitySessionService(
+      new InMemoryActivityRepository(),
+      new FixedClock([
+        new Date('2026-05-12T07:00:00.000Z'),
+        new Date('2026-05-12T07:00:10.000Z'),
+        new Date('2026-05-12T07:00:30.000Z'),
+        new Date('2026-05-12T07:00:50.000Z'),
+        new Date('2026-05-12T07:01:10.000Z'),
+        new Date('2026-05-12T07:01:15.000Z'),
+      ]),
+      new SequentialIds(),
+    );
+
+    service.startSession();
+    service.startMovement('push_up', 'side');
+    service.updateMovement(movementState({ movementType: 'push_up', reps: 1, validReps: 1 }));
+    service.endMovement();
+    service.startMovement('squat', 'side');
+    service.endMovement();
+    const session = await service.endSession();
+
+    expect(session.movements[0]?.setSummary).toMatchObject({
+      restAfterSeconds: 20,
+    });
+    expect(session.movements[1]?.setSummary).toMatchObject({
+      restBeforeSeconds: 20,
     });
   });
 
