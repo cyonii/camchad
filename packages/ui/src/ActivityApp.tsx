@@ -40,6 +40,7 @@ import {
   ActivitySessionOrchestrator,
   createMovementRecognitionEngine,
   diagnoseMovement,
+  evaluateCalibrationPreflight,
   extractBodyState,
   movementDefinitionFor,
   movementRegistry,
@@ -77,6 +78,7 @@ import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
 
 import type {
   ActivitySessionTelemetry,
+  CalibrationPreflightSnapshot,
   CameraAngle,
   MovementInterpreterState,
   MovementType,
@@ -196,6 +198,12 @@ const initialDetectorState: MovementInterpreterState = {
 const initialSessionTelemetry: ActivitySessionTelemetry = {
   mode: 'idle',
   recognitionConfidence: 0,
+};
+const initialCalibrationPreflight: CalibrationPreflightSnapshot = {
+  status: 'waiting',
+  title: 'Calibration pending',
+  message: 'Start tracking and step into frame for a camera readiness check.',
+  confidence: 0,
 };
 const defaultWindowChromeState: WindowChromeState = {
   platform: 'browser',
@@ -651,6 +659,7 @@ function ActivityView({
   const lastRecordedCandidateRef = useRef<MovementType | undefined>(undefined);
   const lastRecordedGuidanceCodeRef = useRef<string | undefined>(undefined);
   const trackingWasLostRef = useRef(false);
+  const calibrationReadyRef = useRef(false);
   const startTokenRef = useRef(0);
   const startInFlightRef = useRef(false);
   const lastInferenceAtRef = useRef(0);
@@ -669,6 +678,9 @@ function ActivityView({
   const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState(0);
   const [sessionTelemetry, setSessionTelemetry] =
     useState<ActivitySessionTelemetry>(initialSessionTelemetry);
+  const [calibrationPreflight, setCalibrationPreflight] = useState<CalibrationPreflightSnapshot>(
+    initialCalibrationPreflight,
+  );
   const [status, setStatus] = useState('Ready');
   const [detectorState, setDetectorState] =
     useState<MovementInterpreterState>(initialDetectorState);
@@ -890,6 +902,20 @@ function ActivityView({
         interpreterState: nextState,
         cameraAngle: preferredCameraAngle,
       });
+      const preflight = evaluateCalibrationPreflight({
+        activityState,
+        window: activityWindowSnapshot,
+        diagnostics,
+      });
+      setCalibrationPreflight(preflight);
+
+      if (!calibrationReadyRef.current && preflight.status === 'ready') {
+        calibrationReadyRef.current = true;
+        setStatus('Tracking');
+      } else if (!calibrationReadyRef.current) {
+        setStatus(preflight.status === 'needs_adjustment' ? 'Calibration needed' : 'Calibrating');
+      }
+
       const nextSessionTelemetry = {
         ...sessionOrchestratorRef.current.process(nextState, timestampMs),
         activityState: activityState.state,
@@ -901,7 +927,9 @@ function ActivityView({
       detectorStateRef.current = nextState;
       setDetectorState(nextState);
       setSessionTelemetry(nextSessionTelemetry);
-      syncMovementRecording(nextState, nextSessionTelemetry);
+      if (calibrationReadyRef.current) {
+        syncMovementRecording(nextState, nextSessionTelemetry);
+      }
 
       if (settingsPreferences.skeletonVisible) {
         drawOverlay(canvasRef.current, video, smoothed);
@@ -910,7 +938,7 @@ function ActivityView({
       }
       animationFrameRef.current = requestAnimationFrame(processFrame);
     },
-    [settingsPreferences.skeletonVisible, syncMovementRecording],
+    [preferredCameraAngle, settingsPreferences.skeletonVisible, syncMovementRecording],
   );
 
   const startActivity = useCallback(async () => {
@@ -923,6 +951,8 @@ function ActivityView({
     startInFlightRef.current = true;
     setIsStarting(true);
     setIsPreviewActive(false);
+    calibrationReadyRef.current = false;
+    setCalibrationPreflight(initialCalibrationPreflight);
     setCameraError(undefined);
     setStatus('Checking camera permission');
 
@@ -984,6 +1014,7 @@ function ActivityView({
       lastRecordedCandidateRef.current = undefined;
       lastRecordedGuidanceCodeRef.current = undefined;
       trackingWasLostRef.current = false;
+      calibrationReadyRef.current = false;
       sessionServiceRef.current = new ActivitySessionService(
         createSessionRepository(onSessionSaved),
       );
@@ -1023,7 +1054,7 @@ function ActivityView({
 
       estimatorRef.current = estimator;
       setIsTracking(true);
-      setStatus('Tracking');
+      setStatus('Calibrating');
       animationFrameRef.current = requestAnimationFrame(processFrame);
     } catch (error) {
       if (startTokenRef.current !== startToken) {
@@ -1241,11 +1272,13 @@ function ActivityView({
     activeMovementTypeRef.current = undefined;
     hasRecordedRestRef.current = false;
     hasRecordableActivityRef.current = false;
+    calibrationReadyRef.current = false;
     activityWindowRef.current.reset();
     activityStateSegmenterRef.current.reset();
     sessionOrchestratorRef.current.reset();
     setSessionElapsedSeconds(0);
     setSessionTelemetry(initialSessionTelemetry);
+    setCalibrationPreflight(initialCalibrationPreflight);
     detectorStateRef.current = initialDetectorState;
     setDetectorState(initialDetectorState);
     setStatus('Ready');
@@ -1271,6 +1304,11 @@ function ActivityView({
 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isStarting, isTracking, startActivity, stopActivity]);
+
+  const visibleGuidance =
+    primaryGuidanceFor(sessionTelemetry) ??
+    (isTracking || isStarting ? calibrationPreflight : undefined) ??
+    sessionTelemetry.cameraAdvice;
 
   return (
     <section
@@ -1348,14 +1386,9 @@ function ActivityView({
         <div className="command-module command-module-guidance">
           <span>Camera guidance</span>
           <div className="camera-guidance">
-            <strong>
-              {primaryGuidanceFor(sessionTelemetry)?.title ??
-                sessionTelemetry.cameraAdvice?.title ??
-                'Awaiting movement'}
-            </strong>
+            <strong>{visibleGuidance?.title ?? 'Awaiting movement'}</strong>
             <small>
-              {primaryGuidanceFor(sessionTelemetry)?.message ??
-                sessionTelemetry.cameraAdvice?.message ??
+              {visibleGuidance?.message ??
                 'Step into frame and begin moving for automatic movement guidance.'}
             </small>
           </div>
