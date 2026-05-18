@@ -2279,6 +2279,7 @@ function SettingsView({
   const [cameraStatus, setCameraStatus] = useState('Camera access has not been checked here.');
   const [dataStatus, setDataStatus] = useState('Local data controls are ready.');
   const [confirmClearSessions, setConfirmClearSessions] = useState(false);
+  const [confirmClearCache, setConfirmClearCache] = useState(false);
   const [cameraDevices, setCameraDevices] = useState<readonly MediaDeviceInfo[]>([]);
   const [storageInfo, setStorageInfo] = useState<HistoryStorageInfo>({
     bytes: 0,
@@ -2395,6 +2396,7 @@ function SettingsView({
   const clearAllSessions = async (): Promise<void> => {
     await platform.history.clear();
     setConfirmClearSessions(false);
+    setConfirmClearCache(false);
     await onHistoryChanged();
     await refreshStorageInfo();
     setDataStatus('All local session history has been cleared.');
@@ -2406,6 +2408,8 @@ function SettingsView({
       localStorage.removeItem(telemetryModeStorageKey);
       onPreferencesChange(defaultSettingsPreferences);
       onTelemetryModeChange('fixed');
+      setConfirmClearSessions(false);
+      setConfirmClearCache(false);
       setDataStatus('Interface preferences and cached UI state have been reset.');
     } catch {
       setDataStatus('Interface cache could not be reset in this environment.');
@@ -2655,17 +2659,30 @@ function SettingsView({
           />
           <SettingsActionRow
             label="Clear analytics cache"
-            description="Reset interface preferences and cached display state without deleting sessions."
-            actionLabel="Reset cache"
+            description={
+              confirmClearCache
+                ? 'Confirm reset. This clears interface preferences and cached display state, but keeps saved sessions.'
+                : 'Reset interface preferences and cached display state without deleting sessions.'
+            }
+            actionLabel={confirmClearCache ? 'Confirm reset' : 'Reset cache'}
             icon={<Trash2 size={16} aria-hidden="true" />}
             variant="secondary"
-            onAction={clearInterfaceCache}
+            onAction={() => {
+              if (confirmClearCache) {
+                clearInterfaceCache();
+              } else {
+                setConfirmClearCache(true);
+                setConfirmClearSessions(false);
+              }
+            }}
           />
           <SettingsActionRow
             label="Clear all sessions"
             description={
               confirmClearSessions
-                ? 'Confirm deletion. This removes all locally saved session history from this device.'
+                ? `Confirm deletion. This removes ${storageInfo.sessionCount} locally saved session${
+                    storageInfo.sessionCount === 1 ? '' : 's'
+                  } from this device.`
                 : 'Remove every saved local session. Export a backup first if you need one.'
             }
             actionLabel={confirmClearSessions ? 'Confirm clear' : 'Clear sessions'}
@@ -2676,6 +2693,7 @@ function SettingsView({
                 void clearAllSessions();
               } else {
                 setConfirmClearSessions(true);
+                setConfirmClearCache(false);
               }
             }}
           />
