@@ -147,6 +147,42 @@ describe('diagnoseMovement', () => {
     );
   });
 
+  it('adds movement-specific setup guidance for recognized candidates', () => {
+    const diagnostics = diagnoseMovement({
+      activityState: {
+        state: 'setup',
+        confidence: 0.78,
+        motionMagnitude: 0.18,
+        evidence: ['low_amplitude_motion'],
+      },
+      cameraAngle: 'side',
+      interpreterState: {
+        movementType: 'squat',
+        recognition: {
+          movementType: 'squat',
+          confidence: 0.66,
+          status: 'candidate',
+          evidence: ['standing_orientation', 'knee_flexion_signal'],
+        },
+        phase: 'setup_needed',
+        reps: 0,
+        validReps: 0,
+        partialReps: 0,
+        warnings: [],
+        metrics: {},
+      },
+    });
+
+    expect(diagnostics.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'movement_setup_hint',
+          title: 'Squat setup',
+        }),
+      ]),
+    );
+  });
+
   it('emits a usable-conditions event when signal quality is stable', () => {
     const diagnostics = diagnoseMovement({
       activityState: {

@@ -14,6 +14,7 @@ export interface MovementDefinition {
   readonly defaultCameraAngle: CameraAngle;
   readonly supportedCameraAngles: readonly CameraAngle[];
   readonly cameraGuidance: MovementCameraGuidance;
+  readonly setupHints: readonly MovementSetupHint[];
   readonly telemetryMetrics: readonly MovementTelemetryMetricDefinition[];
   readonly profile: MovementProfileMetadata;
 }
@@ -82,6 +83,11 @@ export interface MovementCameraGuidance {
   readonly usableMessage: string;
   readonly warningTitle: string;
   readonly warningMessage: string;
+}
+
+export interface MovementSetupHint {
+  readonly title: string;
+  readonly message: string;
 }
 
 export interface CameraAngleAdvice {

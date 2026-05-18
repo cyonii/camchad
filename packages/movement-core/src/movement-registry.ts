@@ -16,6 +16,7 @@ export type {
   MovementProfileMetadata,
   MovementRegion,
   MovementRhythmType,
+  MovementSetupHint,
   MovementTelemetryExtractorDefinition,
   MovementTelemetryExtractorSource,
   MovementTelemetryMetricDefinition,

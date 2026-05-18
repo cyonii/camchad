@@ -37,6 +37,10 @@ describe('movementRegistry profiles', () => {
       expect(movement.cameraGuidance.usableMessage.trim()).toBeTruthy();
       expect(movement.cameraGuidance.warningTitle.trim()).toBeTruthy();
       expect(movement.cameraGuidance.warningMessage.trim()).toBeTruthy();
+      expect(movement.setupHints.length).toBeGreaterThan(0);
+      expect(movement.setupHints.every((hint) => hint.title.trim() && hint.message.trim())).toBe(
+        true,
+      );
       if (movement.maturity !== 'rep_validating') {
         expect(movement.profile.telemetrySignals).toEqual(
           expect.arrayContaining([...movement.analysisSignals]),

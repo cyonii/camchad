@@ -4,6 +4,7 @@ import type {
   MovementCameraGuidance,
   MovementCategory,
   MovementMaturityLevel,
+  MovementSetupHint,
   MovementTelemetryMetricDefinition,
 } from './movement-definition-types.js';
 
@@ -21,6 +22,7 @@ export interface MovementCatalogEntry {
   readonly defaultCameraAngle: CameraAngle;
   readonly supportedCameraAngles: readonly CameraAngle[];
   readonly cameraGuidance: MovementCameraGuidance;
+  readonly setupHints: readonly MovementSetupHint[];
   readonly telemetryMetrics: readonly MovementTelemetryMetricDefinition[];
 }
 
@@ -50,6 +52,13 @@ export const movementCatalog: readonly MovementCatalogEntry[] = [
       warningTitle: 'Prefer side view',
       warningMessage: 'Depth and body-line checks are more reliable from a clean side angle.',
     },
+    setupHints: [
+      {
+        title: 'Push-up setup',
+        message:
+          'Use a side view with wrists, shoulders, hips, knees, and ankles visible through the full rep.',
+      },
+    ],
     telemetryMetrics: [
       { key: 'primaryJointAngle', label: 'Primary joint', unit: 'deg' },
       { key: 'rangeOfMotionScore', label: 'Range', unit: '%' },
@@ -83,6 +92,13 @@ export const movementCatalog: readonly MovementCatalogEntry[] = [
       warningMessage:
         'Squat depth and torso-control checks are most reliable from a clean side angle.',
     },
+    setupHints: [
+      {
+        title: 'Squat setup',
+        message:
+          'Stand fully in frame with hips, knees, ankles, and feet visible before starting your first rep.',
+      },
+    ],
     telemetryMetrics: [
       { key: 'primaryJointAngle', label: 'Primary joint', unit: 'deg' },
       { key: 'rangeOfMotionScore', label: 'Range', unit: '%' },
@@ -285,6 +301,47 @@ function generatedCatalogEntry(input: {
           ? `${input.label} needs a movement definition before the engine can recognize it.`
           : `${input.label} analysis will need a clearer camera angle before rep validation is enabled.`,
     },
+    setupHints: setupHintsFor(input),
     telemetryMetrics: input.telemetryMetrics,
   };
+}
+
+function setupHintsFor(input: {
+  readonly label: string;
+  readonly maturity: MovementMaturityLevel;
+  readonly bodyOrientation: MovementBodyOrientation;
+}): readonly MovementSetupHint[] {
+  if (input.maturity === 'planned') {
+    return [
+      {
+        title: 'Definition pending',
+        message: `${input.label} is planned but does not have a movement profile yet.`,
+      },
+    ];
+  }
+
+  if (input.bodyOrientation === 'floor') {
+    return [
+      {
+        title: `${input.label} setup`,
+        message: 'Keep the full floor-side body line visible so the engine can track posture.',
+      },
+    ];
+  }
+
+  if (input.bodyOrientation === 'standing') {
+    return [
+      {
+        title: `${input.label} setup`,
+        message: 'Stand fully in frame with feet and hands visible before beginning the movement.',
+      },
+    ];
+  }
+
+  return [
+    {
+      title: `${input.label} setup`,
+      message: 'Keep the relevant body regions visible while the engine stabilizes recognition.',
+    },
+  ];
 }

@@ -22,6 +22,7 @@ export type MovementGuidanceCode =
   | 'recent_tracking_gap'
   | 'orientation_mismatch'
   | 'movement_uncertain'
+  | 'movement_setup_hint'
   | 'conditions_usable';
 
 export interface MovementGuidanceEvent {
@@ -91,6 +92,7 @@ const guidanceCodePriority: Record<MovementGuidanceCode, number> = {
   orientation_mismatch: 54,
   low_confidence: 60,
   movement_uncertain: 70,
+  movement_setup_hint: 86,
   conditions_usable: 100,
 };
 
@@ -317,7 +319,38 @@ function interpreterEvents(input: MovementDiagnosticsInput): readonly MovementGu
     events.push(candidateAdvice);
   }
 
+  const setupHint = movementSetupHintEvent(state);
+  if (setupHint) {
+    events.push(setupHint);
+  }
+
   return events;
+}
+
+function movementSetupHintEvent(
+  state: MovementInterpreterState,
+): MovementGuidanceEvent | undefined {
+  if (
+    !state.recognition.movementType ||
+    state.recognition.status === 'tracking_lost' ||
+    state.recognition.confidence < 0.35
+  ) {
+    return undefined;
+  }
+
+  const hint = movementDefinitionFor(state.recognition.movementType).setupHints[0];
+
+  if (!hint) {
+    return undefined;
+  }
+
+  return {
+    code: 'movement_setup_hint',
+    severity: 'info',
+    title: hint.title,
+    message: hint.message,
+    confidence: state.recognition.confidence,
+  };
 }
 
 function candidateCameraAdviceEvent(
