@@ -44,6 +44,20 @@ describe('extractBodyState', () => {
     expect(state?.worldLandmarks?.get('left_knee')?.normalizedZ).toBeDefined();
   });
 
+  it('extracts world-depth skew for view-orientation confidence when available', () => {
+    const state = extractBodyState(
+      withWorldDepthSkew(
+        setTorsoWidth(makeSquatFrame({ timestampMs: 120, kneeAngle: 140 }), 0.12),
+        0.14,
+      ),
+    );
+
+    expect(state?.geometry.shoulderDepthSkewRatio).toBeGreaterThan(0.5);
+    expect(state?.geometry.hipDepthSkewRatio).toBeGreaterThan(0.5);
+    expect(state?.viewOrientation.kind).toBe('diagonal');
+    expect(state?.viewOrientation.confidence).toBeGreaterThan(0.6);
+  });
+
   it('classifies broad shoulder and hip spans as front-facing camera orientation', () => {
     const state = extractBodyState(widenTorso(makeSquatFrame({ timestampMs: 0, kneeAngle: 160 })));
 
@@ -136,6 +150,13 @@ describe('extractBodyState', () => {
 });
 
 function widenTorso(frame: PoseFrame): PoseFrame {
+  return setTorsoWidth(frame, 0.32);
+}
+
+function setTorsoWidth(frame: PoseFrame, width: number): PoseFrame {
+  const leftX = 0.5 - width / 2;
+  const rightX = 0.5 + width / 2;
+
   return {
     ...frame,
     landmarks: toLandmarkMap(
@@ -143,10 +164,30 @@ function widenTorso(frame: PoseFrame): PoseFrame {
         switch (landmark.name) {
           case 'left_shoulder':
           case 'left_hip':
-            return { ...landmark, x: 0.34 };
+            return { ...landmark, x: leftX };
           case 'right_shoulder':
           case 'right_hip':
-            return { ...landmark, x: 0.66 };
+            return { ...landmark, x: rightX };
+          default:
+            return landmark;
+        }
+      }),
+    ),
+  };
+}
+
+function withWorldDepthSkew(frame: PoseFrame, depthGap: number): PoseFrame {
+  return {
+    ...frame,
+    worldLandmarks: toLandmarkMap(
+      [...frame.landmarks.values()].map((landmark) => {
+        switch (landmark.name) {
+          case 'left_shoulder':
+          case 'left_hip':
+            return { ...landmark, z: -depthGap / 2 };
+          case 'right_shoulder':
+          case 'right_hip':
+            return { ...landmark, z: depthGap / 2 };
           default:
             return landmark;
         }

@@ -83,6 +83,9 @@ export interface BodyGeometrySignals {
   readonly hipSpanRatio?: number;
   readonly wristSpanRatio?: number;
   readonly ankleSpanRatio?: number;
+  readonly shoulderDepthSkewRatio?: number;
+  readonly hipDepthSkewRatio?: number;
+  readonly torsoDepthSkewRatio?: number;
   readonly centerOfMassX: number;
   readonly centerOfMassY: number;
 }
@@ -349,6 +352,7 @@ function computeGeometrySignals(
   const rightWrist = frame.landmarks.get('right_wrist');
   const leftAnkle = frame.landmarks.get('left_ankle');
   const rightAnkle = frame.landmarks.get('right_ankle');
+  const worldGeometry = computeWorldDepthGeometry(frame.worldLandmarks);
   const leftBodyLineDeviation =
     leftShoulder && leftHip && leftAnkle
       ? lineDeviationRatio(leftShoulder, leftHip, leftAnkle)
@@ -369,8 +373,54 @@ function computeGeometrySignals(
     hipSpanRatio: leftHip && rightHip ? distance(leftHip, rightHip) / scale : undefined,
     wristSpanRatio: leftWrist && rightWrist ? distance(leftWrist, rightWrist) / scale : undefined,
     ankleSpanRatio: leftAnkle && rightAnkle ? distance(leftAnkle, rightAnkle) / scale : undefined,
+    shoulderDepthSkewRatio: worldGeometry?.shoulderDepthSkewRatio,
+    hipDepthSkewRatio: worldGeometry?.hipDepthSkewRatio,
+    torsoDepthSkewRatio: worldGeometry?.torsoDepthSkewRatio,
     centerOfMassX: (shoulderCenter.x + hipCenter.x * 2) / 3,
     centerOfMassY: (shoulderCenter.y + hipCenter.y * 2) / 3,
+  };
+}
+
+function computeWorldDepthGeometry(
+  worldLandmarks: PoseLandmarkMap | undefined,
+):
+  | Pick<
+      BodyGeometrySignals,
+      'shoulderDepthSkewRatio' | 'hipDepthSkewRatio' | 'torsoDepthSkewRatio'
+    >
+  | undefined {
+  if (!worldLandmarks) {
+    return undefined;
+  }
+
+  const leftShoulder = worldLandmarks.get('left_shoulder');
+  const rightShoulder = worldLandmarks.get('right_shoulder');
+  const leftHip = worldLandmarks.get('left_hip');
+  const rightHip = worldLandmarks.get('right_hip');
+
+  if (
+    !leftShoulder ||
+    !rightShoulder ||
+    !leftHip ||
+    !rightHip ||
+    leftShoulder.z === undefined ||
+    rightShoulder.z === undefined ||
+    leftHip.z === undefined ||
+    rightHip.z === undefined
+  ) {
+    return undefined;
+  }
+
+  const shoulderCenter = midpoint3D(leftShoulder, rightShoulder);
+  const hipCenter = midpoint3D(leftHip, rightHip);
+  const worldScale = Math.max(0.001, distance(shoulderCenter, hipCenter));
+  const shoulderDepthSkewRatio = Math.abs(leftShoulder.z - rightShoulder.z) / worldScale;
+  const hipDepthSkewRatio = Math.abs(leftHip.z - rightHip.z) / worldScale;
+
+  return {
+    shoulderDepthSkewRatio,
+    hipDepthSkewRatio,
+    torsoDepthSkewRatio: averageDefined(shoulderDepthSkewRatio, hipDepthSkewRatio),
   };
 }
 
@@ -460,6 +510,19 @@ function estimateViewOrientation(geometry: BodyGeometrySignals): BodyViewOrienta
   }
 
   const averageSpan = (shoulderSpan + hipSpan) / 2;
+  const depthSkew = geometry.torsoDepthSkewRatio;
+
+  if (depthSkew !== undefined && depthSkew >= 0.55 && averageSpan <= 0.32) {
+    return { kind: 'side', confidence: clamp01(0.62 + (depthSkew - 0.55) / 0.9) };
+  }
+
+  if (depthSkew !== undefined && depthSkew >= 0.35 && averageSpan > 0.32 && averageSpan < 0.72) {
+    return { kind: 'diagonal', confidence: clamp01(0.55 + depthSkew / 1.5) };
+  }
+
+  if (depthSkew !== undefined && depthSkew < 0.18 && averageSpan >= 0.66) {
+    return { kind: 'front', confidence: clamp01(0.7 + (averageSpan - 0.66) / 0.5) };
+  }
 
   if (averageSpan <= 0.18) {
     return { kind: 'side', confidence: clamp01((0.18 - averageSpan) / 0.18) };
