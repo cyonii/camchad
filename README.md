@@ -80,13 +80,13 @@ Rep-validating:
 
 - push-ups
 - squats
+- planks
 
 Count-ready:
 
 - sit-ups
 - lunges
 - jumping jacks
-- planks
 - pull-ups
 - burpees
 - mountain climbers

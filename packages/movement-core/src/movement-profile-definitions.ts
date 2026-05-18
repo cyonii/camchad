@@ -167,6 +167,7 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     failureCriteria: ['tracking loss', 'hands or feet cropped', 'low span contrast'],
   }),
   plank: implementedProfile({
+    maturity: 'rep_validating',
     category: 'hold',
     bodyOrientation: 'floor',
     requiredRegions: ['torso', 'arms', 'hips', 'legs'],
@@ -180,6 +181,10 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
       ['static_hold_stability', 'Static hold stability'],
     ],
     telemetrySignals: ['horizontal body line', 'static hold stability'],
+    validationCriteria: [
+      ['plank_hold_state_machine', 'Hold duration validation', 'validation_profile'],
+      ['body_line_quality', 'Body-line quality threshold', 'declarative'],
+    ],
     failureCriteria: ['tracking loss', 'body-line sag', 'unstable hold'],
   }),
   pull_up: implementedProfile({
@@ -427,6 +432,7 @@ function familyForGeneratedProfile(
 }
 
 function implementedProfile(input: {
+  readonly maturity?: MovementMaturityLevel;
   readonly category: MovementCategory;
   readonly bodyOrientation: MovementBodyOrientation;
   readonly requiredRegions: readonly MovementRegion[];
@@ -436,6 +442,11 @@ function implementedProfile(input: {
   readonly family: MovementFamilyPrimitive;
   readonly cameraSensitivity: MovementProfileMetadata['cameraSensitivity'];
   readonly recognitionCriteria: readonly (readonly [key: string, label: string])[];
+  readonly validationCriteria?: readonly (readonly [
+    key: string,
+    label: string,
+    source: MovementProfileCriterionSource,
+  ])[];
   readonly telemetrySignals: readonly string[];
   readonly failureCriteria: readonly string[];
 }): MovementProfileMetadata {
@@ -445,18 +456,20 @@ function implementedProfile(input: {
     phaseModel: input.phaseModel,
     rhythm: input.rhythm,
     family: input.family,
-    maturity: 'rep_counting',
+    maturity: input.maturity ?? 'rep_counting',
     cameraSensitivity: input.cameraSensitivity,
     recognitionCriteria: input.recognitionCriteria.map(([key, label]) =>
       profileCriterion(key, label, 'declarative'),
     ),
-    validationCriteria: [
-      profileCriterion(
-        'rep_validating_pending',
-        'Rep-validating rules not implemented yet',
-        'planned',
-      ),
-    ],
+    validationCriteria: input.validationCriteria
+      ? input.validationCriteria.map(([key, label, source]) => profileCriterion(key, label, source))
+      : [
+          profileCriterion(
+            'rep_validating_pending',
+            'Rep-validating rules not implemented yet',
+            'planned',
+          ),
+        ],
     telemetrySignals: input.telemetrySignals,
     telemetryExtractors: input.telemetrySignals.map((signal) =>
       telemetryExtractor(

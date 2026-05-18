@@ -21,11 +21,7 @@ export function createMovementInterpreterForDefinition(
     return undefined;
   }
 
-  if (usesProfileInterpreter(definition.maturity)) {
-    if (!isProfileMovementType(definition.type)) {
-      throw new Error(`No profile movement module registered for ${definition.type}.`);
-    }
-
+  if (isProfileMovementType(definition.type)) {
     return createProfileMovementInterpreter(definition.type);
   }
 
@@ -41,10 +37,6 @@ function createRepValidatingInterpreter(
   }
 
   return createRepValidatingMovementInterpreter(movementType, options);
-}
-
-function usesProfileInterpreter(maturity: MovementDefinition['maturity']): boolean {
-  return maturity === 'detected' || maturity === 'recognized' || maturity === 'rep_counting';
 }
 
 function isRepValidatingMovementType(

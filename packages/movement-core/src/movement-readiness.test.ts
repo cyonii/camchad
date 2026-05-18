@@ -29,6 +29,18 @@ describe('movementReadinessChecklist', () => {
     );
   });
 
+  it('promotes plank holds through the validation-ready gate', () => {
+    const checklist = movementReadinessChecklist(movementDefinitionFor('plank'));
+
+    expect(checklist).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: 'recognition_ready', passed: true }),
+        expect.objectContaining({ stage: 'count_ready', passed: true }),
+        expect.objectContaining({ stage: 'validation_ready', passed: true }),
+      ]),
+    );
+  });
+
   it('keeps planned movement profiles inactive', () => {
     const checklist = movementReadinessChecklist(movementDefinitionFor('crunch'));
 

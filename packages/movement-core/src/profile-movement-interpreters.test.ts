@@ -29,10 +29,10 @@ describe('profile movement interpreters', () => {
     ).toBe(true);
     expect(
       movementRegistry.filter((definition) => definition.maturity === 'rep_validating'),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(
       movementRegistry.filter((definition) => definition.maturity === 'rep_counting'),
-    ).toHaveLength(10);
+    ).toHaveLength(9);
     expect(
       movementRegistry.filter((definition) => definition.maturity === 'planned').length,
     ).toBeGreaterThan(0);
@@ -102,6 +102,8 @@ describe('profile movement interpreters', () => {
         status: 'active',
       },
     });
+    expect(heldState.metrics.holdSeconds).toBeGreaterThanOrEqual(1.2);
+    expect(heldState.lastRep?.qualityScore).toBeGreaterThan(70);
   });
 });
 

@@ -4453,12 +4453,20 @@ function formatLongDuration(totalSeconds: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-function formatMetric(value: number | undefined, unit: 'deg' | '%'): string {
+function formatMetric(value: number | undefined, unit: 'deg' | '%' | 's'): string {
   if (value === undefined || Number.isNaN(value)) {
     return 'n/a';
   }
 
-  return unit === '%' ? `${Math.round(value * 100)}%` : `${Math.round(value)}deg`;
+  if (unit === '%') {
+    return `${Math.round(value * 100)}%`;
+  }
+
+  if (unit === 's') {
+    return `${Math.round(value)}s`;
+  }
+
+  return `${Math.round(value)}deg`;
 }
 
 function formatDate(value: string): string {

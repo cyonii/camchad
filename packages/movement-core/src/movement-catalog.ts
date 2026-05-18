@@ -103,10 +103,20 @@ export const movementCatalog: readonly MovementCatalogEntry[] = [
     'arm-leg abduction rhythm',
     'wrist and ankle span oscillation',
   ]),
-  countReadyCatalogEntry('plank', 'Plank', 'Planks', 'floor', [
-    'horizontal body line',
-    'static hold stability',
-  ]),
+  generatedCatalogEntry({
+    type: 'plank',
+    label: 'Plank',
+    pluralLabel: 'Planks',
+    category: 'hold',
+    maturity: 'rep_validating',
+    bodyOrientation: 'floor',
+    analysisSignals: ['horizontal body line', 'static hold stability'],
+    telemetryMetrics: [
+      { key: 'holdSeconds', label: 'Hold time', unit: '%' },
+      { key: 'bodyLineScore', label: 'Body line', unit: '%' },
+      { key: 'movementConfidence', label: 'Signal', unit: '%' },
+    ],
+  }),
   countReadyCatalogEntry('pull_up', 'Pull-up', 'Pull-ups', 'hanging', [
     'vertical hanging posture',
     'elbow flexion',

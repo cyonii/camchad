@@ -95,5 +95,5 @@ export interface CameraAngleAdvice {
 export interface MovementTelemetryMetricDefinition {
   readonly key: string;
   readonly label: string;
-  readonly unit: 'deg' | '%';
+  readonly unit: 'deg' | '%' | 's';
 }
