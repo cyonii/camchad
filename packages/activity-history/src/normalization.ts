@@ -9,18 +9,35 @@ import type {
 
 import type { ActivitySession, ActivityTimelineEvent, MovementSegment } from './models.js';
 
+export const activityHistorySchemaVersion = 1;
+
 export interface PersistedActivityHistory {
+  readonly schemaVersion: typeof activityHistorySchemaVersion;
+  readonly app: 'CamChad';
   readonly sessions: readonly ActivitySession[];
 }
 
+export function persistedActivityHistory(
+  sessions: readonly ActivitySession[],
+): PersistedActivityHistory {
+  return {
+    schemaVersion: activityHistorySchemaVersion,
+    app: 'CamChad',
+    sessions,
+  };
+}
+
 export function normalizeActivityHistory(value: unknown): PersistedActivityHistory {
-  if (!isRecord(value) || !Array.isArray(value.sessions)) {
-    return { sessions: [] };
+  if (
+    !isRecord(value) ||
+    value.schemaVersion !== activityHistorySchemaVersion ||
+    value.app !== 'CamChad' ||
+    !Array.isArray(value.sessions)
+  ) {
+    return persistedActivityHistory([]);
   }
 
-  return {
-    sessions: normalizeActivitySessions(value.sessions),
-  };
+  return persistedActivityHistory(normalizeActivitySessions(value.sessions));
 }
 
 export function normalizeActivitySessions(value: unknown): readonly ActivitySession[] {

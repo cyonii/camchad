@@ -1,5 +1,7 @@
 import {
+  normalizeActivityHistory,
   normalizeActivitySessions,
+  persistedActivityHistory,
   type ActivitySession,
   type ActivitySummary,
 } from '@camchad/activity-history';
@@ -97,7 +99,7 @@ export const localBrowserHistoryClient: HistoryClient = {
   async save(session: ActivitySession): Promise<void> {
     const sessions = readLocalSessions();
     const nextSessions = [session, ...sessions.filter((existing) => existing.id !== session.id)];
-    localStorage.setItem('camchad:sessions', JSON.stringify(nextSessions));
+    writeLocalSessions(nextSessions);
   },
 
   async summary(): Promise<ActivitySummary> {
@@ -119,12 +121,13 @@ export const localBrowserHistoryClient: HistoryClient = {
 
   async replace(sessions: readonly ActivitySession[]): Promise<void> {
     const normalizedSessions = normalizeActivitySessions(sessions);
-    localStorage.setItem('camchad:sessions', JSON.stringify(normalizedSessions));
+    writeLocalSessions(normalizedSessions);
   },
 
   async storageInfo(): Promise<HistoryStorageInfo> {
     const sessions = readLocalSessions();
-    const raw = localStorage.getItem('camchad:sessions') ?? '[]';
+    const raw =
+      localStorage.getItem('camchad:sessions') ?? JSON.stringify(persistedActivityHistory([]));
 
     return {
       bytes: new TextEncoder().encode(raw).byteLength,
@@ -152,11 +155,19 @@ export const browserAppLifecycleClient: AppLifecycleClient = {
 };
 
 function readLocalSessions(): readonly ActivitySession[] {
-  const raw = localStorage.getItem('camchad:sessions') ?? '[]';
+  const raw = localStorage.getItem('camchad:sessions');
+
+  if (!raw) {
+    return [];
+  }
 
   try {
-    return normalizeActivitySessions(JSON.parse(raw));
+    return normalizeActivityHistory(JSON.parse(raw)).sessions;
   } catch {
     return [];
   }
+}
+
+function writeLocalSessions(sessions: readonly ActivitySession[]): void {
+  localStorage.setItem('camchad:sessions', JSON.stringify(persistedActivityHistory(sessions)));
 }

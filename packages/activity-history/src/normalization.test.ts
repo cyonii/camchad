@@ -5,6 +5,8 @@ import { normalizeActivityHistory, normalizeActivitySessions } from './normaliza
 describe('activity history normalization', () => {
   it('normalizes movement collections', () => {
     const history = normalizeActivityHistory({
+      schemaVersion: 1,
+      app: 'CamChad',
       sessions: [
         {
           id: 'session_1',
@@ -135,6 +137,19 @@ describe('activity history normalization', () => {
         trackingQualityScore: undefined,
       },
     ]);
+  });
+
+  it('rejects unsupported activity history backup shapes', () => {
+    expect(normalizeActivityHistory([{ id: 'legacy-array' }])).toEqual({
+      schemaVersion: 1,
+      app: 'CamChad',
+      sessions: [],
+    });
+    expect(normalizeActivityHistory({ schemaVersion: 999, app: 'CamChad', sessions: [] })).toEqual({
+      schemaVersion: 1,
+      app: 'CamChad',
+      sessions: [],
+    });
   });
 
   it('drops malformed sessions and unsupported movement records', () => {

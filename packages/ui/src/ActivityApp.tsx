@@ -34,7 +34,11 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
-import { ActivitySessionService, normalizeActivitySessions } from '@camchad/activity-history';
+import {
+  ActivitySessionService,
+  normalizeActivityHistory,
+  persistedActivityHistory,
+} from '@camchad/activity-history';
 import {
   ActivityStateSegmenter,
   ActivitySessionOrchestrator,
@@ -2329,9 +2333,8 @@ function SettingsView({
     const exportedSessions = await platform.history.list();
     const payload = JSON.stringify(
       {
-        app: 'CamChad',
+        ...persistedActivityHistory(exportedSessions),
         exportedAt: new Date().toISOString(),
-        sessions: exportedSessions,
       },
       null,
       2,
@@ -2347,15 +2350,11 @@ function SettingsView({
 
   const importSessionData = async (file: File): Promise<void> => {
     const parsed = JSON.parse(await file.text()) as unknown;
-    const sourceSessions = Array.isArray(parsed)
-      ? parsed
-      : parsed && typeof parsed === 'object' && 'sessions' in parsed
-        ? (parsed as { sessions: unknown }).sessions
-        : [];
-    const importedSessions = normalizeActivitySessions(sourceSessions);
+    const importedHistory = normalizeActivityHistory(parsed);
+    const importedSessions = importedHistory.sessions;
 
     if (importedSessions.length === 0) {
-      setDataStatus('No valid sessions were found in that backup.');
+      setDataStatus('No supported CamChad v1 sessions were found in that backup.');
       return;
     }
 

@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   normalizeActivityHistory,
+  persistedActivityHistory,
   normalizeActivitySessions,
   type ActivitySession,
   type ActivitySummary,
@@ -170,7 +171,7 @@ async function readHistory(): Promise<PersistedActivityHistory> {
     return normalizeActivityHistory(JSON.parse(raw));
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      return { sessions: [] };
+      return persistedActivityHistory([]);
     }
 
     throw error;
@@ -222,7 +223,7 @@ ipcMain.handle('history:list', async (): Promise<readonly ActivitySession[]> => 
 ipcMain.handle('history:save', async (_event, activitySession: ActivitySession): Promise<void> => {
   const history = await readHistory();
   const sessions = history.sessions.filter((existing) => existing.id !== activitySession.id);
-  await writeHistory({ sessions: [activitySession, ...sessions] });
+  await writeHistory(persistedActivityHistory([activitySession, ...sessions]));
 });
 
 ipcMain.handle('history:summary', async (): Promise<ActivitySummary> => {
@@ -240,13 +241,13 @@ ipcMain.handle('history:summary', async (): Promise<ActivitySummary> => {
 });
 
 ipcMain.handle('history:clear', async (): Promise<void> => {
-  await writeHistory({ sessions: [] });
+  await writeHistory(persistedActivityHistory([]));
 });
 
 ipcMain.handle(
   'history:replace',
   async (_event, sessions: readonly ActivitySession[]): Promise<void> => {
-    await writeHistory({ sessions: normalizeActivitySessions(sessions) });
+    await writeHistory(persistedActivityHistory(normalizeActivitySessions(sessions)));
   },
 );
 
