@@ -151,7 +151,20 @@ npm run lint
 npm run typecheck
 npm run test
 npm run clean
+npm run report:bundle
+npm run report:bundle:check
+npm run report:perception:compare
 ```
+
+## Source Inspection Hygiene
+
+Generated build outputs can contain stale declarations after refactors. Before architecture reviews or broad code searches, run:
+
+```bash
+npm run clean
+```
+
+Source search tools should ignore `dist`, `dist-electron`, `dist-types`, `coverage`, `release`, `out`, `node_modules`, and `.dev`. The committed `.ignore` file mirrors the generated-output rules so `rg` and similar tools stay focused on source files.
 
 ## Web Routes
 

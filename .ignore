@@ -1,0 +1,13 @@
+node_modules/
+coverage/
+dist/
+dist-electron/
+dist-types/
+**/dist/
+**/dist-electron/
+**/dist-types/
+*.tsbuildinfo
+.vite/
+release/
+out/
+.dev/
