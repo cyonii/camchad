@@ -15,6 +15,7 @@ export * from './movement-registry.js';
 export * from './movement-temporal-tracker.js';
 export * from './movement-window.js';
 export * from './profile-movement-interpreters.js';
+export * from './rep-quality.js';
 export * from './rep-validating-movement-interpreter.js';
 export * from './signal-smoothing.js';
 export * from './temporal-confidence.js';

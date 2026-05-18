@@ -46,6 +46,11 @@ export interface ActivityTimelineEvent {
   readonly code?: string;
   readonly repNumber?: number;
   readonly qualityScore?: number;
+  readonly rangeScore?: number;
+  readonly alignmentScore?: number;
+  readonly rhythmScore?: number;
+  readonly confidenceScore?: number;
+  readonly trackingQualityScore?: number;
 }
 
 export interface ActivitySessionAnalysisSummary {

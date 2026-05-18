@@ -18,7 +18,7 @@ describe('rep-validating movement interpreter', () => {
     expect(state.partialReps).toBe(0);
     expect(state.phase).toBe('top');
     expect(state.stateKind).toBe('setup');
-    expect(state.lastRep?.depthScore).toBe(1);
+    expect(state.lastRep?.rangeScore).toBe(1);
   });
 
   it('recognizes push-up movement before validating a complete rep', () => {

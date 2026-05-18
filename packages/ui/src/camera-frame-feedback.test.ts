@@ -118,8 +118,11 @@ describe('deriveCameraFrameFeedback', () => {
         repNumber: 2,
         timestampMs: 1600,
         qualityScore: 48,
-        depthScore: 0.42,
+        rangeScore: 0.42,
         alignmentScore: 0.82,
+        rhythmScore: 0.6,
+        confidenceScore: 0.74,
+        trackingQualityScore: 0.91,
         warnings: [
           {
             code: 'range_of_motion',

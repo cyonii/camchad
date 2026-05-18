@@ -84,6 +84,13 @@ function normalizeTimelineEvent(value: unknown): readonly ActivityTimelineEvent[
       code: typeof value.code === 'string' ? value.code : undefined,
       repNumber: typeof value.repNumber === 'number' ? value.repNumber : undefined,
       qualityScore: typeof value.qualityScore === 'number' ? value.qualityScore : undefined,
+      rangeScore: typeof value.rangeScore === 'number' ? value.rangeScore : undefined,
+      alignmentScore: typeof value.alignmentScore === 'number' ? value.alignmentScore : undefined,
+      rhythmScore: typeof value.rhythmScore === 'number' ? value.rhythmScore : undefined,
+      confidenceScore:
+        typeof value.confidenceScore === 'number' ? value.confidenceScore : undefined,
+      trackingQualityScore:
+        typeof value.trackingQualityScore === 'number' ? value.trackingQualityScore : undefined,
     },
   ];
 }
@@ -144,8 +151,11 @@ function normalizeRepEvent(value: unknown): readonly RepEvent[] {
     typeof value.repNumber !== 'number' ||
     typeof value.timestampMs !== 'number' ||
     typeof value.qualityScore !== 'number' ||
-    typeof value.depthScore !== 'number' ||
-    typeof value.alignmentScore !== 'number'
+    typeof value.rangeScore !== 'number' ||
+    typeof value.alignmentScore !== 'number' ||
+    typeof value.rhythmScore !== 'number' ||
+    typeof value.confidenceScore !== 'number' ||
+    typeof value.trackingQualityScore !== 'number'
   ) {
     return [];
   }
@@ -155,8 +165,11 @@ function normalizeRepEvent(value: unknown): readonly RepEvent[] {
       repNumber: value.repNumber,
       timestampMs: value.timestampMs,
       qualityScore: value.qualityScore,
-      depthScore: value.depthScore,
+      rangeScore: value.rangeScore,
       alignmentScore: value.alignmentScore,
+      rhythmScore: value.rhythmScore,
+      confidenceScore: value.confidenceScore,
+      trackingQualityScore: value.trackingQualityScore,
       warnings: Array.isArray(value.warnings)
         ? value.warnings.flatMap((warning) => normalizeFormWarning(warning))
         : [],

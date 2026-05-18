@@ -132,6 +132,11 @@ export class ActivitySessionService {
           telemetry.recognitionConfidence ?? this.activeSegment.recognitionConfidence,
         repNumber: state.lastRep.repNumber,
         qualityScore: state.lastRep.qualityScore,
+        rangeScore: state.lastRep.rangeScore,
+        alignmentScore: state.lastRep.alignmentScore,
+        rhythmScore: state.lastRep.rhythmScore,
+        confidenceScore: state.lastRep.confidenceScore,
+        trackingQualityScore: state.lastRep.trackingQualityScore,
         message:
           state.lastRep.warnings[0]?.message ??
           (state.lastRep.warnings.length > 0
@@ -281,6 +286,11 @@ export class ActivitySessionService {
       readonly movementSegmentId?: string;
       readonly repNumber?: number;
       readonly qualityScore?: number;
+      readonly rangeScore?: number;
+      readonly alignmentScore?: number;
+      readonly rhythmScore?: number;
+      readonly confidenceScore?: number;
+      readonly trackingQualityScore?: number;
     } = {},
   ): void {
     if (!this.activeSession) {
@@ -304,6 +314,11 @@ export class ActivitySessionService {
           code: telemetry.code,
           repNumber: telemetry.repNumber,
           qualityScore: telemetry.qualityScore,
+          rangeScore: telemetry.rangeScore,
+          alignmentScore: telemetry.alignmentScore,
+          rhythmScore: telemetry.rhythmScore,
+          confidenceScore: telemetry.confidenceScore,
+          trackingQualityScore: telemetry.trackingQualityScore,
         },
       ],
     };
@@ -347,8 +362,11 @@ export function repEvent(repNumber: number, overrides: Partial<RepEvent> = {}): 
     repNumber,
     timestampMs: 1000 * repNumber,
     qualityScore: 90,
-    depthScore: 1,
+    rangeScore: 1,
     alignmentScore: 0.9,
+    rhythmScore: 0.8,
+    confidenceScore: 0.92,
+    trackingQualityScore: 0.96,
     warnings: [],
     ...overrides,
   };

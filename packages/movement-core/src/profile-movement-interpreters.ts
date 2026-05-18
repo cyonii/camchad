@@ -29,6 +29,7 @@ import {
   wristElevationRatio,
   wristSpanRatio,
 } from './movement-profile-signals.js';
+import { buildRepQualityComponents, trackingQualityFromMetrics } from './rep-quality.js';
 
 export type ProfileMovementType =
   | 'sit_up'
@@ -297,7 +298,7 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
       : metric <= this.config.peakThreshold;
   }
 
-  private depthScore(): number {
+  private rangeScore(): number {
     const range = Math.abs(this.config.peakThreshold - this.config.restThreshold);
 
     if (range <= 0) {
@@ -322,7 +323,7 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
     return {
       [this.config.primaryMetricKey]: metric,
       primaryJointAngle: metric,
-      rangeOfMotionScore: this.depthScore(),
+      rangeOfMotionScore: this.rangeScore(),
       alignmentScore: confidence,
       postureScore: confidence,
       movementConfidence: confidence,
@@ -354,21 +355,21 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
   private recordValidRep(timestampMs: number): void {
     this.reps += 1;
     this.validReps += 1;
-    this.lastRep = this.repEvent(timestampMs, this.depthScore(), this.warnings);
+    this.lastRep = this.repEvent(timestampMs, this.rangeScore(), this.warnings);
     this.resetCycle();
   }
 
   private recordPartialRep(timestampMs: number, warnings: readonly FormWarning[] = []): void {
-    const depthScore = this.depthScore();
+    const rangeScore = this.rangeScore();
 
-    if (depthScore < 0.22) {
+    if (rangeScore < 0.22) {
       this.resetCycle();
       return;
     }
 
     this.reps += 1;
     this.partialReps += 1;
-    this.lastRep = this.repEvent(timestampMs, depthScore, [
+    this.lastRep = this.repEvent(timestampMs, rangeScore, [
       ...this.warnings,
       ...warnings,
       {
@@ -381,17 +382,25 @@ class CycleProfileMovementInterpreter implements MovementInterpreter {
 
   private repEvent(
     timestampMs: number,
-    depthScore: number,
+    rangeScore: number,
     warnings: readonly FormWarning[],
   ): RepEvent {
     const alignmentScore = this.metrics.alignmentScore ?? 0;
+    const rhythmScore = this.metrics.rhythmScore ?? 0;
+    const confidenceScore =
+      this.metrics.temporalMovementConfidence ?? this.metrics.movementConfidence ?? 0;
+    const trackingQualityScore = trackingQualityFromMetrics(this.metrics);
 
     return {
       repNumber: this.reps,
       timestampMs,
-      qualityScore: Math.round((alignmentScore + depthScore) * 50),
-      depthScore,
-      alignmentScore,
+      ...buildRepQualityComponents({
+        rangeScore,
+        alignmentScore,
+        rhythmScore,
+        confidenceScore,
+        trackingQualityScore,
+      }),
       warnings,
     };
   }
@@ -489,12 +498,17 @@ class HoldProfileMovementInterpreter implements MovementInterpreter {
     if (holdState.completedHoldCount > this.validReps) {
       this.reps = holdState.completedHoldCount;
       this.validReps = holdState.completedHoldCount;
+      const trackingQualityScore = trackingQualityFromMetrics(this.metrics);
       this.lastRep = {
         repNumber: this.validReps,
         timestampMs,
-        qualityScore: Math.round(confidence * 100),
-        depthScore: confidence,
-        alignmentScore: confidence,
+        ...buildRepQualityComponents({
+          rangeScore: confidence,
+          alignmentScore: confidence,
+          rhythmScore: 1,
+          confidenceScore: confidence,
+          trackingQualityScore,
+        }),
         warnings: this.warnings,
       };
     }

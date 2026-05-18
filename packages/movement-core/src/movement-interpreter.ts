@@ -67,8 +67,11 @@ export interface RepEvent {
   readonly repNumber: number;
   readonly timestampMs: number;
   readonly qualityScore: number;
-  readonly depthScore: number;
+  readonly rangeScore: number;
   readonly alignmentScore: number;
+  readonly rhythmScore: number;
+  readonly confidenceScore: number;
+  readonly trackingQualityScore: number;
   readonly warnings: readonly FormWarning[];
 }
 

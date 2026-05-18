@@ -20,6 +20,7 @@ import { extractBodyState, type BodyState } from './body-state.js';
 import { MovementTemporalTracker } from './movement-temporal-tracker.js';
 import { bodyKneeLiftRatio, bodyMaxKneeLiftRatio } from './movement-profile-signals.js';
 import type { MovementWindowSnapshot } from './movement-window.js';
+import { buildRepQualityComponents, trackingQualityFromMetrics } from './rep-quality.js';
 
 interface FloorPressValidationConfig {
   readonly cameraAngle: CameraAngle;
@@ -167,7 +168,7 @@ class FloorBodyLineValidationInterpreter implements MovementInterpreter {
       alignmentScore,
       alignmentDegradation,
       lockoutScore,
-      rangeOfMotionScore: this.depthScore(),
+      rangeOfMotionScore: this.rangeScore(),
       depthDeficitDegrees: Math.max(0, this.lowestElbowAngle - this.config.bottomElbowAngle),
       depthDriftDegrees,
       confidenceDecay,
@@ -318,11 +319,17 @@ class FloorBodyLineValidationInterpreter implements MovementInterpreter {
   private recordValidRep(timestampMs: number, alignmentScore: number): void {
     this.reps += 1;
     this.validReps += 1;
+    const rangeScore = this.rangeScore();
     this.lastRep = {
       repNumber: this.reps,
       timestampMs,
-      qualityScore: Math.round((alignmentScore + this.depthScore()) * 50),
-      depthScore: this.depthScore(),
+      ...buildRepQualityComponents({
+        rangeScore,
+        alignmentScore,
+        rhythmScore: this.metrics.rhythmScore,
+        confidenceScore: this.metrics.temporalMovementConfidence ?? this.metrics.movementConfidence,
+        trackingQualityScore: trackingQualityFromMetrics(this.metrics),
+      }),
       alignmentScore,
       warnings: this.warnings,
     };
@@ -332,11 +339,17 @@ class FloorBodyLineValidationInterpreter implements MovementInterpreter {
   private recordPartialRep(timestampMs: number, alignmentScore: number): void {
     this.reps += 1;
     this.partialReps += 1;
+    const rangeScore = this.rangeScore();
     this.lastRep = {
       repNumber: this.reps,
       timestampMs,
-      qualityScore: Math.round(alignmentScore * 50),
-      depthScore: this.depthScore(),
+      ...buildRepQualityComponents({
+        rangeScore,
+        alignmentScore,
+        rhythmScore: this.metrics.rhythmScore,
+        confidenceScore: this.metrics.temporalMovementConfidence ?? this.metrics.movementConfidence,
+        trackingQualityScore: trackingQualityFromMetrics(this.metrics),
+      }),
       alignmentScore,
       warnings: [
         ...this.warnings,
@@ -349,7 +362,7 @@ class FloorBodyLineValidationInterpreter implements MovementInterpreter {
     this.lowestElbowAngle = 180;
   }
 
-  private depthScore(): number {
+  private rangeScore(): number {
     const depthRange = this.config.topElbowAngle - this.config.bottomElbowAngle;
 
     if (depthRange <= 0) {
@@ -758,7 +771,7 @@ class StandingKneeBendValidationInterpreter implements MovementInterpreter {
       tempoDriftRatio: kneeRhythm.tempoDriftRatio,
       tempoDriftMs: kneeRhythm.cycleDurationRangeMs,
       kneeAngle,
-      rangeOfMotionScore: this.depthScore(),
+      rangeOfMotionScore: this.rangeScore(),
       depthDeficitDegrees,
       depthConsistencyScore: clamp01(1 - depthDriftRatio),
       postureScore,
@@ -888,11 +901,17 @@ class StandingKneeBendValidationInterpreter implements MovementInterpreter {
   private recordValidRep(timestampMs: number, postureScore: number): void {
     this.reps += 1;
     this.validReps += 1;
+    const rangeScore = this.rangeScore();
     this.lastRep = {
       repNumber: this.reps,
       timestampMs,
-      qualityScore: Math.round((postureScore + this.depthScore()) * 50),
-      depthScore: this.depthScore(),
+      ...buildRepQualityComponents({
+        rangeScore,
+        alignmentScore: postureScore,
+        rhythmScore: this.metrics.rhythmScore,
+        confidenceScore: this.metrics.temporalMovementConfidence ?? this.metrics.movementConfidence,
+        trackingQualityScore: trackingQualityFromMetrics(this.metrics),
+      }),
       alignmentScore: postureScore,
       warnings: this.warnings,
     };
@@ -902,11 +921,17 @@ class StandingKneeBendValidationInterpreter implements MovementInterpreter {
   private recordPartialRep(timestampMs: number, postureScore: number): void {
     this.reps += 1;
     this.partialReps += 1;
+    const rangeScore = this.rangeScore();
     this.lastRep = {
       repNumber: this.reps,
       timestampMs,
-      qualityScore: Math.round(postureScore * 50),
-      depthScore: this.depthScore(),
+      ...buildRepQualityComponents({
+        rangeScore,
+        alignmentScore: postureScore,
+        rhythmScore: this.metrics.rhythmScore,
+        confidenceScore: this.metrics.temporalMovementConfidence ?? this.metrics.movementConfidence,
+        trackingQualityScore: trackingQualityFromMetrics(this.metrics),
+      }),
       alignmentScore: postureScore,
       warnings: [
         ...this.warnings,
@@ -919,7 +944,7 @@ class StandingKneeBendValidationInterpreter implements MovementInterpreter {
     this.lowestKneeAngle = 180;
   }
 
-  private depthScore(): number {
+  private rangeScore(): number {
     const depthRange = this.config.topKneeAngle - this.config.bottomKneeAngle;
 
     if (depthRange <= 0) {
