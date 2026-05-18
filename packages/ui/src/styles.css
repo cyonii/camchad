@@ -1603,6 +1603,10 @@ button,
   background: var(--surface-glass-strong);
 }
 
+.camera-advice[data-severity='warning'] > span {
+  color: var(--warning);
+}
+
 .camera-advice p {
   margin: 0;
   color: var(--text-muted);
@@ -1733,10 +1737,10 @@ button,
 .camera-guidance {
   display: grid;
   width: max-content;
-  max-width: 100%;
+  max-width: min(58ch, 100%);
   gap: 4px;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 11px 13px;
   border: 1px solid rgb(var(--primary-rgb) / 24%);
   border-radius: 6px;
   background: rgb(var(--primary-rgb) / 7%);
@@ -1745,16 +1749,25 @@ button,
     0 0 22px rgb(var(--primary-rgb) / 8%);
 }
 
+.camera-guidance[data-severity='warning'] {
+  border-color: rgb(var(--warning-rgb) / 36%);
+  background: rgb(var(--warning-rgb) / 8%);
+  box-shadow:
+    inset 2px 0 0 rgb(var(--warning-rgb) / 78%),
+    0 0 22px rgb(var(--warning-rgb) / 9%);
+}
+
 .camera-guidance strong {
   color: var(--text);
   font-size: 0.82rem;
   font-weight: 700;
+  line-height: 1.25;
 }
 
 .camera-guidance small {
   color: var(--text-muted);
   font-size: 0.78rem;
-  line-height: 1.35;
+  line-height: 1.42;
 }
 
 .segmented-control {

@@ -1385,7 +1385,12 @@ function ActivityView({
       <div className="bottom-command-deck">
         <div className="command-module command-module-guidance">
           <span>Camera guidance</span>
-          <div className="camera-guidance">
+          <div
+            className="camera-guidance"
+            role="status"
+            aria-live="polite"
+            data-severity={guidanceSeverity(visibleGuidance)}
+          >
             <strong>{visibleGuidance?.title ?? 'Awaiting movement'}</strong>
             <small>
               {visibleGuidance?.message ??
@@ -4471,6 +4476,20 @@ function primaryGuidanceFor(
   telemetry: ActivitySessionTelemetry,
 ): NonNullable<ActivitySessionTelemetry['guidanceEvents']>[number] | undefined {
   return telemetry.guidanceEvents?.find((event) => event.code !== 'conditions_usable');
+}
+
+function guidanceSeverity(
+  guidance:
+    | NonNullable<ActivitySessionTelemetry['guidanceEvents']>[number]
+    | NonNullable<ActivitySessionTelemetry['cameraAdvice']>
+    | CalibrationPreflightSnapshot
+    | undefined,
+): 'info' | 'warning' {
+  if (!guidance || !('severity' in guidance)) {
+    return 'info';
+  }
+
+  return guidance.severity;
 }
 
 function formatSessionMode(mode: ActivitySessionTelemetry['mode']): string {
