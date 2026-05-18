@@ -3102,6 +3102,7 @@ function SettingsInterfacePreview({
     <div
       className="settings-interface-preview"
       data-theme-preview={themePreference}
+      data-telemetry-mode={telemetryMode}
       style={
         {
           '--preview-hud-opacity': `${preferences.telemetryOpacity / 100}`,
@@ -3119,12 +3120,23 @@ function SettingsInterfacePreview({
         <div className={bodyPreviewClass}>
           <img src="/settings/human-body-preview.webp" alt="" aria-hidden="true" />
         </div>
+        {telemetryMode === 'engraved' ? (
+          <div className="settings-preview-mirror-hud" aria-hidden="true">
+            <small>Movement</small>
+            <strong>Observing</strong>
+            <span>Signal stable</span>
+            <small>Valid reps</small>
+            <strong>12</strong>
+          </div>
+        ) : null}
       </div>
-      <div className={`settings-preview-telemetry mode-${telemetryMode}`}>
-        <small>{telemetryMode === 'fixed' ? 'Sidebar telemetry' : 'Mirror HUD'}</small>
-        <strong>{preferences.telemetryOpacity}% opacity</strong>
-        <span>{preferences.telemetryBlur}px blur</span>
-      </div>
+      {telemetryMode === 'fixed' ? (
+        <div className="settings-preview-telemetry">
+          <small>Sidebar telemetry</small>
+          <strong>{preferences.telemetryOpacity}% opacity</strong>
+          <span>{preferences.telemetryBlur}px blur</span>
+        </div>
+      ) : null}
     </div>
   );
 }

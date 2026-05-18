@@ -78,7 +78,6 @@ export function ActivityLogChart({ model }: { readonly model: HistoryChartModel 
                     borderRadius: 8,
                     background: 'var(--surface-glass-strong)',
                     color: 'var(--text)',
-                    boxShadow: '0 18px 44px var(--shadow)',
                   }}
                   labelStyle={{ color: 'var(--text)' }}
                 />
