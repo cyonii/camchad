@@ -33,6 +33,15 @@ export interface MovementInferenceState {
   readonly primaryMovementType?: MovementType;
   readonly competingMovementTypes: readonly MovementType[];
   readonly evidence: readonly string[];
+  readonly confusion?: MovementCandidateConfusion;
+}
+
+export interface MovementCandidateConfusion {
+  readonly primaryMovementType: MovementType;
+  readonly runnerUpMovementType?: MovementType;
+  readonly confidenceGap: number;
+  readonly sharedEvidence: readonly string[];
+  readonly decisiveEvidence: readonly string[];
 }
 
 export interface MovementRecognitionEngineOptions {
@@ -204,6 +213,7 @@ function inferMovementState(
   const runnerUp = rankedCandidates.find(
     (candidate) => candidate.movementType !== primary.movementType,
   );
+  const confusion = candidateConfusion(primary, runnerUp);
 
   if (primary.recognition.status === 'tracking_lost') {
     return {
@@ -211,6 +221,7 @@ function inferMovementState(
       confidence: 0,
       competingMovementTypes: [],
       evidence: ['tracking_lost'],
+      confusion,
     };
   }
 
@@ -223,6 +234,7 @@ function inferMovementState(
         .slice(0, 3)
         .map((candidate) => candidate.movementType),
       evidence: ['insufficient_temporal_confidence'],
+      confusion,
     };
   }
 
@@ -238,6 +250,7 @@ function inferMovementState(
       primaryMovementType: primary.movementType,
       competingMovementTypes: [primary.movementType, runnerUp.movementType],
       evidence: ['similar_candidate_confidence'],
+      confusion,
     };
   }
 
@@ -247,6 +260,29 @@ function inferMovementState(
     primaryMovementType: primary.movementType,
     competingMovementTypes: runnerUp ? [runnerUp.movementType] : [],
     evidence: primary.recognition.evidence,
+    confusion,
+  };
+}
+
+function candidateConfusion(
+  primary: MovementInterpreterState,
+  runnerUp: MovementInterpreterState | undefined,
+): MovementCandidateConfusion {
+  const primaryEvidence = new Set(primary.recognition.evidence);
+  const runnerUpEvidence = new Set(runnerUp?.recognition.evidence ?? []);
+  const sharedEvidence = [...primaryEvidence].filter((evidence) => runnerUpEvidence.has(evidence));
+  const decisiveEvidence = [...primaryEvidence].filter(
+    (evidence) => !runnerUpEvidence.has(evidence),
+  );
+
+  return {
+    primaryMovementType: primary.movementType,
+    runnerUpMovementType: runnerUp?.movementType,
+    confidenceGap: runnerUp
+      ? Math.abs(primary.recognition.confidence - runnerUp.recognition.confidence)
+      : primary.recognition.confidence,
+    sharedEvidence,
+    decisiveEvidence,
   };
 }
 

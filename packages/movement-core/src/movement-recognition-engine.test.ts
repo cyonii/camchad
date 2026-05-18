@@ -207,6 +207,51 @@ describe('MovementRecognitionEngine', () => {
 
     expect(state.inference.status).toBe('ambiguous');
     expect(state.inference.competingMovementTypes).toEqual(['push_up', 'squat']);
+    expect(state.inference.confusion).toMatchObject({
+      primaryMovementType: 'push_up',
+      runnerUpMovementType: 'squat',
+    });
+    expect(state.inference.confusion?.confidenceGap).toBeLessThanOrEqual(0.08);
+  });
+
+  it('records shared and decisive evidence for candidate confusion', () => {
+    const engine = new MovementRecognitionEngine([
+      fakeInterpreter(
+        movementState({
+          movementType: 'push_up',
+          recognition: {
+            movementType: 'push_up',
+            confidence: 0.86,
+            status: 'active',
+            evidence: ['profile_criteria_checked', 'floor_orientation_match', 'body_line_signal'],
+          },
+        }),
+      ),
+      fakeInterpreter(
+        movementState({
+          movementType: 'plank',
+          recognition: {
+            movementType: 'plank',
+            confidence: 0.62,
+            status: 'candidate',
+            evidence: ['profile_criteria_checked', 'floor_orientation_match'],
+          },
+        }),
+      ),
+    ]);
+
+    engine.processPose(undefined);
+    const state = engine.processPose(undefined);
+
+    expect(state.inference.confusion).toMatchObject({
+      primaryMovementType: 'push_up',
+      runnerUpMovementType: 'plank',
+      sharedEvidence: expect.arrayContaining([
+        'profile_criteria_checked',
+        'floor_orientation_match',
+      ]),
+      decisiveEvidence: expect.arrayContaining(['body_line_signal']),
+    });
   });
 
   it('adds declarative profile criteria evidence and metrics to recognizable candidates', () => {
