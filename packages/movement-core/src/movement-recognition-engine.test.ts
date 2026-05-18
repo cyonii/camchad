@@ -320,7 +320,7 @@ describe('MovementRecognitionEngine', () => {
     });
   });
 
-  it('adds declarative profile criteria evidence and metrics to recognizable candidates', () => {
+  it('adds declarative profile criteria evidence and metrics to count-ready candidates', () => {
     const sequence = makeHighKneesSequence();
     const engine = new MovementRecognitionEngine([
       sequencedInterpreter(

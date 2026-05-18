@@ -2114,7 +2114,7 @@ button,
   color: var(--primary);
 }
 
-.exercise-definition-row[data-maturity='recognizable'] .exercise-definition-main span {
+.exercise-definition-row[data-maturity='rep_counting'] .exercise-definition-main span {
   color: var(--warning);
 }
 
@@ -3184,7 +3184,7 @@ button,
   text-transform: uppercase;
 }
 
-.engine-definition-card[data-maturity='recognizable'] .engine-definition-title-row span {
+.engine-definition-card[data-maturity='rep_counting'] .engine-definition-title-row span {
   color: var(--warning);
   background: rgb(var(--warning-rgb) / 10%);
 }

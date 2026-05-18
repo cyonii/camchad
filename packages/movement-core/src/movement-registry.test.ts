@@ -81,7 +81,7 @@ describe('movementRegistry profiles', () => {
       maturity: 'rep_validating',
       rhythm: 'cyclic',
     });
-    expect(movementDefinitionFor('sit_up').profile.maturity).toBe('recognizable');
+    expect(movementDefinitionFor('sit_up').profile.maturity).toBe('rep_counting');
     expect(movementDefinitionFor('crunch').profile.maturity).toBe('planned');
   });
 

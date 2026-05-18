@@ -12,7 +12,7 @@ CamChad should feel like a local movement-analysis instrument:
 - live camera-based pose inference on-device;
 - automatic movement recognition instead of manual exercise selection;
 - rep-validating movement profiles where the engine can judge rep quality;
-- recognizable profiles where the engine can identify movement patterns without claiming mature validation;
+- count-ready profiles where the engine can identify and count movement patterns without claiming mature validation;
 - local session history with movement segments, rep events, guidance, and telemetry;
 - tactical, readable instrumentation UI for live analysis, logs, exercises, and settings.
 
@@ -81,7 +81,7 @@ Rep-validating:
 - push-ups
 - squats
 
-Recognizable:
+Count-ready:
 
 - sit-ups
 - lunges
@@ -286,7 +286,7 @@ Near-term priorities are tracked locally under `.dev/plans` and `.dev/core-movem
 
 Current themes:
 
-- improve movement-profile specificity for recognizable profiles;
+- improve movement-profile specificity for count-ready profiles;
 - build real browser/Electron runtime perception benchmarking;
 - compare Pose Lite, Full, and Heavy with measured latency, FPS, detection ratio, jitter, and downstream recognition stability;
 - grow a local pose-trace corpus for replay tests;

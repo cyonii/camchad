@@ -20,7 +20,13 @@ export interface MovementDefinition {
 
 export type MovementCategory = 'repetition' | 'hold' | 'compound';
 
-export type MovementMaturityLevel = 'rep_validating' | 'recognizable' | 'planned';
+export type MovementMaturityLevel =
+  | 'detected'
+  | 'recognized'
+  | 'rep_counting'
+  | 'rep_validating'
+  | 'quality_validating'
+  | 'planned';
 
 export type MovementBodyOrientation = 'standing' | 'floor' | 'seated' | 'hanging' | 'mixed';
 

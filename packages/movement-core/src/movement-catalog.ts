@@ -90,45 +90,45 @@ export const movementCatalog: readonly MovementCatalogEntry[] = [
       { key: 'movementConfidence', label: 'Signal', unit: '%' },
     ],
   },
-  recognizableCatalogEntry('sit_up', 'Sit-up', 'Sit-ups', 'floor', [
+  countReadyCatalogEntry('sit_up', 'Sit-up', 'Sit-ups', 'floor', [
     'torso curl trajectory',
     'hip anchor stability',
   ]),
-  recognizableCatalogEntry('lunge', 'Lunge', 'Lunges', 'standing', [
+  countReadyCatalogEntry('lunge', 'Lunge', 'Lunges', 'standing', [
     'split stance',
     'front knee flexion',
     'hip drop',
   ]),
-  recognizableCatalogEntry('jumping_jack', 'Jumping jack', 'Jumping jacks', 'standing', [
+  countReadyCatalogEntry('jumping_jack', 'Jumping jack', 'Jumping jacks', 'standing', [
     'arm-leg abduction rhythm',
     'wrist and ankle span oscillation',
   ]),
-  recognizableCatalogEntry('plank', 'Plank', 'Planks', 'floor', [
+  countReadyCatalogEntry('plank', 'Plank', 'Planks', 'floor', [
     'horizontal body line',
     'static hold stability',
   ]),
-  recognizableCatalogEntry('pull_up', 'Pull-up', 'Pull-ups', 'hanging', [
+  countReadyCatalogEntry('pull_up', 'Pull-up', 'Pull-ups', 'hanging', [
     'vertical hanging posture',
     'elbow flexion',
     'shoulder elevation change',
   ]),
-  recognizableCatalogEntry('burpee', 'Burpee', 'Burpees', 'mixed', [
+  countReadyCatalogEntry('burpee', 'Burpee', 'Burpees', 'mixed', [
     'standing-floor-standing transition',
     'compound motion rhythm',
   ]),
-  recognizableCatalogEntry('mountain_climber', 'Mountain climber', 'Mountain climbers', 'floor', [
+  countReadyCatalogEntry('mountain_climber', 'Mountain climber', 'Mountain climbers', 'floor', [
     'plank base',
     'alternating knee drive',
   ]),
-  recognizableCatalogEntry('high_knees', 'High knees', 'High knees', 'standing', [
+  countReadyCatalogEntry('high_knees', 'High knees', 'High knees', 'standing', [
     'alternating knee lift',
     'vertical cadence',
   ]),
-  recognizableCatalogEntry('lateral_raise', 'Lateral raise', 'Lateral raises', 'standing', [
+  countReadyCatalogEntry('lateral_raise', 'Lateral raise', 'Lateral raises', 'standing', [
     'shoulder abduction',
     'arm elevation symmetry',
   ]),
-  recognizableCatalogEntry('yoga_hold', 'Yoga hold', 'Yoga holds', 'mixed', [
+  countReadyCatalogEntry('yoga_hold', 'Yoga hold', 'Yoga holds', 'mixed', [
     'static pose geometry',
     'hold stability',
   ]),
@@ -194,7 +194,7 @@ export const movementCatalog: readonly MovementCatalogEntry[] = [
   ]),
 ];
 
-function recognizableCatalogEntry(
+function countReadyCatalogEntry(
   type: MovementType,
   label: string,
   pluralLabel: string,
@@ -208,7 +208,7 @@ function recognizableCatalogEntry(
     label,
     pluralLabel,
     category,
-    maturity: 'recognizable',
+    maturity: 'rep_counting',
     bodyOrientation,
     analysisSignals,
     telemetryMetrics: [

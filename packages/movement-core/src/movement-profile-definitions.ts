@@ -394,7 +394,7 @@ function implementedProfile(input: {
     primaryJoints: input.primaryJoints,
     phaseModel: input.phaseModel,
     rhythm: input.rhythm,
-    maturity: 'recognizable',
+    maturity: 'rep_counting',
     cameraSensitivity: input.cameraSensitivity,
     recognitionCriteria: input.recognitionCriteria.map(([key, label]) =>
       profileCriterion(key, label, 'declarative'),

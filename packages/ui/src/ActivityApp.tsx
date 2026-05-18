@@ -2881,13 +2881,13 @@ function SupportedExercisesView({
   const repValidatingDefinitions = movementRegistry.filter(
     (definition) => definition.maturity === 'rep_validating',
   );
-  const recognizableDefinitions = movementRegistry.filter(
-    (definition) => definition.maturity === 'recognizable',
+  const countReadyDefinitions = movementRegistry.filter(
+    (definition) => definition.maturity === 'rep_counting',
   );
   const plannedDefinitions = movementRegistry.filter(
     (definition) => definition.maturity === 'planned',
   );
-  const activeDefinitionCount = repValidatingDefinitions.length + recognizableDefinitions.length;
+  const activeDefinitionCount = repValidatingDefinitions.length + countReadyDefinitions.length;
   const selectedDefinition =
     movementRegistry.find((definition) => definition.type === selectedMovementType) ??
     movementRegistry[0];
@@ -2921,8 +2921,8 @@ function SupportedExercisesView({
               <span>Exercise library</span>
               <h1>Movement Profiles</h1>
               <p>
-                Browse the local movement profiles CamChad can validate today, recognize as
-                patterns, or keep as planned definitions for future tracking.
+                Browse the local movement profiles CamChad can validate today, count as movement
+                events, or keep as planned definitions for future tracking.
               </p>
             </div>
           </div>
@@ -2940,9 +2940,9 @@ function SupportedExercisesView({
             <small>Full rep counting and quality checks</small>
           </div>
           <div>
-            <span>Recognizable</span>
-            <strong>{recognizableDefinitions.length}</strong>
-            <small>Detected as movement patterns</small>
+            <span>Count-ready</span>
+            <strong>{countReadyDefinitions.length}</strong>
+            <small>Counted with generic movement primitives</small>
           </div>
           <div>
             <span>Planned</span>
@@ -3006,12 +3006,12 @@ function SupportedExercisesView({
               Rep-validating
             </ExerciseFilterPill>
             <ExerciseFilterPill
-              value="recognizable"
-              count={filterCount('recognizable')}
+              value="rep_counting"
+              count={filterCount('rep_counting')}
               activeFilter={filter}
               onChange={setFilter}
             >
-              Recognizable
+              Count-ready
             </ExerciseFilterPill>
             <ExerciseFilterPill
               value="planned"
@@ -3934,7 +3934,15 @@ function movementMaturityScore(definition: MovementDefinition): number {
     return 18 + definition.analysisSignals.length * 3;
   }
 
-  const supportBase = definition.maturity === 'rep_validating' ? 72 : 46;
+  const supportBaseByMaturity: Record<MovementDefinition['maturity'], number> = {
+    planned: 18,
+    detected: 30,
+    recognized: 44,
+    rep_counting: 58,
+    rep_validating: 72,
+    quality_validating: 86,
+  };
+  const supportBase = supportBaseByMaturity[definition.maturity];
   const telemetryWeight = Math.min(18, definition.telemetryMetrics.length * 4);
   const phaseWeight = Math.min(8, definition.phaseLabels.length * 2);
   const cameraWeight = Math.min(6, definition.supportedCameraAngles.length * 2);
@@ -3979,10 +3987,24 @@ function movementMaturitySteps(
 ): readonly { readonly label: string; readonly active: boolean }[] {
   return [
     { label: 'Profiled', active: true },
-    { label: 'Recognized', active: definition.maturity !== 'planned' },
-    { label: 'Rep phases', active: definition.phaseLabels.length > 0 },
-    { label: 'Quality', active: definition.maturity === 'rep_validating' },
+    { label: 'Recognized', active: movementMaturityRank(definition.maturity) >= 2 },
+    { label: 'Counted', active: movementMaturityRank(definition.maturity) >= 3 },
+    { label: 'Validated', active: movementMaturityRank(definition.maturity) >= 4 },
+    { label: 'Quality', active: movementMaturityRank(definition.maturity) >= 5 },
   ];
+}
+
+function movementMaturityRank(level: MovementDefinition['maturity']): number {
+  const ranks: Record<MovementDefinition['maturity'], number> = {
+    planned: 0,
+    detected: 1,
+    recognized: 2,
+    rep_counting: 3,
+    rep_validating: 4,
+    quality_validating: 5,
+  };
+
+  return ranks[level];
 }
 
 function formatCameraAngle(cameraAngle: CameraAngle): string {
@@ -4014,12 +4036,24 @@ function formatBodyOrientation(orientation: MovementDefinition['bodyOrientation'
 }
 
 function formatMaturityLevel(level: MovementDefinition['maturity']): string {
+  if (level === 'detected') {
+    return 'Detected';
+  }
+
+  if (level === 'recognized') {
+    return 'Recognized';
+  }
+
+  if (level === 'rep_counting') {
+    return 'Count-ready';
+  }
+
   if (level === 'rep_validating') {
     return 'Rep-validating';
   }
 
-  if (level === 'recognizable') {
-    return 'Recognizable';
+  if (level === 'quality_validating') {
+    return 'Quality-validating';
   }
 
   return 'Planned';

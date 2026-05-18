@@ -27,7 +27,7 @@ describe('profile movement interpreters', () => {
       movementRegistry.filter((definition) => definition.maturity === 'rep_validating'),
     ).toHaveLength(2);
     expect(
-      movementRegistry.filter((definition) => definition.maturity === 'recognizable'),
+      movementRegistry.filter((definition) => definition.maturity === 'rep_counting'),
     ).toHaveLength(10);
     expect(
       movementRegistry.filter((definition) => definition.maturity === 'planned').length,
