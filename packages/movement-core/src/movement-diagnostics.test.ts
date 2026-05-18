@@ -78,6 +78,43 @@ describe('diagnoseMovement', () => {
     expect(diagnostics.events.some((event) => event.code === 'side_angle_recommended')).toBe(true);
   });
 
+  it('recommends validation camera angle for stable movement candidates', () => {
+    const diagnostics = diagnoseMovement({
+      activityState: {
+        state: 'moving',
+        confidence: 0.78,
+        motionMagnitude: 0.38,
+        evidence: ['body_motion_threshold'],
+      },
+      cameraAngle: 'front',
+      interpreterState: {
+        movementType: 'push_up',
+        recognition: {
+          movementType: 'push_up',
+          confidence: 0.64,
+          status: 'candidate',
+          evidence: ['floor_orientation', 'elbow_flexion_signal'],
+        },
+        phase: 'setup_needed',
+        reps: 0,
+        validReps: 0,
+        partialReps: 0,
+        warnings: [],
+        metrics: {},
+      },
+    });
+
+    expect(diagnostics.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'side_angle_recommended',
+          severity: 'warning',
+          message: expect.stringContaining('validation'),
+        }),
+      ]),
+    );
+  });
+
   it('emits a usable-conditions event when signal quality is stable', () => {
     const diagnostics = diagnoseMovement({
       activityState: {

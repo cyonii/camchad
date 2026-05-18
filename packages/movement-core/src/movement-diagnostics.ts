@@ -1,4 +1,4 @@
-import type { MovementInterpreterState } from './movement-interpreter.js';
+import type { CameraAngle, MovementInterpreterState } from './movement-interpreter.js';
 import type { ActivityStateSnapshot } from './activity-state-segmenter.js';
 import type { MovementWindowSnapshot } from './movement-window.js';
 import { movementDefinitionFor } from './movement-registry.js';
@@ -36,6 +36,8 @@ export interface MovementDiagnosticsInput {
   readonly activityState: ActivityStateSnapshot;
   readonly window?: MovementWindowSnapshot;
   readonly interpreterState?: MovementInterpreterState;
+  readonly cameraAngle?: CameraAngle;
+  readonly cameraAdviceConfidence?: number;
 }
 
 export interface MovementDiagnosticsSnapshot {
@@ -46,7 +48,7 @@ export interface MovementDiagnosticsSnapshot {
 export function diagnoseMovement(input: MovementDiagnosticsInput): MovementDiagnosticsSnapshot {
   const events = [
     ...trackingEvents(input),
-    ...interpreterEvents(input.interpreterState),
+    ...interpreterEvents(input),
     conditionsUsableEvent(input),
   ].filter((event): event is MovementGuidanceEvent => event !== undefined);
 
@@ -240,18 +242,20 @@ function trackingEvents(input: MovementDiagnosticsInput): readonly MovementGuida
   return events;
 }
 
-function interpreterEvents(
-  state: MovementInterpreterState | undefined,
-): readonly MovementGuidanceEvent[] {
+function interpreterEvents(input: MovementDiagnosticsInput): readonly MovementGuidanceEvent[] {
+  const state = input.interpreterState;
+
   if (!state) {
     return [];
   }
+
+  const events: MovementGuidanceEvent[] = [];
 
   if (state.recognition.evidence.includes('body_orientation_mismatch')) {
     const recommendedAngle = movementDefinitionFor(state.movementType).cameraGuidance
       .recommendedAngle;
 
-    return [
+    events.push(
       {
         code: recommendedAngle === 'front' ? 'front_angle_recommended' : 'side_angle_recommended',
         severity: 'warning',
@@ -269,10 +273,52 @@ function interpreterEvents(
         message: 'Adjust your camera position for this movement pattern.',
         confidence: 1 - state.recognition.confidence,
       },
-    ];
+    );
   }
 
-  return [];
+  const candidateAdvice = candidateCameraAdviceEvent(input);
+  if (candidateAdvice && !events.some((event) => event.code === candidateAdvice.code)) {
+    events.push(candidateAdvice);
+  }
+
+  return events;
+}
+
+function candidateCameraAdviceEvent(
+  input: MovementDiagnosticsInput,
+): MovementGuidanceEvent | undefined {
+  const state = input.interpreterState;
+
+  if (!state?.recognition.movementType || !input.cameraAngle) {
+    return undefined;
+  }
+
+  const confidenceFloor = input.cameraAdviceConfidence ?? 0.35;
+  if (
+    state.recognition.status === 'tracking_lost' ||
+    state.recognition.confidence < confidenceFloor
+  ) {
+    return undefined;
+  }
+
+  const definition = movementDefinitionFor(state.recognition.movementType);
+  const recommendedAngle = definition.cameraGuidance.recommendedAngle;
+
+  if (input.cameraAngle === recommendedAngle) {
+    return undefined;
+  }
+
+  const isSupportedAngle = definition.supportedCameraAngles.includes(input.cameraAngle);
+  const angleLabel = recommendedAngle === 'front' ? 'front' : 'side';
+  const title = `${recommendedAngle === 'front' ? 'Front' : 'Side'} angle recommended`;
+
+  return {
+    code: recommendedAngle === 'front' ? 'front_angle_recommended' : 'side_angle_recommended',
+    severity: isSupportedAngle ? 'info' : 'warning',
+    title,
+    message: `${definition.label} is being recognized, but ${angleLabel} view is the strongest camera angle for validation.`,
+    confidence: state.recognition.confidence,
+  };
 }
 
 function conditionsUsableEvent(input: MovementDiagnosticsInput): MovementGuidanceEvent | undefined {

@@ -887,6 +887,7 @@ function ActivityView({
         activityState,
         window: activityWindowSnapshot,
         interpreterState: nextState,
+        cameraAngle: preferredCameraAngle,
       });
       const nextSessionTelemetry = {
         ...sessionOrchestratorRef.current.process(nextState, timestampMs),
