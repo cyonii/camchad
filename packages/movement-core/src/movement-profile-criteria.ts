@@ -52,7 +52,7 @@ const criterionEvaluators = {
   push_up_depth: scoreElbowSignal,
   shoulder_abduction: scoreWristSpan,
   shoulder_elevation_change: scoreElbowSignal,
-  split_stance: scoreAnkleSpan,
+  split_stance: scoreSplitStance,
   squat_depth: scoreKneeSignal,
   standing_floor_standing_transition: scoreMovementRhythm,
   standing_orientation: scoreBodyOrientation,
@@ -208,8 +208,10 @@ function scoreWristSpan(context: MovementProfileEvaluationContext): number {
   return wristSpanRatio(context) === undefined ? 0 : 1;
 }
 
-function scoreAnkleSpan(context: MovementProfileEvaluationContext): number {
-  return ankleSpanRatio(context) === undefined ? 0 : 1;
+function scoreSplitStance(context: MovementProfileEvaluationContext): number {
+  const ratio = ankleSpanRatio(context);
+
+  return ratio === undefined ? 0 : ratioScore(ratio, 0.45, 0.9);
 }
 
 function scoreAppendageSpanOscillation(context: MovementProfileEvaluationContext): number {

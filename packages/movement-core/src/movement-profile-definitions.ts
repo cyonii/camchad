@@ -114,48 +114,158 @@ export const movementProfiles: Readonly<Record<MovementType, MovementProfileMeta
     ],
     failureCriteria: ['tracking loss', 'forward torso collapse', 'partial depth'],
   },
-  sit_up: generatedProfile('recognizable', 'repetition', 'floor', [
-    'torso curl trajectory',
-    'hip anchor stability',
-  ]),
-  lunge: generatedProfile('recognizable', 'repetition', 'standing', [
-    'split stance',
-    'front knee flexion',
-    'hip drop',
-  ]),
-  jumping_jack: generatedProfile('recognizable', 'repetition', 'standing', [
-    'arm-leg abduction rhythm',
-    'wrist and ankle span oscillation',
-  ]),
-  plank: generatedProfile('recognizable', 'hold', 'floor', [
-    'horizontal body line',
-    'static hold stability',
-  ]),
-  pull_up: generatedProfile('recognizable', 'repetition', 'hanging', [
-    'vertical hanging posture',
-    'elbow flexion',
-    'shoulder elevation change',
-  ]),
-  burpee: generatedProfile('recognizable', 'repetition', 'mixed', [
-    'standing-floor-standing transition',
-    'compound motion rhythm',
-  ]),
-  mountain_climber: generatedProfile('recognizable', 'repetition', 'floor', [
-    'plank base',
-    'alternating knee drive',
-  ]),
-  high_knees: generatedProfile('recognizable', 'repetition', 'standing', [
-    'alternating knee lift',
-    'vertical cadence',
-  ]),
-  lateral_raise: generatedProfile('recognizable', 'repetition', 'standing', [
-    'shoulder abduction',
-    'arm elevation symmetry',
-  ]),
-  yoga_hold: generatedProfile('recognizable', 'hold', 'mixed', [
-    'static pose geometry',
-    'hold stability',
-  ]),
+  sit_up: implementedProfile({
+    category: 'repetition',
+    bodyOrientation: 'floor',
+    requiredRegions: ['torso', 'hips', 'legs'],
+    primaryJoints: ['hip', 'spine', 'shoulder'],
+    phaseModel: ['supine', 'curl', 'upright', 'return'],
+    rhythm: 'cyclic',
+    cameraSensitivity: 'medium',
+    recognitionCriteria: [
+      ['torso_curl_trajectory', 'Torso curl trajectory'],
+      ['hip_anchor_stability', 'Hip anchor stability'],
+    ],
+    telemetrySignals: ['torso curl trajectory', 'hip anchor stability'],
+    failureCriteria: ['tracking loss', 'hip anchor drift', 'low torso confidence'],
+  }),
+  lunge: implementedProfile({
+    category: 'repetition',
+    bodyOrientation: 'standing',
+    requiredRegions: ['torso', 'hips', 'legs', 'feet'],
+    primaryJoints: ['hip', 'knee', 'ankle'],
+    phaseModel: ['standing', 'lowering', 'bottom', 'rising'],
+    rhythm: 'cyclic',
+    cameraSensitivity: 'medium',
+    recognitionCriteria: [
+      ['split_stance', 'Split stance'],
+      ['front_knee_flexion', 'Front knee flexion'],
+      ['hip_drop', 'Hip drop'],
+    ],
+    telemetrySignals: ['split stance', 'front knee flexion', 'hip drop'],
+    failureCriteria: ['tracking loss', 'feet cropped', 'stance ambiguity'],
+  }),
+  jumping_jack: implementedProfile({
+    category: 'repetition',
+    bodyOrientation: 'standing',
+    requiredRegions: ['torso', 'arms', 'legs', 'feet'],
+    primaryJoints: ['shoulder', 'hip', 'ankle'],
+    phaseModel: ['closed stance', 'abducting', 'open stance', 'returning'],
+    rhythm: 'cyclic',
+    cameraSensitivity: 'medium',
+    recognitionCriteria: [
+      ['arm_leg_abduction_rhythm', 'Arm-leg abduction rhythm'],
+      ['wrist_and_ankle_span_oscillation', 'Wrist and ankle span oscillation'],
+    ],
+    telemetrySignals: ['arm-leg abduction rhythm', 'wrist and ankle span oscillation'],
+    failureCriteria: ['tracking loss', 'hands or feet cropped', 'low span contrast'],
+  }),
+  plank: implementedProfile({
+    category: 'hold',
+    bodyOrientation: 'floor',
+    requiredRegions: ['torso', 'arms', 'hips', 'legs'],
+    primaryJoints: ['shoulder', 'hip', 'knee'],
+    phaseModel: ['setup', 'hold', 'release'],
+    rhythm: 'hold',
+    cameraSensitivity: 'high',
+    recognitionCriteria: [
+      ['horizontal_body_line', 'Horizontal body line'],
+      ['static_hold_stability', 'Static hold stability'],
+    ],
+    telemetrySignals: ['horizontal body line', 'static hold stability'],
+    failureCriteria: ['tracking loss', 'body-line sag', 'unstable hold'],
+  }),
+  pull_up: implementedProfile({
+    category: 'repetition',
+    bodyOrientation: 'hanging',
+    requiredRegions: ['torso', 'arms', 'hands'],
+    primaryJoints: ['shoulder', 'elbow', 'wrist'],
+    phaseModel: ['dead hang', 'pulling', 'top', 'lowering'],
+    rhythm: 'cyclic',
+    cameraSensitivity: 'high',
+    recognitionCriteria: [
+      ['vertical_hanging_posture', 'Vertical hanging posture'],
+      ['elbow_flexion', 'Elbow flexion'],
+      ['shoulder_elevation_change', 'Shoulder elevation change'],
+    ],
+    telemetrySignals: ['vertical hanging posture', 'elbow flexion', 'shoulder elevation change'],
+    failureCriteria: ['tracking loss', 'hands cropped', 'bar occlusion'],
+  }),
+  burpee: implementedProfile({
+    category: 'compound',
+    bodyOrientation: 'mixed',
+    requiredRegions: ['torso', 'arms', 'hips', 'legs', 'feet'],
+    primaryJoints: ['shoulder', 'elbow', 'hip', 'knee'],
+    phaseModel: ['standing', 'floor transition', 'floor position', 'standing return'],
+    rhythm: 'compound',
+    cameraSensitivity: 'high',
+    recognitionCriteria: [
+      ['standing_floor_standing_transition', 'Standing-floor-standing transition'],
+      ['compound_motion_rhythm', 'Compound motion rhythm'],
+    ],
+    telemetrySignals: ['standing-floor-standing transition', 'compound motion rhythm'],
+    failureCriteria: ['tracking loss', 'transition ambiguity', 'partial body visibility'],
+  }),
+  mountain_climber: implementedProfile({
+    category: 'repetition',
+    bodyOrientation: 'floor',
+    requiredRegions: ['torso', 'arms', 'hips', 'legs'],
+    primaryJoints: ['hip', 'knee', 'shoulder'],
+    phaseModel: ['plank base', 'left drive', 'switch', 'right drive'],
+    rhythm: 'cyclic',
+    cameraSensitivity: 'high',
+    recognitionCriteria: [
+      ['plank_base', 'Plank base'],
+      ['alternating_knee_drive', 'Alternating knee drive'],
+    ],
+    telemetrySignals: ['plank base', 'alternating knee drive'],
+    failureCriteria: ['tracking loss', 'weak plank base', 'knee-drive ambiguity'],
+  }),
+  high_knees: implementedProfile({
+    category: 'repetition',
+    bodyOrientation: 'standing',
+    requiredRegions: ['torso', 'hips', 'legs', 'feet'],
+    primaryJoints: ['hip', 'knee', 'ankle'],
+    phaseModel: ['standing', 'left drive', 'switch', 'right drive'],
+    rhythm: 'cyclic',
+    cameraSensitivity: 'medium',
+    recognitionCriteria: [
+      ['alternating_knee_lift', 'Alternating knee lift'],
+      ['vertical_cadence', 'Vertical cadence'],
+    ],
+    telemetrySignals: ['alternating knee lift', 'vertical cadence'],
+    failureCriteria: ['tracking loss', 'missed alternation', 'low knee lift'],
+  }),
+  lateral_raise: implementedProfile({
+    category: 'repetition',
+    bodyOrientation: 'standing',
+    requiredRegions: ['torso', 'arms', 'hands'],
+    primaryJoints: ['shoulder', 'elbow', 'wrist'],
+    phaseModel: ['arms down', 'raising', 'top', 'lowering'],
+    rhythm: 'cyclic',
+    cameraSensitivity: 'medium',
+    recognitionCriteria: [
+      ['shoulder_abduction', 'Shoulder abduction'],
+      ['arm_elevation_symmetry', 'Arm elevation symmetry'],
+    ],
+    telemetrySignals: ['shoulder abduction', 'arm elevation symmetry'],
+    failureCriteria: ['tracking loss', 'hands cropped', 'asymmetric elevation'],
+  }),
+  yoga_hold: implementedProfile({
+    category: 'hold',
+    bodyOrientation: 'mixed',
+    requiredRegions: ['torso', 'arms', 'hips', 'legs', 'feet'],
+    primaryJoints: ['shoulder', 'elbow', 'hip', 'knee'],
+    phaseModel: ['setup', 'hold', 'release'],
+    rhythm: 'hold',
+    cameraSensitivity: 'medium',
+    recognitionCriteria: [
+      ['static_pose_geometry', 'Static pose geometry'],
+      ['hold_stability', 'Hold stability'],
+    ],
+    telemetrySignals: ['static pose geometry', 'hold stability'],
+    failureCriteria: ['tracking loss', 'unstable pose geometry', 'low hold confidence'],
+  }),
   crunch: generatedProfile('planned', 'repetition', 'floor', [
     'abdominal curl definition pending',
     'shoulder elevation from floor',
@@ -264,6 +374,48 @@ function generatedProfile(
       maturity === 'planned'
         ? ['movement profile not implemented']
         : ['tracking loss', 'low confidence', 'incomplete movement evidence'],
+  };
+}
+
+function implementedProfile(input: {
+  readonly category: MovementCategory;
+  readonly bodyOrientation: MovementBodyOrientation;
+  readonly requiredRegions: readonly MovementRegion[];
+  readonly primaryJoints: readonly string[];
+  readonly phaseModel: readonly string[];
+  readonly rhythm: MovementProfileMetadata['rhythm'];
+  readonly cameraSensitivity: MovementProfileMetadata['cameraSensitivity'];
+  readonly recognitionCriteria: readonly (readonly [key: string, label: string])[];
+  readonly telemetrySignals: readonly string[];
+  readonly failureCriteria: readonly string[];
+}): MovementProfileMetadata {
+  return {
+    requiredRegions: input.requiredRegions,
+    primaryJoints: input.primaryJoints,
+    phaseModel: input.phaseModel,
+    rhythm: input.rhythm,
+    maturity: 'recognizable',
+    cameraSensitivity: input.cameraSensitivity,
+    recognitionCriteria: input.recognitionCriteria.map(([key, label]) =>
+      profileCriterion(key, label, 'declarative'),
+    ),
+    validationCriteria: [
+      profileCriterion(
+        'rep_validating_pending',
+        'Rep-validating rules not implemented yet',
+        'planned',
+      ),
+    ],
+    telemetrySignals: input.telemetrySignals,
+    telemetryExtractors: input.telemetrySignals.map((signal) =>
+      telemetryExtractor(
+        signalKey(signal),
+        signal,
+        'derived',
+        `${signal} contributes to recognition confidence.`,
+      ),
+    ),
+    failureCriteria: input.failureCriteria,
   };
 }
 
