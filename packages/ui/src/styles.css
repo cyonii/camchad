@@ -3741,6 +3741,21 @@ button,
   background: rgb(255 96 72 / 8%);
 }
 
+.settings-state-pill {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(var(--primary-rgb) / 18%);
+  border-radius: 999px;
+  padding: 0 12px;
+  color: var(--text-muted);
+  background: rgb(var(--surface-rgb) / 48%);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
 .settings-toggle {
   position: relative;
   width: 52px;

@@ -109,36 +109,22 @@ type AppRoute = {
 type RoutingMode = 'browser' | 'memory';
 type ThemePreference = 'system' | 'light' | 'dark';
 type TelemetryMode = 'fixed' | 'engraved';
-type SettingsCameraSource = 'system' | 'integrated' | 'external';
 type SettingsResolution = 'auto' | '720p' | '1080p';
 type SettingsFrameRate = '30' | '60';
 type SettingsPositionGuide = 'auto' | 'side' | 'front';
-type SettingsSkeletonStyle = 'tactical' | 'minimal' | 'diagnostic';
-type SettingsTelemetryDensity = 'compact' | 'standard' | 'expanded';
-type SettingsFeedbackVerbosity = 'minimal' | 'balanced' | 'detailed';
 type ExerciseCatalogFilter =
   | 'all'
   | MovementDefinition['maturity']
   | MovementDefinition['category'];
 
 interface AppSettingsPreferences {
-  readonly cameraSource: SettingsCameraSource;
   readonly cameraResolution: SettingsResolution;
   readonly cameraFrameRate: SettingsFrameRate;
   readonly cameraMirror: boolean;
-  readonly cameraLowLightAssist: boolean;
   readonly cameraPositionGuide: SettingsPositionGuide;
   readonly skeletonVisible: boolean;
-  readonly skeletonStyle: SettingsSkeletonStyle;
-  readonly skeletonJointsVisible: boolean;
-  readonly skeletonConfidenceColoring: boolean;
-  readonly skeletonLineWidth: number;
-  readonly skeletonDebugOverlay: boolean;
-  readonly telemetryDensity: SettingsTelemetryDensity;
   readonly telemetryOpacity: number;
   readonly telemetryBlur: number;
-  readonly telemetryLiveGraphs: boolean;
-  readonly telemetryFeedbackVerbosity: SettingsFeedbackVerbosity;
   readonly autoSaveSessions: boolean;
 }
 
@@ -164,23 +150,13 @@ const poseInferenceIntervalMs = 80;
 const runtimeBenchmarkFrameCount = 60;
 const runtimeBenchmarkModelQualities: readonly PoseModelQuality[] = ['lite', 'full', 'heavy'];
 const defaultSettingsPreferences: AppSettingsPreferences = {
-  cameraSource: 'system',
   cameraResolution: '720p',
   cameraFrameRate: '30',
   cameraMirror: false,
-  cameraLowLightAssist: true,
   cameraPositionGuide: 'auto',
   skeletonVisible: true,
-  skeletonStyle: 'tactical',
-  skeletonJointsVisible: true,
-  skeletonConfidenceColoring: true,
-  skeletonLineWidth: 2,
-  skeletonDebugOverlay: false,
-  telemetryDensity: 'standard',
   telemetryOpacity: 86,
   telemetryBlur: 14,
-  telemetryLiveGraphs: true,
-  telemetryFeedbackVerbosity: 'balanced',
   autoSaveSessions: true,
 };
 const defaultMovementDefinition = defaultCatalogDefinition();
@@ -2410,20 +2386,6 @@ function SettingsView({
           description="Tune capture assumptions and check whether this app can access the camera."
         >
           <SettingsRow
-            label="Camera source"
-            description="Use the system default for now; explicit device routing can attach here later."
-          >
-            <SettingsSelect
-              value={preferences.cameraSource}
-              onChange={(value) => updatePreference('cameraSource', value as SettingsCameraSource)}
-              options={[
-                ['system', 'System default'],
-                ['integrated', 'Integrated camera'],
-                ['external', 'External camera'],
-              ]}
-            />
-          </SettingsRow>
-          <SettingsRow
             label="Resolution"
             description="Higher capture targets can improve analysis detail."
           >
@@ -2459,15 +2421,6 @@ function SettingsView({
             />
           </SettingsRow>
           <SettingsRow
-            label="Low-light assist"
-            description="Surface guidance when tracking confidence drops."
-          >
-            <SettingsToggle
-              checked={preferences.cameraLowLightAssist}
-              onChange={(checked) => updatePreference('cameraLowLightAssist', checked)}
-            />
-          </SettingsRow>
-          <SettingsRow
             label="Default camera view"
             description="Start from a natural front-facing view, then surface angle guidance per movement."
           >
@@ -2491,6 +2444,14 @@ function SettingsView({
             disabled={!canCheckCamera}
             onAction={() => void checkCameraAccess()}
           />
+          <SettingsCapabilityRow
+            label="Camera source routing"
+            description="Planned. The app currently uses the browser/Electron default capture device until explicit device selection is wired into startup."
+          />
+          <SettingsCapabilityRow
+            label="Low-light detection"
+            description="Engine diagnostics already react to low signal confidence; dedicated lighting classification is not implemented yet."
+          />
         </SettingsSection>
 
         <SettingsSection
@@ -2507,61 +2468,14 @@ function SettingsView({
               onChange={(checked) => updatePreference('skeletonVisible', checked)}
             />
           </SettingsRow>
-          <SettingsRow
-            label="Overlay style"
-            description="Choose how technical the skeleton display should feel."
-          >
-            <SettingsSelect
-              value={preferences.skeletonStyle}
-              onChange={(value) =>
-                updatePreference('skeletonStyle', value as SettingsSkeletonStyle)
-              }
-              options={[
-                ['tactical', 'Tactical'],
-                ['minimal', 'Minimal'],
-                ['diagnostic', 'Diagnostic'],
-              ]}
-            />
-          </SettingsRow>
-          <SettingsRow
-            label="Joint points"
-            description="Show individual landmark points for spatial feedback."
-          >
-            <SettingsToggle
-              checked={preferences.skeletonJointsVisible}
-              onChange={(checked) => updatePreference('skeletonJointsVisible', checked)}
-            />
-          </SettingsRow>
-          <SettingsRow
-            label="Confidence coloring"
-            description="Use confidence state to emphasize weaker landmark detection."
-          >
-            <SettingsToggle
-              checked={preferences.skeletonConfidenceColoring}
-              onChange={(checked) => updatePreference('skeletonConfidenceColoring', checked)}
-            />
-          </SettingsRow>
-          <SettingsRow
-            label="Line thickness"
-            description="Adjust skeleton line weight for visibility."
-          >
-            <SettingsRange
-              value={preferences.skeletonLineWidth}
-              min={1}
-              max={5}
-              unit="px"
-              onChange={(value) => updatePreference('skeletonLineWidth', value)}
-            />
-          </SettingsRow>
-          <SettingsRow
-            label="Debug overlay"
-            description="Expose additional detection state while tuning."
-          >
-            <SettingsToggle
-              checked={preferences.skeletonDebugOverlay}
-              onChange={(checked) => updatePreference('skeletonDebugOverlay', checked)}
-            />
-          </SettingsRow>
+          <SettingsCapabilityRow
+            label="Skeleton styling controls"
+            description="Planned. The runtime currently exposes one production overlay; line style, joint density, and confidence-color controls need renderer support before they become settings."
+          />
+          <SettingsCapabilityRow
+            label="Diagnostic overlay"
+            description="Planned. Developer diagnostics should expose body-state and confidence internals without pretending to be a user-facing toggle today."
+          />
         </SettingsSection>
 
         <SettingsSection
@@ -2579,22 +2493,6 @@ function SettingsView({
               options={[
                 ['fixed', 'Sidebar'],
                 ['engraved', 'Mirror HUD'],
-              ]}
-            />
-          </SettingsRow>
-          <SettingsRow
-            label="HUD density"
-            description="Control how much instrumentation appears at once."
-          >
-            <SettingsSelect
-              value={preferences.telemetryDensity}
-              onChange={(value) =>
-                updatePreference('telemetryDensity', value as SettingsTelemetryDensity)
-              }
-              options={[
-                ['compact', 'Compact'],
-                ['standard', 'Standard'],
-                ['expanded', 'Expanded'],
               ]}
             />
           </SettingsRow>
@@ -2622,31 +2520,14 @@ function SettingsView({
               onChange={(value) => updatePreference('telemetryBlur', value)}
             />
           </SettingsRow>
-          <SettingsRow
-            label="Live graphs"
-            description="Show compact trendlines when telemetry supports them."
-          >
-            <SettingsToggle
-              checked={preferences.telemetryLiveGraphs}
-              onChange={(checked) => updatePreference('telemetryLiveGraphs', checked)}
-            />
-          </SettingsRow>
-          <SettingsRow
+          <SettingsCapabilityRow
+            label="HUD density and metric selection"
+            description="Planned. The telemetry panels currently render engine-selected metrics; user-selected density needs a real metric visibility model first."
+          />
+          <SettingsCapabilityRow
             label="Feedback verbosity"
-            description="Choose how assertive movement guidance should be during tracking."
-          >
-            <SettingsSelect
-              value={preferences.telemetryFeedbackVerbosity}
-              onChange={(value) =>
-                updatePreference('telemetryFeedbackVerbosity', value as SettingsFeedbackVerbosity)
-              }
-              options={[
-                ['minimal', 'Minimal'],
-                ['balanced', 'Balanced'],
-                ['detailed', 'Detailed'],
-              ]}
-            />
-          </SettingsRow>
+            description="Planned. Guidance is prioritized by actionability today; adjustable verbosity should be wired through the guidance priority model before exposure."
+          />
         </SettingsSection>
 
         <SettingsSection
@@ -2880,6 +2761,20 @@ function SettingsActionRow({
   );
 }
 
+function SettingsCapabilityRow({
+  label,
+  description,
+}: {
+  readonly label: string;
+  readonly description: string;
+}): ReactElement {
+  return (
+    <SettingsRow label={label} description={description}>
+      <span className="settings-state-pill">Planned</span>
+    </SettingsRow>
+  );
+}
+
 function SettingsToggle({
   checked,
   onChange,
@@ -2992,7 +2887,7 @@ function SettingsInterfacePreview({
   readonly themePreference: ThemePreference;
 }): ReactElement {
   const bodyPreviewClass = preferences.skeletonVisible
-    ? `settings-body-preview settings-body-${preferences.skeletonStyle}`
+    ? 'settings-body-preview'
     : 'settings-body-preview is-hidden';
 
   return (
@@ -3003,7 +2898,6 @@ function SettingsInterfacePreview({
         {
           '--preview-hud-opacity': `${preferences.telemetryOpacity / 100}`,
           '--preview-hud-blur': `${preferences.telemetryBlur}px`,
-          '--preview-line-width': `${preferences.skeletonLineWidth}px`,
         } as CSSProperties
       }
     >
@@ -3020,8 +2914,8 @@ function SettingsInterfacePreview({
       </div>
       <div className={`settings-preview-telemetry mode-${telemetryMode}`}>
         <small>{telemetryMode === 'fixed' ? 'Sidebar telemetry' : 'Mirror HUD'}</small>
-        <strong>{preferences.telemetryDensity}</strong>
-        <span>Graphs {preferences.telemetryLiveGraphs ? 'online' : 'hidden'}</span>
+        <strong>{preferences.telemetryOpacity}% opacity</strong>
+        <span>{preferences.telemetryBlur}px blur</span>
       </div>
     </div>
   );
@@ -3614,14 +3508,23 @@ function readSettingsPreferences(): AppSettingsPreferences {
     ) as Partial<AppSettingsPreferences>;
 
     return {
-      ...defaultSettingsPreferences,
-      ...parsed,
-      skeletonLineWidth: clampNumber(
-        parsed.skeletonLineWidth,
-        defaultSettingsPreferences.skeletonLineWidth,
-        1,
-        5,
-      ),
+      cameraResolution: isSettingsResolution(parsed.cameraResolution)
+        ? parsed.cameraResolution
+        : defaultSettingsPreferences.cameraResolution,
+      cameraFrameRate: isSettingsFrameRate(parsed.cameraFrameRate)
+        ? parsed.cameraFrameRate
+        : defaultSettingsPreferences.cameraFrameRate,
+      cameraMirror:
+        typeof parsed.cameraMirror === 'boolean'
+          ? parsed.cameraMirror
+          : defaultSettingsPreferences.cameraMirror,
+      cameraPositionGuide: isSettingsPositionGuide(parsed.cameraPositionGuide)
+        ? parsed.cameraPositionGuide
+        : defaultSettingsPreferences.cameraPositionGuide,
+      skeletonVisible:
+        typeof parsed.skeletonVisible === 'boolean'
+          ? parsed.skeletonVisible
+          : defaultSettingsPreferences.skeletonVisible,
       telemetryOpacity: clampNumber(
         parsed.telemetryOpacity,
         defaultSettingsPreferences.telemetryOpacity,
@@ -3634,10 +3537,26 @@ function readSettingsPreferences(): AppSettingsPreferences {
         0,
         24,
       ),
+      autoSaveSessions:
+        typeof parsed.autoSaveSessions === 'boolean'
+          ? parsed.autoSaveSessions
+          : defaultSettingsPreferences.autoSaveSessions,
     };
   } catch {
     return defaultSettingsPreferences;
   }
+}
+
+function isSettingsResolution(value: unknown): value is SettingsResolution {
+  return value === 'auto' || value === '720p' || value === '1080p';
+}
+
+function isSettingsFrameRate(value: unknown): value is SettingsFrameRate {
+  return value === '30' || value === '60';
+}
+
+function isSettingsPositionGuide(value: unknown): value is SettingsPositionGuide {
+  return value === 'auto' || value === 'side' || value === 'front';
 }
 
 function writeSettingsPreferences(preferences: AppSettingsPreferences): void {
