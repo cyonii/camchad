@@ -1943,6 +1943,8 @@ function HistoryView({
                     const primaryGuidance = movement.guidanceEvents?.find(
                       (event) => event.code !== 'conditions_usable',
                     );
+                    const quality = movementQualityBreakdown(movement);
+                    const warningEntries = Object.entries(movement.setSummary?.warningCounts ?? {});
 
                     return (
                       <div className="movement-breakdown-item" key={movement.id}>
@@ -1972,6 +1974,53 @@ function HistoryView({
                             <span>{formatQualityScore(averageMovementQuality(movement))}</span>
                           </div>
                         </div>
+
+                        <div
+                          className="movement-set-detail-grid"
+                          aria-label={`${definition.label} set quality and timing`}
+                        >
+                          <div>
+                            <small>Range</small>
+                            <span>{formatMetric(quality.rangeScore, '%')}</span>
+                          </div>
+                          <div>
+                            <small>Alignment</small>
+                            <span>{formatMetric(quality.alignmentScore, '%')}</span>
+                          </div>
+                          <div>
+                            <small>Rhythm</small>
+                            <span>{formatMetric(quality.rhythmScore, '%')}</span>
+                          </div>
+                          <div>
+                            <small>Signal</small>
+                            <span>
+                              {formatMetric(
+                                movement.setSummary?.averageConfidence ?? quality.confidenceScore,
+                                '%',
+                              )}
+                            </span>
+                          </div>
+                          <div>
+                            <small>Cadence</small>
+                            <span>
+                              {formatSecondsValue(movement.setSummary?.averageCadenceSeconds)}
+                            </span>
+                          </div>
+                          <div>
+                            <small>Rest</small>
+                            <span>{formatRestWindow(movement)}</span>
+                          </div>
+                        </div>
+
+                        {warningEntries.length > 0 ? (
+                          <div className="movement-warning-chips" aria-label="Warning counts">
+                            {warningEntries.map(([code, count]) => (
+                              <span key={code}>
+                                {formatCodeLabel(code)} x{count}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -3968,6 +4017,56 @@ function averageMovementQuality(movement: MovementSegment): number | undefined {
     movement.repEvents.reduce((sum, event) => sum + event.qualityScore, 0) /
       movement.repEvents.length,
   );
+}
+
+function movementQualityBreakdown(movement: MovementSegment): {
+  readonly rangeScore?: number;
+  readonly alignmentScore?: number;
+  readonly rhythmScore?: number;
+  readonly confidenceScore?: number;
+} {
+  return {
+    rangeScore: averageRepComponent(movement, (event) => event.rangeScore),
+    alignmentScore: averageRepComponent(movement, (event) => event.alignmentScore),
+    rhythmScore: averageRepComponent(movement, (event) => event.rhythmScore),
+    confidenceScore: averageRepComponent(movement, (event) => event.confidenceScore),
+  };
+}
+
+function averageRepComponent(
+  movement: MovementSegment,
+  selector: (event: MovementSegment['repEvents'][number]) => number,
+): number | undefined {
+  if (movement.repEvents.length === 0) {
+    return undefined;
+  }
+
+  return (
+    movement.repEvents.reduce((sum, event) => sum + selector(event), 0) / movement.repEvents.length
+  );
+}
+
+function formatSecondsValue(value: number | undefined): string {
+  if (value === undefined || Number.isNaN(value)) {
+    return 'n/a';
+  }
+
+  return `${value.toFixed(value % 1 === 0 ? 0 : 1)}s`;
+}
+
+function formatRestWindow(movement: MovementSegment): string {
+  const before = formatSecondsValue(movement.setSummary?.restBeforeSeconds);
+  const after = formatSecondsValue(movement.setSummary?.restAfterSeconds);
+
+  if (before === 'n/a' && after === 'n/a') {
+    return 'n/a';
+  }
+
+  return `${before} / ${after}`;
+}
+
+function formatCodeLabel(code: string): string {
+  return code.replaceAll('_', ' ');
 }
 
 function formatMovementSegmentState(movement: MovementSegment): string {
