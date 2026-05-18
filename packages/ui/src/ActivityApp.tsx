@@ -1929,6 +1929,45 @@ function HistoryView({
             <section className="history-detail-card">
               <div className="history-section-heading">
                 <div>
+                  <span>Session flow</span>
+                  <h2>Movement mix</h2>
+                </div>
+                <small>{selectedSession.movements.length} sets</small>
+              </div>
+
+              {selectedSession.movements.length === 0 ? (
+                <div className="history-empty-line">No movement flow recorded.</div>
+              ) : (
+                <div className="session-flow-map" aria-label="Session movement sequence">
+                  {selectedSession.movements.map((movement, index) => (
+                    <div className="session-flow-node" key={movement.id}>
+                      <span>{String(index + 1).padStart(2, '0')}</span>
+                      <strong>{movementDefinitionFor(movement.movementType).label}</strong>
+                      <small>
+                        {movement.reps} reps / {formatMovementDuration(movement)}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {sessionTransitionEvents(selectedSession).length > 0 ? (
+                <div className="session-transition-list" aria-label="Movement transitions">
+                  {sessionTransitionEvents(selectedSession).map((event) => (
+                    <span key={event.id}>
+                      {formatCompactTime(event.timestamp)} /{' '}
+                      {event.competingMovementTypes
+                        ?.map((movementType) => movementDefinitionFor(movementType).label)
+                        .join(' -> ') ?? 'transition'}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+
+            <section className="history-detail-card">
+              <div className="history-section-heading">
+                <div>
                   <span>Movement breakdown</span>
                   <h2>Movement segments</h2>
                 </div>
@@ -3957,6 +3996,27 @@ function formatSessionMovementNames(session: ActivitySession): string {
       session.movements.map((movement) => movementDefinitionFor(movement.movementType).label),
     ),
   ].join(', ');
+}
+
+function sessionTransitionEvents(
+  session: ActivitySession,
+): readonly ActivitySession['timeline'][number][] {
+  return session.timeline.filter((event) => event.kind === 'transition');
+}
+
+function formatMovementDuration(movement: MovementSegment): string {
+  if (!movement.endedAt) {
+    return 'active';
+  }
+
+  const startedAt = new Date(movement.startedAt).getTime();
+  const endedAt = new Date(movement.endedAt).getTime();
+
+  if (!Number.isFinite(startedAt) || !Number.isFinite(endedAt)) {
+    return 'n/a';
+  }
+
+  return formatDuration(Math.max(0, Math.round((endedAt - startedAt) / 1000)));
 }
 
 function sessionTotalReps(session: ActivitySession): number {

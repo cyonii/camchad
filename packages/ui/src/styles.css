@@ -2573,6 +2573,60 @@ button,
   font-weight: 600;
 }
 
+.session-flow-map {
+  display: grid;
+  gap: 8px;
+}
+
+.session-flow-node {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgb(var(--primary-rgb) / 11%);
+  border-radius: 6px;
+  background: rgb(var(--primary-rgb) / 5%);
+}
+
+.session-flow-node > span {
+  grid-row: span 2;
+  color: var(--primary);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.session-flow-node strong,
+.session-flow-node small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.session-flow-node small {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.session-transition-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.session-transition-list span {
+  padding: 5px 8px;
+  border: 1px solid rgb(var(--primary-rgb) / 14%);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: rgb(0 0 0 / 8%);
+  font-family: 'SF Mono', 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .movement-breakdown-list {
   display: grid;
   gap: 10px;
