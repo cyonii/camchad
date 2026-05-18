@@ -22,16 +22,30 @@ export type ActivityTimelineEventKind =
   | 'session_start'
   | 'movement_start'
   | 'movement_end'
-  | 'rest';
+  | 'rest'
+  | 'transition'
+  | 'tracking_lost'
+  | 'tracking_recovered'
+  | 'movement_candidate'
+  | 'movement_ambiguous'
+  | 'camera_guidance'
+  | 'rep_valid'
+  | 'rep_partial'
+  | 'quality_warning';
 
 export interface ActivityTimelineEvent {
   readonly id: string;
   readonly kind: ActivityTimelineEventKind;
   readonly timestamp: string;
   readonly movementType?: MovementType;
+  readonly competingMovementTypes?: readonly MovementType[];
   readonly movementSegmentId?: string;
   readonly activityState?: ActivityStateKind;
   readonly recognitionConfidence?: number;
+  readonly message?: string;
+  readonly code?: string;
+  readonly repNumber?: number;
+  readonly qualityScore?: number;
 }
 
 export interface ActivitySessionAnalysisSummary {

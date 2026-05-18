@@ -7,7 +7,7 @@ import type {
   RepEvent,
 } from '@camchad/movement-core';
 
-import type { MovementSegment, ActivitySession } from './models.js';
+import type { ActivityTimelineEventKind, MovementSegment, ActivitySession } from './models.js';
 import type { ActivityRepository } from './activity-repository.js';
 import { summarizeActivitySession } from './session-summary.js';
 
@@ -23,6 +23,9 @@ export interface MovementTelemetryUpdate {
   readonly activityState?: ActivityStateKind;
   readonly recognitionConfidence?: number;
   readonly guidanceEvents?: readonly MovementGuidanceEvent[];
+  readonly competingMovementTypes?: readonly MovementType[];
+  readonly message?: string;
+  readonly code?: string;
 }
 
 export class SystemClock implements Clock {
@@ -121,6 +124,21 @@ export class ActivitySessionService {
     if (state.lastRep && !this.recordedRepNumbers.has(state.lastRep.repNumber)) {
       repEvents.push(state.lastRep);
       this.recordedRepNumbers.add(state.lastRep.repNumber);
+      this.appendTimelineEvent(state.lastRep.warnings.length > 0 ? 'rep_partial' : 'rep_valid', {
+        movementType: this.activeSegment.movementType,
+        movementSegmentId: this.activeSegment.id,
+        activityState: telemetry.activityState ?? this.activeSegment.activityState,
+        recognitionConfidence:
+          telemetry.recognitionConfidence ?? this.activeSegment.recognitionConfidence,
+        repNumber: state.lastRep.repNumber,
+        qualityScore: state.lastRep.qualityScore,
+        message:
+          state.lastRep.warnings[0]?.message ??
+          (state.lastRep.warnings.length > 0
+            ? 'Partial repetition recorded.'
+            : 'Valid repetition recorded.'),
+        code: state.lastRep.warnings[0]?.code,
+      });
     }
 
     this.activeSegment = {
@@ -183,19 +201,45 @@ export class ActivitySessionService {
       throw new Error('Cannot record rest because no activity session is active.');
     }
 
-    this.activeSession = {
-      ...this.activeSession,
-      timeline: [
-        ...this.activeSession.timeline,
-        {
-          id: this.ids.createId('event'),
-          kind: 'rest',
-          timestamp: this.clock.now().toISOString(),
-          activityState: telemetry.activityState,
-          recognitionConfidence: telemetry.recognitionConfidence,
-        },
-      ],
-    };
+    this.appendTimelineEvent('rest', telemetry);
+  }
+
+  public recordTransition(telemetry: MovementTelemetryUpdate = {}): void {
+    this.appendTimelineEvent('transition', telemetry);
+  }
+
+  public recordTrackingLost(telemetry: MovementTelemetryUpdate = {}): void {
+    this.appendTimelineEvent('tracking_lost', telemetry);
+  }
+
+  public recordTrackingRecovered(telemetry: MovementTelemetryUpdate = {}): void {
+    this.appendTimelineEvent('tracking_recovered', telemetry);
+  }
+
+  public recordMovementCandidate(
+    movementType: MovementType | undefined,
+    telemetry: MovementTelemetryUpdate = {},
+  ): void {
+    this.appendTimelineEvent('movement_candidate', { ...telemetry, movementType });
+  }
+
+  public recordMovementAmbiguous(telemetry: MovementTelemetryUpdate = {}): void {
+    this.appendTimelineEvent('movement_ambiguous', telemetry);
+  }
+
+  public recordCameraGuidance(event: MovementGuidanceEvent): void {
+    this.appendTimelineEvent('camera_guidance', {
+      code: event.code,
+      message: event.message,
+      recognitionConfidence: event.confidence,
+    });
+  }
+
+  public recordQualityWarning(
+    movementType: MovementType | undefined,
+    telemetry: MovementTelemetryUpdate = {},
+  ): void {
+    this.appendTimelineEvent('quality_warning', { ...telemetry, movementType });
   }
 
   public async endSession(notes?: string): Promise<ActivitySession> {
@@ -228,6 +272,41 @@ export class ActivitySessionService {
 
   public getActiveSession(): ActivitySession | undefined {
     return this.activeSession;
+  }
+
+  private appendTimelineEvent(
+    kind: ActivityTimelineEventKind,
+    telemetry: MovementTelemetryUpdate & {
+      readonly movementType?: MovementType;
+      readonly movementSegmentId?: string;
+      readonly repNumber?: number;
+      readonly qualityScore?: number;
+    } = {},
+  ): void {
+    if (!this.activeSession) {
+      throw new Error(`Cannot record ${kind} because no activity session is active.`);
+    }
+
+    this.activeSession = {
+      ...this.activeSession,
+      timeline: [
+        ...this.activeSession.timeline,
+        {
+          id: this.ids.createId('event'),
+          kind,
+          timestamp: this.clock.now().toISOString(),
+          movementType: telemetry.movementType,
+          competingMovementTypes: telemetry.competingMovementTypes,
+          movementSegmentId: telemetry.movementSegmentId,
+          activityState: telemetry.activityState,
+          recognitionConfidence: telemetry.recognitionConfidence,
+          message: telemetry.message,
+          code: telemetry.code,
+          repNumber: telemetry.repNumber,
+          qualityScore: telemetry.qualityScore,
+        },
+      ],
+    };
   }
 }
 

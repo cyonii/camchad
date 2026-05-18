@@ -13,10 +13,14 @@ describe('activity history normalization', () => {
           timeline: [
             {
               id: 'event_1',
-              kind: 'rest',
+              kind: 'movement_ambiguous',
               timestamp: '2026-05-12T07:00:30.000Z',
+              movementType: 'squat',
+              competingMovementTypes: ['squat', 'lunge', 'dance'],
               activityState: 'resting',
               recognitionConfidence: 0.4,
+              message: 'Movement candidates are close.',
+              code: 'similar_candidate_confidence',
             },
           ],
           movements: [
@@ -83,12 +87,17 @@ describe('activity history normalization', () => {
     expect(history.sessions[0]?.timeline).toEqual([
       {
         id: 'event_1',
-        kind: 'rest',
+        kind: 'movement_ambiguous',
         timestamp: '2026-05-12T07:00:30.000Z',
-        movementType: undefined,
+        movementType: 'squat',
+        competingMovementTypes: ['squat', 'lunge'],
         movementSegmentId: undefined,
         activityState: 'resting',
         recognitionConfidence: 0.4,
+        message: 'Movement candidates are close.',
+        code: 'similar_candidate_confidence',
+        repNumber: undefined,
+        qualityScore: undefined,
       },
     ]);
   });

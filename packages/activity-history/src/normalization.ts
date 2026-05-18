@@ -70,6 +70,9 @@ function normalizeTimelineEvent(value: unknown): readonly ActivityTimelineEvent[
       kind: value.kind,
       timestamp: value.timestamp,
       movementType: isMovementType(value.movementType) ? value.movementType : undefined,
+      competingMovementTypes: Array.isArray(value.competingMovementTypes)
+        ? value.competingMovementTypes.filter(isMovementType)
+        : undefined,
       movementSegmentId:
         typeof value.movementSegmentId === 'string' ? value.movementSegmentId : undefined,
       activityState: isActivityState(value.activityState) ? value.activityState : undefined,
@@ -77,6 +80,10 @@ function normalizeTimelineEvent(value: unknown): readonly ActivityTimelineEvent[
         typeof value.recognitionConfidence === 'number'
           ? clamp01(value.recognitionConfidence)
           : undefined,
+      message: typeof value.message === 'string' ? value.message : undefined,
+      code: typeof value.code === 'string' ? value.code : undefined,
+      repNumber: typeof value.repNumber === 'number' ? value.repNumber : undefined,
+      qualityScore: typeof value.qualityScore === 'number' ? value.qualityScore : undefined,
     },
   ];
 }
@@ -205,7 +212,16 @@ function isTimelineEventKind(value: unknown): value is ActivityTimelineEvent['ki
     value === 'session_start' ||
     value === 'movement_start' ||
     value === 'movement_end' ||
-    value === 'rest'
+    value === 'rest' ||
+    value === 'transition' ||
+    value === 'tracking_lost' ||
+    value === 'tracking_recovered' ||
+    value === 'movement_candidate' ||
+    value === 'movement_ambiguous' ||
+    value === 'camera_guidance' ||
+    value === 'rep_valid' ||
+    value === 'rep_partial' ||
+    value === 'quality_warning'
   );
 }
 

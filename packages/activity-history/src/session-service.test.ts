@@ -35,6 +35,7 @@ describe('ActivitySessionService', () => {
       new FixedClock([
         new Date('2026-05-12T07:00:00.000Z'),
         new Date('2026-05-12T07:00:10.000Z'),
+        new Date('2026-05-12T07:00:25.000Z'),
         new Date('2026-05-12T07:02:00.000Z'),
         new Date('2026-05-12T07:02:05.000Z'),
       ]),
@@ -71,9 +72,16 @@ describe('ActivitySessionService', () => {
     expect(session.timeline.map((event) => event.kind)).toEqual([
       'session_start',
       'movement_start',
+      'rep_valid',
       'movement_end',
     ]);
     expect(session.timeline[2]).toMatchObject({
+      kind: 'rep_valid',
+      movementType: 'push_up',
+      repNumber: 1,
+      qualityScore: 90,
+    });
+    expect(session.timeline[3]).toMatchObject({
       movementType: 'push_up',
       activityState: 'moving',
       recognitionConfidence: 0.91,
@@ -194,6 +202,68 @@ describe('ActivitySessionService', () => {
     expect(session.timeline[1]).toMatchObject({
       activityState: 'resting',
       recognitionConfidence: 0.2,
+    });
+  });
+
+  it('records transition, ambiguity, tracking, guidance, and quality timeline events', async () => {
+    const service = new ActivitySessionService(
+      new InMemoryActivityRepository(),
+      new FixedClock([
+        new Date('2026-05-12T07:00:00.000Z'),
+        new Date('2026-05-12T07:00:05.000Z'),
+        new Date('2026-05-12T07:00:08.000Z'),
+        new Date('2026-05-12T07:00:12.000Z'),
+        new Date('2026-05-12T07:00:18.000Z'),
+        new Date('2026-05-12T07:00:24.000Z'),
+        new Date('2026-05-12T07:00:30.000Z'),
+      ]),
+      new SequentialIds(),
+    );
+
+    service.startSession();
+    service.recordTransition({ activityState: 'moving', message: 'Movement pattern changed.' });
+    service.recordMovementCandidate('squat', {
+      recognitionConfidence: 0.54,
+      competingMovementTypes: ['squat', 'lunge'],
+    });
+    service.recordMovementAmbiguous({
+      recognitionConfidence: 0.62,
+      competingMovementTypes: ['squat', 'lunge'],
+      message: 'Squat and lunge candidates are close.',
+    });
+    service.recordTrackingLost({ activityState: 'tracking_lost', recognitionConfidence: 0.1 });
+    service.recordTrackingRecovered({ activityState: 'setup', recognitionConfidence: 0.74 });
+    service.recordCameraGuidance({
+      code: 'body_near_edge',
+      severity: 'warning',
+      title: 'Body near frame edge',
+      message: 'Re-center before continuing.',
+      confidence: 0.8,
+    });
+    service.recordQualityWarning('squat', {
+      code: 'partial_depth',
+      message: 'Depth was incomplete.',
+      recognitionConfidence: 0.7,
+    });
+    const session = await service.endSession();
+
+    expect(session.timeline.map((event) => event.kind)).toEqual([
+      'session_start',
+      'transition',
+      'movement_candidate',
+      'movement_ambiguous',
+      'tracking_lost',
+      'tracking_recovered',
+      'camera_guidance',
+      'quality_warning',
+    ]);
+    expect(session.timeline[2]).toMatchObject({
+      movementType: 'squat',
+      competingMovementTypes: ['squat', 'lunge'],
+    });
+    expect(session.timeline[6]).toMatchObject({
+      code: 'body_near_edge',
+      message: 'Re-center before continuing.',
     });
   });
 });
