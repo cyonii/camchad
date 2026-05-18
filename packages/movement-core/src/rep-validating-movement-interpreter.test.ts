@@ -103,6 +103,55 @@ describe('rep-validating movement interpreter', () => {
     expect(state.reps).toBe(0);
   });
 
+  it('does not count piked push-ups as valid body-line reps', () => {
+    const detector = createRepValidatingMovementInterpreter('push_up');
+
+    detector.processPose(
+      makePushUpFrame({
+        timestampMs: 0,
+        elbowAngle: 165,
+        hipOffsetY: -0.42,
+        ankleOffsetY: 0.42,
+      }),
+    );
+    detector.processPose(
+      makePushUpFrame({
+        timestampMs: 120,
+        elbowAngle: 108,
+        hipOffsetY: -0.42,
+        ankleOffsetY: 0.42,
+      }),
+    );
+    const state = detector.processPose(
+      makePushUpFrame({
+        timestampMs: 260,
+        elbowAngle: 165,
+        hipOffsetY: -0.42,
+        ankleOffsetY: 0.42,
+      }),
+    );
+
+    expect(state.phase).toBe('invalid_form');
+    expect(state.reps).toBe(0);
+    expect(state.warnings.some((warning) => warning.code === 'body_alignment')).toBe(true);
+  });
+
+  it('does not count push-ups when hands are too far ahead of shoulders', () => {
+    const detector = createRepValidatingMovementInterpreter('push_up');
+
+    detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165, wristOffsetX: 0.36 }));
+    detector.processPose(
+      makePushUpFrame({ timestampMs: 120, elbowAngle: 108, wristOffsetX: 0.36 }),
+    );
+    const state = detector.processPose(
+      makePushUpFrame({ timestampMs: 260, elbowAngle: 165, wristOffsetX: 0.36 }),
+    );
+
+    expect(state.phase).toBe('invalid_form');
+    expect(state.reps).toBe(0);
+    expect(state.warnings.some((warning) => warning.code === 'hand_position')).toBe(true);
+  });
+
   it('enters tracking lost state when landmarks are unavailable', () => {
     const detector = createRepValidatingMovementInterpreter('push_up');
 
@@ -112,6 +161,32 @@ describe('rep-validating movement interpreter', () => {
     expect(state.stateKind).toBe('tracking_lost');
     expect(state.recognition.status).toBe('tracking_lost');
     expect(state.warnings[0]?.code).toBe('tracking_lost');
+  });
+
+  it('does not count a push-up when tracking is lost at bottom depth', () => {
+    const detector = createRepValidatingMovementInterpreter('push_up');
+
+    detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
+    detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 98 }));
+    detector.processPose(undefined);
+    const state = detector.processPose(makePushUpFrame({ timestampMs: 320, elbowAngle: 165 }));
+
+    expect(state.reps).toBe(0);
+    expect(state.validReps).toBe(0);
+    expect(state.phase).toBe('top');
+  });
+
+  it('does not count a push-up that never returns to lockout', () => {
+    const detector = createRepValidatingMovementInterpreter('push_up');
+
+    detector.processPose(makePushUpFrame({ timestampMs: 0, elbowAngle: 165 }));
+    detector.processPose(makePushUpFrame({ timestampMs: 120, elbowAngle: 98 }));
+    detector.processPose(makePushUpFrame({ timestampMs: 240, elbowAngle: 98 }));
+    const state = detector.processPose(makePushUpFrame({ timestampMs: 380, elbowAngle: 142 }));
+
+    expect(state.reps).toBe(0);
+    expect(state.validReps).toBe(0);
+    expect(state.phase).toBe('ascending');
   });
 
   it('reports temporal movement telemetry while interpreting push-ups', () => {
@@ -253,6 +328,18 @@ describe('rep-validating standing knee-bend profile', () => {
     expect(state.metrics.fatigueScore).toBeGreaterThan(0);
   });
 
+  it('warns when squat lower-body landmarks are not reliable enough for depth', () => {
+    const interpreter = createRepValidatingMovementInterpreter('squat');
+
+    interpreter.processPose(makeSquatFrame({ timestampMs: 0, kneeAngle: 168, visibility: 0.5 }));
+    const state = interpreter.processPose(
+      makeSquatFrame({ timestampMs: 120, kneeAngle: 138, visibility: 0.5 }),
+    );
+
+    expect(state.warnings.some((warning) => warning.code === 'lower_body_visibility')).toBe(true);
+    expect(state.metrics.lowerBodyCoverage).toBeLessThan(0.58);
+  });
+
   it('does not enter a rep phase for slow standing threshold drift', () => {
     const interpreter = createRepValidatingMovementInterpreter('squat');
 
@@ -262,5 +349,29 @@ describe('rep-validating standing knee-bend profile', () => {
     expect(state.phase).toBe('top');
     expect(state.reps).toBe(0);
     expect(Math.abs(state.metrics.phaseVelocity ?? 0)).toBeLessThan(12);
+  });
+
+  it('does not count a squat that never returns to standing lockout', () => {
+    const interpreter = createRepValidatingMovementInterpreter('squat');
+
+    interpreter.processPose(makeSquatFrame({ timestampMs: 0, kneeAngle: 168 }));
+    interpreter.processPose(makeSquatFrame({ timestampMs: 140, kneeAngle: 96 }));
+    interpreter.processPose(makeSquatFrame({ timestampMs: 260, kneeAngle: 96 }));
+    const state = interpreter.processPose(makeSquatFrame({ timestampMs: 400, kneeAngle: 142 }));
+
+    expect(state.reps).toBe(0);
+    expect(state.validReps).toBe(0);
+    expect(state.phase).toBe('ascending');
+  });
+
+  it('warns when validating squats away from the side camera angle', () => {
+    const interpreter = createRepValidatingMovementInterpreter('squat', { cameraAngle: 'front' });
+
+    interpreter.processPose(makeSquatFrame({ timestampMs: 0, kneeAngle: 168 }));
+    const state = interpreter.processPose(makeSquatFrame({ timestampMs: 120, kneeAngle: 138 }));
+
+    expect(state.warnings.some((warning) => warning.code === 'camera_angle_experimental')).toBe(
+      true,
+    );
   });
 });

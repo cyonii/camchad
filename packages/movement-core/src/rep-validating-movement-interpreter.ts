@@ -28,6 +28,8 @@ interface FloorPressValidationConfig {
   readonly bottomElbowAngle: number;
   readonly maxBodyLineDeviation: number;
   readonly maxInvalidBodyLineDeviation: number;
+  readonly maxHandStackOffsetRatio: number;
+  readonly maxInvalidHandStackOffsetRatio: number;
   readonly minBottomHoldMs: number;
   readonly minPhaseVelocityDegPerSecond: number;
   readonly phaseHysteresisDegrees: number;
@@ -40,6 +42,8 @@ const floorBodyLineValidationConfig: FloorPressValidationConfig = {
   bottomElbowAngle: 122,
   maxBodyLineDeviation: 0.16,
   maxInvalidBodyLineDeviation: 0.28,
+  maxHandStackOffsetRatio: 1.1,
+  maxInvalidHandStackOffsetRatio: 1.55,
   minBottomHoldMs: 80,
   minPhaseVelocityDegPerSecond: 12,
   phaseHysteresisDegrees: 8,
@@ -136,6 +140,9 @@ class FloorBodyLineValidationInterpreter implements MovementInterpreter {
       Math.abs(elbowVelocityValue) >= this.config.minPhaseVelocityDegPerSecond;
     const primaryJointRange = elbowStats.range;
     const wristShoulderOffsetRatio = Math.abs(sample.wrist.x - sample.shoulder.x) / bodyState.scale;
+    const hasHandPositionWarning = wristShoulderOffsetRatio > this.config.maxHandStackOffsetRatio;
+    const hasInvalidHandPosition =
+      wristShoulderOffsetRatio > this.config.maxInvalidHandStackOffsetRatio;
     const lockoutScore = jointLockoutScore(
       elbowAngle,
       this.config.bottomElbowAngle,
@@ -190,9 +197,12 @@ class FloorBodyLineValidationInterpreter implements MovementInterpreter {
       shoulderY: sample.shoulder.y,
       hipY: sample.hip.y,
     };
-    this.warnings = this.buildWarnings(hasAlignmentWarning);
+    this.warnings = this.buildWarnings({
+      hasAlignmentWarning,
+      hasHandPositionWarning,
+    });
 
-    if (hasInvalidAlignment) {
+    if (hasInvalidAlignment || hasInvalidHandPosition) {
       this.phaseMachine.setPhase('invalid_form');
       this.recognition = this.buildRecognition('active');
       return this.getState();
@@ -266,13 +276,23 @@ class FloorBodyLineValidationInterpreter implements MovementInterpreter {
     };
   }
 
-  private buildWarnings(hasAlignmentWarning: boolean): FormWarning[] {
+  private buildWarnings(input: {
+    readonly hasAlignmentWarning: boolean;
+    readonly hasHandPositionWarning: boolean;
+  }): FormWarning[] {
     const warnings: FormWarning[] = [];
 
-    if (hasAlignmentWarning) {
+    if (input.hasAlignmentWarning) {
       warnings.push({
         code: 'body_alignment',
         message: 'Keep shoulders, hips, and ankles in a straighter line.',
+      });
+    }
+
+    if (input.hasHandPositionWarning) {
+      warnings.push({
+        code: 'hand_position',
+        message: 'Stack hands closer under the shoulders so depth and lockout stay measurable.',
       });
     }
 
@@ -540,6 +560,7 @@ interface StandingKneeBendValidationConfig {
   readonly maxSplitStanceRatio: number;
   readonly maxHingeInclinationDegrees: number;
   readonly minHingeKneeAngle: number;
+  readonly minLowerBodyCoverage: number;
   readonly minBottomHoldMs: number;
   readonly minPhaseVelocityDegPerSecond: number;
   readonly phaseHysteresisDegrees: number;
@@ -555,6 +576,7 @@ const standingKneeBendValidationConfig: StandingKneeBendValidationConfig = {
   maxSplitStanceRatio: 1.2,
   maxHingeInclinationDegrees: 45,
   minHingeKneeAngle: 142,
+  minLowerBodyCoverage: 0.58,
   minBottomHoldMs: 80,
   minPhaseVelocityDegPerSecond: 12,
   phaseHysteresisDegrees: 8,
@@ -762,7 +784,10 @@ class StandingKneeBendValidationInterpreter implements MovementInterpreter {
       bottomHoldMs: this.phaseMachine.lastBottomHoldMs,
       fatigueScore: fatigueSignal,
     };
-    this.warnings = this.buildWarnings(hasPostureWarning);
+    this.warnings = this.buildWarnings({
+      hasPostureWarning,
+      hasLowerBodyCoverageWarning: bodyState.coverage.lowerBody < this.config.minLowerBodyCoverage,
+    });
 
     const transition = this.phaseMachine.update({
       signal: kneeAngle,
@@ -821,13 +846,30 @@ class StandingKneeBendValidationInterpreter implements MovementInterpreter {
     };
   }
 
-  private buildWarnings(hasPostureWarning: boolean): FormWarning[] {
+  private buildWarnings(input: {
+    readonly hasPostureWarning: boolean;
+    readonly hasLowerBodyCoverageWarning: boolean;
+  }): FormWarning[] {
     const warnings: FormWarning[] = [];
 
-    if (hasPostureWarning) {
+    if (input.hasPostureWarning) {
       warnings.push({
         code: 'posture_alignment',
         message: 'Keep your torso controlled and avoid collapsing forward.',
+      });
+    }
+
+    if (input.hasLowerBodyCoverageWarning) {
+      warnings.push({
+        code: 'lower_body_visibility',
+        message: 'Keep hips, knees, ankles, and feet visible before trusting squat depth.',
+      });
+    }
+
+    if (this.config.cameraAngle !== 'side') {
+      warnings.push({
+        code: 'camera_angle_experimental',
+        message: 'Side view is more reliable for squat depth and torso control.',
       });
     }
 

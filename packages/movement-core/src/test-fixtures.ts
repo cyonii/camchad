@@ -15,6 +15,8 @@ interface PushUpFrameOptions {
   readonly visibility?: number;
   readonly leftVisibility?: number;
   readonly rightVisibility?: number;
+  readonly wristOffsetX?: number;
+  readonly ankleOffsetY?: number;
 }
 
 interface SquatFrameOptions {
@@ -234,11 +236,12 @@ export function makePushUpFrame(options: PushUpFrameOptions): PoseFrame {
   };
   const radians = ((180 - options.elbowAngle) * Math.PI) / 180;
   const wrist = {
-    x: elbow.x + Math.cos(radians) * forearmLength,
+    x: elbow.x + Math.cos(radians) * forearmLength + (options.wristOffsetX ?? 0),
     y: elbow.y + Math.sin(radians) * forearmLength,
   };
   const hipY = 0.5 + (options.hipOffsetY ?? 0);
-  const left = sideLandmarks('left', shoulder, elbow, wrist, hipY, leftVisibility);
+  const ankleY = hipY + (options.ankleOffsetY ?? 0);
+  const left = sideLandmarks('left', shoulder, elbow, wrist, hipY, leftVisibility, ankleY);
   const right = sideLandmarks(
     'right',
     { x: shoulder.x, y: shoulder.y + 0.01 },
@@ -246,6 +249,7 @@ export function makePushUpFrame(options: PushUpFrameOptions): PoseFrame {
     { x: wrist.x, y: wrist.y + 0.01 },
     hipY + 0.01,
     rightVisibility,
+    ankleY + 0.01,
   );
 
   return {
@@ -477,6 +481,7 @@ function sideLandmarks(
   wrist: { readonly x: number; readonly y: number },
   hipY: number,
   visibility: number,
+  ankleY = hipY,
 ): PoseLandmark[] {
   const names = {
     shoulder: `${side}_shoulder` as LandmarkName,
@@ -493,7 +498,7 @@ function sideLandmarks(
     landmark(names.wrist, wrist.x, wrist.y, visibility),
     landmark(names.hip, 0.5, hipY, visibility),
     landmark(names.knee, 0.68, hipY, visibility),
-    landmark(names.ankle, 0.86, hipY, visibility),
+    landmark(names.ankle, 0.86, ankleY, visibility),
   ];
 }
 

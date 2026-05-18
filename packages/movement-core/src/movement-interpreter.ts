@@ -53,7 +53,9 @@ export interface FormWarning {
     | 'tracking_lost'
     | 'low_confidence'
     | 'body_alignment'
+    | 'hand_position'
     | 'posture_alignment'
+    | 'lower_body_visibility'
     | 'partial_depth'
     | 'range_of_motion'
     | 'camera_angle_experimental';
