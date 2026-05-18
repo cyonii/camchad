@@ -133,6 +133,9 @@ interface CameraStreamInfo {
   readonly height?: number;
   readonly frameRate?: number;
   readonly deviceId?: string;
+  readonly requestedWidth?: number;
+  readonly requestedHeight?: number;
+  readonly requestedFrameRate?: number;
 }
 
 export interface ActivityAssets {
@@ -1000,7 +1003,7 @@ function ActivityView({
         video: cameraCaptureConstraints(settingsPreferences),
         audio: false,
       });
-      setCameraStreamInfo(cameraStreamInfoFor(stream));
+      setCameraStreamInfo(cameraStreamInfoFor(stream, settingsPreferences));
       const video = videoRef.current;
 
       if (!video) {
@@ -1021,6 +1024,7 @@ function ActivityView({
         'Camera stream opened, but playback did not start. Stop tracking and try again.',
       );
       await waitForVideoFrame(video);
+      setCameraStreamInfo(cameraStreamInfoFor(stream, settingsPreferences));
 
       if (startTokenRef.current !== startToken) {
         setCameraStreamInfo(undefined);
@@ -1113,6 +1117,49 @@ function ActivityView({
     platform.cameraPermission,
     preferredCameraAngle,
     processFrame,
+    settingsPreferences.cameraDeviceId,
+    settingsPreferences.cameraFrameRate,
+    settingsPreferences.cameraResolution,
+  ]);
+
+  useEffect(() => {
+    if (!isPreviewActive) {
+      return;
+    }
+
+    const stream = mediaStreamForVideo(videoRef.current);
+    const [track] = stream?.getVideoTracks() ?? [];
+
+    if (!stream || !track) {
+      return;
+    }
+
+    const activeStream = stream;
+    let isCancelled = false;
+
+    const applyCapturePreferences = async (): Promise<void> => {
+      try {
+        await track.applyConstraints(cameraLiveCaptureConstraints(settingsPreferences));
+
+        if (!isCancelled) {
+          setCameraError(undefined);
+          setCameraStreamInfo(cameraStreamInfoFor(activeStream, settingsPreferences));
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setCameraStreamInfo(cameraStreamInfoFor(activeStream, settingsPreferences));
+          setCameraError(describeCameraSettingsError(error, settingsPreferences));
+        }
+      }
+    };
+
+    void applyCapturePreferences();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    isPreviewActive,
     settingsPreferences.cameraDeviceId,
     settingsPreferences.cameraFrameRate,
     settingsPreferences.cameraResolution,
@@ -3904,25 +3951,52 @@ function cameraResolutionConstraints(
   return {};
 }
 
+function cameraFrameRateConstraints(
+  frameRate: SettingsFrameRate,
+): MediaTrackConstraints['frameRate'] {
+  const target = Number(frameRate);
+
+  return {
+    min: target === 60 ? 54 : 27,
+    ideal: target,
+    max: target + 1,
+  };
+}
+
 function cameraCaptureConstraints(preferences: AppSettingsPreferences): MediaTrackConstraints {
   return {
-    ...cameraResolutionConstraints(preferences.cameraResolution),
-    frameRate: { ideal: Number(preferences.cameraFrameRate) },
+    ...cameraLiveCaptureConstraints(preferences),
     ...(preferences.cameraDeviceId
       ? { deviceId: { exact: preferences.cameraDeviceId } }
       : { facingMode: 'user' }),
   };
 }
 
-function cameraStreamInfoFor(stream: MediaStream): CameraStreamInfo {
+function cameraLiveCaptureConstraints(
+  preferences: AppSettingsPreferences,
+): Pick<MediaTrackConstraints, 'width' | 'height' | 'frameRate'> {
+  return {
+    ...cameraResolutionConstraints(preferences.cameraResolution),
+    frameRate: cameraFrameRateConstraints(preferences.cameraFrameRate),
+  };
+}
+
+function cameraStreamInfoFor(
+  stream: MediaStream,
+  preferences: AppSettingsPreferences,
+): CameraStreamInfo {
   const [track] = stream.getVideoTracks();
   const settings = track?.getSettings();
+  const requestedResolution = cameraResolutionFor(preferences.cameraResolution);
 
   return {
     width: settings?.width,
     height: settings?.height,
     frameRate: settings?.frameRate,
     deviceId: settings?.deviceId,
+    requestedWidth: requestedResolution?.width,
+    requestedHeight: requestedResolution?.height,
+    requestedFrameRate: Number(preferences.cameraFrameRate),
   };
 }
 
@@ -3931,9 +4005,36 @@ function formatCameraStreamInfo(info: CameraStreamInfo | undefined): string {
     return 'Capture pending';
   }
 
-  const frameRate = info.frameRate ? ` / ${Math.round(info.frameRate)} FPS` : '';
+  const requestedResolution =
+    info.requestedWidth && info.requestedHeight
+      ? `${info.requestedWidth} x ${info.requestedHeight}`
+      : undefined;
+  const actualResolution = `${info.width} x ${info.height}`;
+  const resolution =
+    requestedResolution && requestedResolution !== actualResolution
+      ? `${actualResolution} (${requestedResolution} requested)`
+      : actualResolution;
+  const actualFrameRate = info.frameRate ? Math.round(info.frameRate) : undefined;
+  const requestedFrameRate = info.requestedFrameRate;
+  const frameRate = actualFrameRate
+    ? ` / ${actualFrameRate} FPS${requestedFrameRate && actualFrameRate !== requestedFrameRate ? ` (${requestedFrameRate} requested)` : ''}`
+    : '';
 
-  return `${info.width} x ${info.height}${frameRate}`;
+  return `${resolution}${frameRate}`;
+}
+
+function cameraResolutionFor(
+  resolution: SettingsResolution,
+): { readonly width: number; readonly height: number } | undefined {
+  if (resolution === '1080p') {
+    return { width: 1920, height: 1080 };
+  }
+
+  if (resolution === '720p') {
+    return { width: 1280, height: 720 };
+  }
+
+  return undefined;
 }
 
 function clampNumber(
@@ -3977,6 +4078,22 @@ function describeCameraStartupError(error: unknown): string {
   }
 
   return error instanceof Error ? error.message : 'Unable to start camera tracking.';
+}
+
+function describeCameraSettingsError(error: unknown, preferences: AppSettingsPreferences): string {
+  const requestedResolution = cameraResolutionFor(preferences.cameraResolution);
+  const requestedCapture = [
+    requestedResolution ? `${requestedResolution.width} x ${requestedResolution.height}` : 'auto',
+    `${preferences.cameraFrameRate} FPS`,
+  ].join(' / ');
+
+  if (error instanceof DOMException && error.name === 'OverconstrainedError') {
+    return `The active camera does not support the selected capture target (${requestedCapture}). Choose a lower camera setting or select another camera.`;
+  }
+
+  return error instanceof Error
+    ? `Could not apply camera settings (${requestedCapture}): ${error.message}`
+    : `Could not apply camera settings (${requestedCapture}).`;
 }
 
 function NavButton({
@@ -4870,12 +4987,15 @@ function stopCamera(video: HTMLVideoElement | null): void {
     return;
   }
 
-  const stream = video.srcObject as MediaStream | null;
-  stopMediaStream(stream);
+  stopMediaStream(mediaStreamForVideo(video) ?? null);
   video.pause();
   video.removeAttribute('src');
   video.srcObject = null;
   video.load();
+}
+
+function mediaStreamForVideo(video: HTMLVideoElement | null): MediaStream | undefined {
+  return video?.srcObject instanceof MediaStream ? video.srcObject : undefined;
 }
 
 function stopMediaStream(stream: MediaStream | null): void {
