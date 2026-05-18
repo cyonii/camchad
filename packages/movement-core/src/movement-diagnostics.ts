@@ -46,17 +46,53 @@ export interface MovementDiagnosticsSnapshot {
 }
 
 export function diagnoseMovement(input: MovementDiagnosticsInput): MovementDiagnosticsSnapshot {
-  const events = [
-    ...trackingEvents(input),
-    ...interpreterEvents(input),
-    conditionsUsableEvent(input),
-  ].filter((event): event is MovementGuidanceEvent => event !== undefined);
+  const events = prioritizeGuidanceEvents(
+    [...trackingEvents(input), ...interpreterEvents(input), conditionsUsableEvent(input)].filter(
+      (event): event is MovementGuidanceEvent => event !== undefined,
+    ),
+  );
 
   return {
     events,
     primary: events[0],
   };
 }
+
+export function prioritizeGuidanceEvents(
+  events: readonly MovementGuidanceEvent[],
+): readonly MovementGuidanceEvent[] {
+  return [...events].sort((a, b) => guidanceRank(a) - guidanceRank(b));
+}
+
+function guidanceRank(event: MovementGuidanceEvent): number {
+  const baseRank = guidanceCodePriority[event.code] ?? 80;
+  const severityAdjustment = event.severity === 'warning' ? 0 : 8;
+  const confidenceAdjustment = Math.round((1 - event.confidence) * 4);
+
+  return baseRank + severityAdjustment + confidenceAdjustment;
+}
+
+const guidanceCodePriority: Record<MovementGuidanceCode, number> = {
+  tracking_lost: 10,
+  recent_tracking_gap: 16,
+  full_body_not_visible: 20,
+  torso_occluded: 24,
+  camera_too_low: 26,
+  camera_too_close: 28,
+  camera_too_far: 30,
+  body_near_edge: 32,
+  unstable_camera_distance: 36,
+  frame_drift: 38,
+  landmark_jitter: 40,
+  hands_missing: 44,
+  feet_missing: 46,
+  side_angle_recommended: 50,
+  front_angle_recommended: 50,
+  orientation_mismatch: 54,
+  low_confidence: 60,
+  movement_uncertain: 70,
+  conditions_usable: 100,
+};
 
 function trackingEvents(input: MovementDiagnosticsInput): readonly MovementGuidanceEvent[] {
   const events: MovementGuidanceEvent[] = [];

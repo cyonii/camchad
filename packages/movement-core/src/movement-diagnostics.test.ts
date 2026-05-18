@@ -49,6 +49,38 @@ describe('diagnoseMovement', () => {
     expect(diagnostics.events.some((event) => event.code === 'recent_tracking_gap')).toBe(true);
   });
 
+  it('prioritizes actionable framing guidance over lower-severity informational events', () => {
+    const bodyState = extractBodyState(makePushUpFrame({ timestampMs: 0, elbowAngle: 150 }));
+
+    if (!bodyState) {
+      throw new Error('Expected fixture to produce body state.');
+    }
+
+    const diagnostics = diagnoseMovement({
+      activityState: {
+        state: 'unknown',
+        confidence: 0.84,
+        motionMagnitude: 0.7,
+        evidence: ['body_motion_threshold'],
+      },
+      window: snapshotWithBodyState({
+        ...bodyState,
+        coverage: {
+          ...bodyState.coverage,
+          fullBody: 0.42,
+        },
+      }),
+    });
+
+    expect(diagnostics.primary).toMatchObject({
+      code: 'full_body_not_visible',
+      severity: 'warning',
+    });
+    expect(diagnostics.events.at(-1)).toMatchObject({
+      code: 'conditions_usable',
+    });
+  });
+
   it('surfaces orientation mismatch evidence from an interpreter state', () => {
     const diagnostics = diagnoseMovement({
       activityState: {
