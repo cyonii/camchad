@@ -46,6 +46,7 @@ packages/
 docs/
   ENGINE_PIPELINE.md
   MOVEMENT_THRESHOLDS.md
+  QUALITY_GATES.md
 ```
 
 The app shells should stay thin. Product behavior belongs in shared packages unless it is truly platform-specific.
@@ -73,6 +74,7 @@ Important engine concepts:
 - `MovementInterpreterState`: current recognition, phase, rep counts, warnings, and metrics for one movement profile.
 
 See [docs/ENGINE_PIPELINE.md](docs/ENGINE_PIPELINE.md) for the full architecture notes.
+See [docs/QUALITY_GATES.md](docs/QUALITY_GATES.md) for movement promotion, confidence language, privacy, and release-readiness gates.
 
 ## Movement Coverage
 
