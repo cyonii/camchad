@@ -109,7 +109,7 @@ type RoutingMode = 'browser' | 'memory';
 type ThemePreference = 'system' | 'light' | 'dark';
 type TelemetryMode = 'fixed' | 'engraved';
 type SettingsResolution = 'auto' | '720p' | '1080p';
-type SettingsFrameRate = '30' | '60';
+type SettingsFrameRate = 'auto' | '30' | '60';
 type SettingsPositionGuide = 'auto' | 'side' | 'front';
 type ExerciseCatalogFilter =
   | 'all'
@@ -205,7 +205,7 @@ const movementMaturityStates: readonly {
 const defaultSettingsPreferences: AppSettingsPreferences = {
   cameraDeviceId: undefined,
   cameraResolution: '720p',
-  cameraFrameRate: '30',
+  cameraFrameRate: 'auto',
   cameraMirror: false,
   cameraPositionGuide: 'auto',
   skeletonVisible: true,
@@ -2573,11 +2573,15 @@ function SettingsView({
               ]}
             />
           </SettingsRow>
-          <SettingsRow label="Frame rate" description="30 FPS is stable for most local analysis.">
+          <SettingsRow
+            label="Frame rate"
+            description="Auto lets the camera choose a stable capture rate; 30 and 60 FPS are preferred targets when supported."
+          >
             <SettingsSelect
               value={preferences.cameraFrameRate}
               onChange={(value) => updatePreference('cameraFrameRate', value as SettingsFrameRate)}
               options={[
+                ['auto', 'Auto'],
                 ['30', '30 FPS'],
                 ['60', '60 FPS'],
               ]}
@@ -3810,7 +3814,7 @@ function isSettingsResolution(value: unknown): value is SettingsResolution {
 }
 
 function isSettingsFrameRate(value: unknown): value is SettingsFrameRate {
-  return value === '30' || value === '60';
+  return value === 'auto' || value === '30' || value === '60';
 }
 
 function isSettingsPositionGuide(value: unknown): value is SettingsPositionGuide {
@@ -3956,12 +3960,14 @@ function cameraResolutionConstraints(
 function cameraFrameRateConstraints(
   frameRate: SettingsFrameRate,
 ): MediaTrackConstraints['frameRate'] {
+  if (frameRate === 'auto') {
+    return undefined;
+  }
+
   const target = Number(frameRate);
 
   return {
-    min: target === 60 ? 54 : 27,
     ideal: target,
-    max: target + 1,
   };
 }
 
@@ -3977,9 +3983,11 @@ function cameraCaptureConstraints(preferences: AppSettingsPreferences): MediaTra
 function cameraLiveCaptureConstraints(
   preferences: AppSettingsPreferences,
 ): Pick<MediaTrackConstraints, 'width' | 'height' | 'frameRate'> {
+  const frameRate = cameraFrameRateConstraints(preferences.cameraFrameRate);
+
   return {
     ...cameraResolutionConstraints(preferences.cameraResolution),
-    frameRate: cameraFrameRateConstraints(preferences.cameraFrameRate),
+    ...(frameRate ? { frameRate } : {}),
   };
 }
 
@@ -3998,7 +4006,8 @@ function cameraStreamInfoFor(
     deviceId: settings?.deviceId,
     requestedWidth: requestedResolution?.width,
     requestedHeight: requestedResolution?.height,
-    requestedFrameRate: Number(preferences.cameraFrameRate),
+    requestedFrameRate:
+      preferences.cameraFrameRate === 'auto' ? undefined : Number(preferences.cameraFrameRate),
   };
 }
 
@@ -4086,7 +4095,7 @@ function describeCameraSettingsError(error: unknown, preferences: AppSettingsPre
   const requestedResolution = cameraResolutionFor(preferences.cameraResolution);
   const requestedCapture = [
     requestedResolution ? `${requestedResolution.width} x ${requestedResolution.height}` : 'auto',
-    `${preferences.cameraFrameRate} FPS`,
+    preferences.cameraFrameRate === 'auto' ? 'auto FPS' : `${preferences.cameraFrameRate} FPS`,
   ].join(' / ');
 
   if (error instanceof DOMException && error.name === 'OverconstrainedError') {
