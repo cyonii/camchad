@@ -18,6 +18,59 @@ describe('movementRegistry profiles', () => {
     }
   });
 
+  it('keeps movement definition schema internally consistent', () => {
+    const types = new Set<string>();
+
+    for (const movement of movementRegistry) {
+      expect(types.has(movement.type)).toBe(false);
+      types.add(movement.type);
+
+      expect(movement.label.trim()).toBeTruthy();
+      expect(movement.pluralLabel.trim()).toBeTruthy();
+      expect(movement.repLabel.trim()).toBeTruthy();
+      expect(movement.repPluralLabel.trim()).toBeTruthy();
+      expect(movement.profile.maturity).toBe(movement.maturity);
+      expect(movement.supportedCameraAngles).toContain(movement.defaultCameraAngle);
+      expect(movement.supportedCameraAngles).toContain(movement.cameraGuidance.recommendedAngle);
+      expect(movement.cameraGuidance.usableTitle.trim()).toBeTruthy();
+      expect(movement.cameraGuidance.usableMessage.trim()).toBeTruthy();
+      expect(movement.cameraGuidance.warningTitle.trim()).toBeTruthy();
+      expect(movement.cameraGuidance.warningMessage.trim()).toBeTruthy();
+      if (movement.maturity !== 'rep_validating') {
+        expect(movement.profile.telemetrySignals).toEqual(
+          expect.arrayContaining([...movement.analysisSignals]),
+        );
+      }
+      if (movement.maturity !== 'rep_validating') {
+        expect(movement.profile.telemetryExtractors.map((extractor) => extractor.key)).toEqual(
+          expect.arrayContaining(
+            movement.profile.telemetrySignals.map((signal) =>
+              signal
+                .toLowerCase()
+                .replaceAll(/[^a-z0-9]+/g, '_')
+                .replaceAll(/^_|_$/g, ''),
+            ),
+          ),
+        );
+      }
+    }
+  });
+
+  it('requires executable criteria only for implemented movement profiles', () => {
+    for (const movement of movementRegistry) {
+      const recognitionSources = movement.profile.recognitionCriteria.map(
+        (criterion) => criterion.source,
+      );
+
+      if (movement.maturity === 'planned') {
+        expect(recognitionSources.every((source) => source === 'planned')).toBe(true);
+      } else {
+        expect(recognitionSources).toContain('declarative');
+        expect(recognitionSources).not.toContain('planned');
+      }
+    }
+  });
+
   it('records maturity explicitly without embedding interpreter construction', () => {
     expect(movementDefinitionFor('push_up').profile).toMatchObject({
       maturity: 'rep_validating',
