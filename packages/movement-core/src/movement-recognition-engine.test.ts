@@ -143,6 +143,72 @@ describe('MovementRecognitionEngine', () => {
     ).toBe('candidate');
   });
 
+  it('uses hysteresis before switching the primary movement', () => {
+    const squat = sequencedInterpreter([
+      movementState({
+        movementType: 'squat',
+        recognition: {
+          movementType: 'squat',
+          confidence: 0.82,
+          status: 'active',
+          evidence: ['squat_signal'],
+        },
+      }),
+      movementState({
+        movementType: 'squat',
+        recognition: {
+          movementType: 'squat',
+          confidence: 0.72,
+          status: 'active',
+          evidence: ['squat_signal'],
+        },
+      }),
+      movementState({
+        movementType: 'squat',
+        recognition: {
+          movementType: 'squat',
+          confidence: 0.5,
+          status: 'candidate',
+          evidence: ['squat_signal'],
+        },
+      }),
+    ]);
+    const lunge = sequencedInterpreter([
+      movementState({
+        movementType: 'lunge',
+        recognition: {
+          movementType: 'lunge',
+          confidence: 0.3,
+          status: 'candidate',
+          evidence: ['lunge_signal'],
+        },
+      }),
+      movementState({
+        movementType: 'lunge',
+        recognition: {
+          movementType: 'lunge',
+          confidence: 0.78,
+          status: 'active',
+          evidence: ['lunge_signal'],
+        },
+      }),
+      movementState({
+        movementType: 'lunge',
+        recognition: {
+          movementType: 'lunge',
+          confidence: 0.88,
+          status: 'active',
+          evidence: ['lunge_signal'],
+        },
+      }),
+    ]);
+    const engine = new MovementRecognitionEngine([squat, lunge]);
+
+    expect(engine.processPose(undefined).primary.movementType).toBe('squat');
+    expect(engine.processPose(undefined).primary.movementType).toBe('squat');
+    expect(engine.processPose(undefined).primary.movementType).toBe('lunge');
+  });
+
   it('marks inference as unknown when no candidate has enough confidence', () => {
     const engine = new MovementRecognitionEngine([
       fakeInterpreter(

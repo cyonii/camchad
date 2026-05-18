@@ -51,9 +51,11 @@ export interface MovementRecognitionEngineOptions {
 
 const unknownConfidenceThreshold = 0.32;
 const ambiguityConfidenceGap = 0.08;
+const primarySwitchHysteresisGap = 0.12;
 
 export class MovementRecognitionEngine {
   private lastState: MovementRecognitionEngineState;
+  private lastPrimaryMovementType?: MovementType;
   private readonly candidateConfidence = new Map<MovementType, TemporalConfidenceAccumulator>();
   private readonly profileWindow = createMovementProfileWindow({ maxAgeMs: 1400 });
   private readonly definitionsByType: ReadonlyMap<MovementType, MovementDefinition>;
@@ -91,6 +93,7 @@ export class MovementRecognitionEngine {
     }
 
     this.candidateConfidence.clear();
+    this.lastPrimaryMovementType = undefined;
     this.profileWindow.reset();
     this.lastState = this.buildState(
       this.interpreters.map((interpreter) => interpreter.getState()),
@@ -104,17 +107,55 @@ export class MovementRecognitionEngine {
   private buildState(
     candidates: readonly MovementInterpreterState[],
   ): MovementRecognitionEngineState {
-    const primary = [...candidates].sort(compareMovementCandidates)[0];
+    const rankedCandidates = [...candidates].sort(compareMovementCandidates);
+    const primary = this.selectPrimaryCandidate(rankedCandidates);
 
     if (!primary) {
       throw new Error('MovementRecognitionEngine requires at least one movement state.');
     }
+
+    this.lastPrimaryMovementType =
+      primary.recognition.status === 'tracking_lost' ? undefined : primary.movementType;
 
     return {
       primary,
       candidates,
       inference: inferMovementState(primary, candidates),
     };
+  }
+
+  private selectPrimaryCandidate(
+    rankedCandidates: readonly MovementInterpreterState[],
+  ): MovementInterpreterState | undefined {
+    const strongest = rankedCandidates[0];
+
+    if (!strongest || !this.lastPrimaryMovementType) {
+      return strongest;
+    }
+
+    const previousPrimary = rankedCandidates.find(
+      (candidate) => candidate.movementType === this.lastPrimaryMovementType,
+    );
+
+    if (
+      !previousPrimary ||
+      previousPrimary.recognition.status === 'tracking_lost' ||
+      previousPrimary.recognition.confidence < unknownConfidenceThreshold
+    ) {
+      return strongest;
+    }
+
+    const confidenceGap = strongest.recognition.confidence - previousPrimary.recognition.confidence;
+
+    if (
+      strongest.movementType !== previousPrimary.movementType &&
+      confidenceGap > 0 &&
+      confidenceGap < primarySwitchHysteresisGap
+    ) {
+      return previousPrimary;
+    }
+
+    return strongest;
   }
 
   private applyProfileCriteria(
