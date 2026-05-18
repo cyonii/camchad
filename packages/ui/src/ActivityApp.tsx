@@ -3105,6 +3105,7 @@ function SupportedExercisesView({
 
     return matchesFilter && matchesQuery;
   });
+  const visibleDefinitions = [...filteredDefinitions].sort(compareMovementDefinitionsForCatalog);
   const filterCount = (catalogFilter: ExerciseCatalogFilter): number =>
     movementRegistry.filter(
       (definition) =>
@@ -3155,7 +3156,7 @@ function SupportedExercisesView({
                 <h2 id="exercise-catalog-title">Available profiles</h2>
               </div>
               <small>
-                Showing {filteredDefinitions.length} of {movementRegistry.length}
+                Showing {visibleDefinitions.length} of {movementRegistry.length}
               </small>
             </div>
 
@@ -3231,12 +3232,12 @@ function SupportedExercisesView({
           </div>
 
           <div className="engine-definition-grid">
-            {filteredDefinitions.length === 0 ? (
+            {visibleDefinitions.length === 0 ? (
               <div className="engine-definition-empty">
                 No movement definitions match the current search and filter state.
               </div>
             ) : (
-              filteredDefinitions.map((definition) => (
+              visibleDefinitions.map((definition) => (
                 <EngineDefinitionRow
                   definition={definition}
                   exerciseGuideAssetBasePath={exerciseGuideAssetBasePath}
@@ -3293,6 +3294,7 @@ function EngineDefinitionRow({
   const guide = exerciseGuideFor(definition.type, exerciseGuideAssetBasePath);
   const maturityScore = movementMaturityScore(definition);
   const telemetryRichness = movementTelemetryRichness(definition);
+  const planningPriority = movementPlanningPriority(definition);
 
   return (
     <button
@@ -3326,7 +3328,11 @@ function EngineDefinitionRow({
         <div className="engine-definition-metadata">
           <span>{telemetryRichness}% telemetry</span>
           <span>{definition.supportedCameraAngles.length} camera angles</span>
-          <span>{movementComplexityLabel(definition)}</span>
+          <span>
+            {definition.maturity === 'planned'
+              ? `${planningPriority.label} priority`
+              : movementComplexityLabel(definition)}
+          </span>
         </div>
       </div>
     </button>
@@ -3373,6 +3379,7 @@ function MovementDefinitionInspector({
   const maturitySteps = movementMaturitySteps(definition);
   const readinessChecklist = movementReadinessChecklist(definition);
   const validationGapReasons = movementValidationGapReasons(definition, readinessChecklist);
+  const planningPriority = movementPlanningPriority(definition);
 
   return (
     <aside className="movement-inspector" aria-label="Movement definition details">
@@ -3478,6 +3485,14 @@ function MovementDefinitionInspector({
           <span>Complexity</span>
           <strong>{movementComplexityLabel(definition)}</strong>
         </div>
+        {definition.maturity === 'planned' ? (
+          <div>
+            <span>Planned priority</span>
+            <strong>
+              {planningPriority.label} / {planningPriority.score}
+            </strong>
+          </div>
+        ) : null}
       </section>
 
       <section className="movement-inspector-card">
@@ -4409,6 +4424,56 @@ function movementComplexityLabel(definition: MovementDefinition): string {
   }
 
   return 'Calibration sensitive';
+}
+
+function compareMovementDefinitionsForCatalog(
+  first: MovementDefinition,
+  second: MovementDefinition,
+): number {
+  if (first.maturity === 'planned' && second.maturity === 'planned') {
+    return movementPlanningPriority(second).score - movementPlanningPriority(first).score;
+  }
+
+  if (first.maturity === 'planned') {
+    return 1;
+  }
+
+  if (second.maturity === 'planned') {
+    return -1;
+  }
+
+  return movementMaturityRank(second.maturity) - movementMaturityRank(first.maturity);
+}
+
+function movementPlanningPriority(definition: MovementDefinition): {
+  readonly score: number;
+  readonly label: 'High' | 'Medium' | 'Low';
+} {
+  if (definition.maturity !== 'planned') {
+    return { score: movementMaturityScore(definition), label: 'High' };
+  }
+
+  const cameraScore =
+    definition.profile.cameraSensitivity === 'low'
+      ? 24
+      : definition.profile.cameraSensitivity === 'medium'
+        ? 16
+        : 8;
+  const categoryScore =
+    definition.category === 'hold' ? 18 : definition.category === 'repetition' ? 16 : 10;
+  const regionScore = Math.max(4, 20 - definition.profile.requiredRegions.length * 2);
+  const telemetryScore = Math.min(18, definition.profile.telemetrySignals.length * 3);
+  const score = Math.min(100, cameraScore + categoryScore + regionScore + telemetryScore);
+
+  if (score >= 62) {
+    return { score, label: 'High' };
+  }
+
+  if (score >= 48) {
+    return { score, label: 'Medium' };
+  }
+
+  return { score, label: 'Low' };
 }
 
 function movementMaturitySteps(
