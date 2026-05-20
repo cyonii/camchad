@@ -7,9 +7,9 @@ const defaultNotificationDurationMs = 2600;
 export function AppNotificationToaster(): ReactElement {
   return (
     <Toaster
+      className="app-notification-region"
       position="top-center"
       expand={false}
-      closeButton
       richColors
       duration={defaultNotificationDurationMs}
       containerAriaLabel="App notifications"
@@ -18,7 +18,6 @@ export function AppNotificationToaster(): ReactElement {
         classNames: {
           title: 'app-notification-title',
           description: 'app-notification-description',
-          closeButton: 'app-notification-close',
         },
       }}
     />

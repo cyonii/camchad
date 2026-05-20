@@ -1,3 +1,5 @@
+@import 'sonner/dist/styles.css';
+
 :root,
 :root[data-theme='light'] {
   color-scheme: light;
@@ -216,6 +218,12 @@ button:disabled {
   opacity: 0.58;
 }
 
+.app-notification-region,
+section[aria-label^='App notifications'] {
+  position: fixed;
+  z-index: 999999;
+}
+
 .app-notification-toast {
   border-color: rgb(var(--primary-rgb) / 24%) !important;
   border-radius: 8px !important;
@@ -223,6 +231,15 @@ button:disabled {
   background: var(--surface-glass-strong) !important;
   box-shadow: 0 16px 40px var(--shadow) !important;
   backdrop-filter: blur(18px) saturate(1.18);
+}
+
+.app-notification-toast:has([data-description]) {
+  align-items: flex-start !important;
+}
+
+.app-notification-toast:has([data-description]) [data-icon] {
+  align-items: flex-start !important;
+  padding-top: 2px;
 }
 
 .app-notification-title {
@@ -233,12 +250,6 @@ button:disabled {
 
 .app-notification-description {
   color: var(--text-muted) !important;
-}
-
-.app-notification-close {
-  color: var(--text-muted) !important;
-  background: var(--card-surface-strong) !important;
-  border-color: rgb(var(--primary-rgb) / 22%) !important;
 }
 
 button,

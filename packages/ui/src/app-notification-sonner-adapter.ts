@@ -10,7 +10,7 @@ export const sonnerAppNotificationAdapter = {
       id: notification.id,
       description: notification.message,
       duration: notification.durationMs ?? defaultNotificationDurationMs,
-      closeButton: true,
+      closeButton: false,
     };
 
     toastForTone(notification.tone)(notification.title, options);
