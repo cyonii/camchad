@@ -17,4 +17,5 @@ apps/web/public/vendor/
 videos/
 release/
 out/
-.dev
+.dev/
+.continue/
