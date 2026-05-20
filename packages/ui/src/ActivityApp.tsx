@@ -587,6 +587,7 @@ export function ActivityApp({ assets, platform, routingMode }: ActivityAppProps)
             telemetryMode={telemetryMode}
             onTelemetryModeChange={changeTelemetryMode}
             settingsPreferences={settingsPreferences}
+            appNotifications={appNotifications}
           />
         </div>
         {view === 'history' ? <HistoryView sessions={sessions} summary={summary} /> : null}
@@ -691,6 +692,7 @@ function ActivityView({
   telemetryMode,
   onTelemetryModeChange,
   settingsPreferences,
+  appNotifications,
 }: {
   readonly assets: ActivityAssets;
   readonly platform: ActivityPlatform;
@@ -699,6 +701,7 @@ function ActivityView({
   readonly telemetryMode: TelemetryMode;
   readonly onTelemetryModeChange: (mode: TelemetryMode) => void;
   readonly settingsPreferences: AppSettingsPreferences;
+  readonly appNotifications: AppNotificationController;
 }): ReactElement {
   const preferredCameraAngle = cameraAngleForSettingsPreferences(settingsPreferences);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -1015,9 +1018,20 @@ function ActivityView({
 
   const startActivity = useCallback(async () => {
     if (startInFlightRef.current || isTracking) {
+      appNotifications.notify(
+        systemNotification(
+          'session-start',
+          'warning',
+          'warning',
+          isTracking ? 'Session already running' : 'Camera is already starting',
+        ),
+      );
       return;
     }
 
+    appNotifications.notify(
+      systemNotification('session-start', 'pending', 'info', 'Starting session'),
+    );
     const startToken = startTokenRef.current + 1;
     startTokenRef.current = startToken;
     startInFlightRef.current = true;
@@ -1127,6 +1141,15 @@ function ActivityView({
       estimatorRef.current = estimator;
       setIsTracking(true);
       setStatus('Calibrating');
+      appNotifications.notify(
+        systemNotification(
+          'session-start',
+          'success',
+          'success',
+          'Session started',
+          'Step into frame for calibration.',
+        ),
+      );
       animationFrameRef.current = requestAnimationFrame(processFrame);
     } catch (error) {
       if (startTokenRef.current !== startToken) {
@@ -1140,6 +1163,9 @@ function ActivityView({
       const message = describeCameraStartupError(error);
       setCameraError(message);
       setStatus('Setup needed');
+      appNotifications.notify(
+        systemNotification('session-start', 'error', 'error', 'Session could not start', message),
+      );
     } finally {
       if (startTokenRef.current === startToken) {
         startInFlightRef.current = false;
@@ -1149,6 +1175,7 @@ function ActivityView({
   }, [
     assets.modelAssetPath,
     assets.wasmAssetPath,
+    appNotifications,
     isTracking,
     onSessionSaved,
     platform.cameraPermission,
@@ -1207,6 +1234,14 @@ function ActivityView({
 
     if (!recorder) {
       setDeveloperTraceStatus('No pose trace is currently buffered.');
+      appNotifications.notify(
+        systemNotification(
+          'developer-pose-trace-export',
+          'warning',
+          'warning',
+          'No pose trace buffered',
+        ),
+      );
       return;
     }
 
@@ -1214,6 +1249,14 @@ function ActivityView({
 
     if (snapshot.samples.length === 0) {
       setDeveloperTraceStatus('No pose samples have been captured yet.');
+      appNotifications.notify(
+        systemNotification(
+          'developer-pose-trace-export',
+          'warning',
+          'warning',
+          'No pose samples captured',
+        ),
+      );
       return;
     }
 
@@ -1232,12 +1275,30 @@ function ActivityView({
       setDeveloperTraceStatus(
         `Saved ${trace.samples.length} samples to ${result.path ?? result.filename}.`,
       );
+      appNotifications.notify(
+        systemNotification(
+          'developer-pose-trace-export',
+          'success',
+          'success',
+          'Pose trace saved',
+          `${trace.samples.length} samples saved.`,
+        ),
+      );
       return;
     }
 
     const filename = downloadPoseTrace(trace);
     setDeveloperTraceStatus(`Downloaded ${trace.samples.length} pose samples as ${filename}.`);
-  }, [platform.developerTools, preferredCameraAngle]);
+    appNotifications.notify(
+      systemNotification(
+        'developer-pose-trace-export',
+        'success',
+        'success',
+        'Pose trace downloaded',
+        `${trace.samples.length} samples exported.`,
+      ),
+    );
+  }, [appNotifications, platform.developerTools, preferredCameraAngle]);
 
   const selectDeveloperBenchmarkVideo = useCallback(
     async (file: File | undefined): Promise<void> => {
@@ -1260,10 +1321,19 @@ function ActivityView({
       benchmarkVideoUrlRef.current = url;
       benchmarkVideoLabelRef.current = file.name;
       setDeveloperBenchmarkStatus(`Loaded benchmark video: ${file.name}`);
+      appNotifications.notify(
+        systemNotification(
+          'developer-benchmark-video',
+          'success',
+          'success',
+          'Benchmark video loaded',
+          file.name,
+        ),
+      );
 
       await waitForVideoMetadata(video);
     },
-    [],
+    [appNotifications],
   );
 
   const runDeveloperRuntimeBenchmark = useCallback(async (): Promise<void> => {
@@ -1282,16 +1352,27 @@ function ActivityView({
         : undefined;
 
     if (!video || video.readyState < HTMLMediaElement.HAVE_METADATA) {
-      setDeveloperBenchmarkStatus(
-        selectedVideo
-          ? 'Benchmark video is not ready yet.'
-          : 'Start the camera or select a local benchmark video first.',
+      const message = selectedVideo
+        ? 'Benchmark video is not ready yet.'
+        : 'Start the camera or select a local benchmark video first.';
+      setDeveloperBenchmarkStatus(message);
+      appNotifications.notify(
+        systemNotification(
+          'developer-runtime-benchmark',
+          'warning',
+          'warning',
+          'Benchmark not ready',
+          message,
+        ),
       );
       return;
     }
 
     setIsDeveloperBenchmarkRunning(true);
     setDeveloperBenchmarkStatus(`Benchmarking ${runtimeBenchmarkModelQualities.join(', ')}.`);
+    appNotifications.notify(
+      systemNotification('developer-runtime-benchmark', 'pending', 'info', 'Running benchmark'),
+    );
 
     try {
       if (selectedVideo) {
@@ -1333,9 +1414,26 @@ function ActivityView({
         : { filename: downloadRuntimeBenchmarkReport(report) };
 
       setDeveloperBenchmarkStatus(`Saved benchmark report to ${saved.path ?? saved.filename}.`);
+      appNotifications.notify(
+        systemNotification(
+          'developer-runtime-benchmark',
+          'success',
+          'success',
+          'Benchmark report saved',
+          saved.path ?? saved.filename,
+        ),
+      );
     } catch (error) {
-      setDeveloperBenchmarkStatus(
-        error instanceof Error ? error.message : 'Runtime benchmark failed.',
+      const message = error instanceof Error ? error.message : 'Runtime benchmark failed.';
+      setDeveloperBenchmarkStatus(message);
+      appNotifications.notify(
+        systemNotification(
+          'developer-runtime-benchmark',
+          'error',
+          'error',
+          'Benchmark failed',
+          message,
+        ),
       );
     } finally {
       setIsDeveloperBenchmarkRunning(false);
@@ -1346,12 +1444,27 @@ function ActivityView({
   }, [
     assets.modelAssetPath,
     assets.wasmAssetPath,
+    appNotifications,
     isDeveloperBenchmarkRunning,
     isPreviewActive,
     platform.developerTools,
   ]);
 
   const stopActivity = useCallback(async () => {
+    const hadActiveSession = isTracking || isStarting || isPreviewActive;
+    appNotifications.notify(
+      systemNotification(
+        'session-stop',
+        hadActiveSession ? 'pending' : 'warning',
+        hadActiveSession ? 'info' : 'warning',
+        hadActiveSession ? 'Stopping session' : 'No session is in progress',
+      ),
+    );
+
+    if (!hadActiveSession) {
+      return;
+    }
+
     startTokenRef.current += 1;
     startInFlightRef.current = false;
     setIsStarting(false);
@@ -1400,7 +1513,18 @@ function ActivityView({
     detectorStateRef.current = initialDetectorState;
     setDetectorState(initialDetectorState);
     setStatus('Ready');
-  }, [endActiveMovement, exportDeveloperPoseTrace, settingsPreferences.autoSaveSessions]);
+    appNotifications.notify(
+      systemNotification('session-stop', 'success', 'success', 'Session stopped'),
+    );
+  }, [
+    appNotifications,
+    endActiveMovement,
+    exportDeveloperPoseTrace,
+    isPreviewActive,
+    isStarting,
+    isTracking,
+    settingsPreferences.autoSaveSessions,
+  ]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
