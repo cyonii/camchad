@@ -31,7 +31,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   ActivitySessionService,
@@ -59,6 +59,10 @@ import {
 } from '@camchad/pose-core';
 
 import { deriveCameraFrameFeedback, impulseForRep } from './camera-frame-feedback.js';
+import { AppNotificationToaster } from './app-notification-adapter.js';
+import { createAppNotificationController } from './app-notification-controller.js';
+import { sonnerAppNotificationAdapter } from './app-notification-sonner-adapter.js';
+import { settingsNotification, systemNotification } from './app-notifications.js';
 import { buildHistoryChartModel } from './history-chart.js';
 import { buildSessionFatigueModel } from './history-fatigue.js';
 import { selectedHistorySession } from './history-session-selection.js';
@@ -94,6 +98,7 @@ import type {
   RuntimeBenchmarkReport,
   WindowChromeState,
 } from './platform.js';
+import type { AppNotificationController } from './app-notification-controller.js';
 const ActivityLogChart = lazy(async () => {
   const module = await import('./ActivityLogChart.js');
 
@@ -360,6 +365,10 @@ export function ActivityApp({ assets, platform, routingMode }: ActivityAppProps)
   const [settingsPreferences, setSettingsPreferences] = useState<AppSettingsPreferences>(() =>
     readSettingsPreferences(),
   );
+  const appNotifications = useMemo(
+    () => createAppNotificationController(sonnerAppNotificationAdapter),
+    [],
+  );
   const view = route.view;
 
   useEffect(() => {
@@ -442,6 +451,31 @@ export function ActivityApp({ assets, platform, routingMode }: ActivityAppProps)
     void platform.appLifecycle?.exit();
   }, [platform.appLifecycle]);
 
+  const changeThemePreference = useCallback(
+    (preference: ThemePreference): void => {
+      setThemePreference(preference);
+      appNotifications.notify(
+        settingsNotification('theme', 'success', 'success', `Theme set to ${preference}`),
+      );
+    },
+    [appNotifications],
+  );
+
+  const changeTelemetryMode = useCallback(
+    (mode: TelemetryMode): void => {
+      setTelemetryMode(mode);
+      appNotifications.notify(
+        settingsNotification(
+          'telemetryMode',
+          'success',
+          'success',
+          mode === 'fixed' ? 'Telemetry moved to sidebar' : 'Mirror HUD enabled',
+        ),
+      );
+    },
+    [appNotifications],
+  );
+
   const navigateTo = useCallback(
     (nextRoute: AppRoute): void => {
       setRoute(nextRoute);
@@ -470,6 +504,8 @@ export function ActivityApp({ assets, platform, routingMode }: ActivityAppProps)
         windowChromeState.isFocused ? '' : ' window-inactive'
       }`}
     >
+      <AppNotificationToaster />
+
       {shouldShowWindowChrome ? (
         <WindowChrome state={windowChromeState} controls={platform.windowControls} />
       ) : null}
@@ -529,7 +565,7 @@ export function ActivityApp({ assets, platform, routingMode }: ActivityAppProps)
           </div>
 
           <div className="sidebar-actions">
-            <ThemeCycleButton value={themePreference} onChange={setThemePreference} />
+            <ThemeCycleButton value={themePreference} onChange={changeThemePreference} />
             <button className="sidebar-icon-action exit-action" type="button" onClick={exitApp}>
               <Power size={18} aria-hidden="true" />
               <span>Exit</span>
@@ -549,7 +585,7 @@ export function ActivityApp({ assets, platform, routingMode }: ActivityAppProps)
             onSessionSaved={saveSession}
             onShellSessionTelemetryChange={setShellSessionTelemetry}
             telemetryMode={telemetryMode}
-            onTelemetryModeChange={setTelemetryMode}
+            onTelemetryModeChange={changeTelemetryMode}
             settingsPreferences={settingsPreferences}
           />
         </div>
@@ -569,14 +605,15 @@ export function ActivityApp({ assets, platform, routingMode }: ActivityAppProps)
             startupEnabled={startupEnabled}
             onStartupEnabledChange={setStartupEnabled}
             themePreference={themePreference}
-            onThemePreferenceChange={setThemePreference}
+            onThemePreferenceChange={changeThemePreference}
             telemetryMode={telemetryMode}
-            onTelemetryModeChange={setTelemetryMode}
+            onTelemetryModeChange={changeTelemetryMode}
             sessions={sessions}
             summary={summary}
             onHistoryChanged={loadHistory}
             preferences={settingsPreferences}
             onPreferencesChange={setSettingsPreferences}
+            appNotifications={appNotifications}
           />
         ) : null}
       </main>
@@ -2351,6 +2388,7 @@ function SettingsView({
   onHistoryChanged,
   preferences,
   onPreferencesChange,
+  appNotifications,
 }: {
   readonly platform: ActivityPlatform;
   readonly startupEnabled: boolean;
@@ -2364,6 +2402,7 @@ function SettingsView({
   readonly onHistoryChanged: () => Promise<void>;
   readonly preferences: AppSettingsPreferences;
   readonly onPreferencesChange: (preferences: AppSettingsPreferences) => void;
+  readonly appNotifications: AppNotificationController;
 }): ReactElement {
   const [reminderStatus, setReminderStatus] = useState('No reminder sent this session.');
   const [cameraStatus, setCameraStatus] = useState('Camera access has not been checked here.');
@@ -2401,6 +2440,10 @@ function SettingsView({
       ...preferences,
       [key]: value,
     });
+    const copy = settingsPreferenceNotificationCopy(key, value);
+    appNotifications.notify(
+      settingsNotification(String(key), 'success', 'success', copy.title, copy.message),
+    );
   };
 
   const refreshCameraDevices = useCallback(async () => {
@@ -2433,65 +2476,161 @@ function SettingsView({
   }, [refreshCameraDevices]);
 
   const toggleStartup = async (enabled: boolean) => {
-    await platform.settings?.setStartupEnabled(enabled);
-    onStartupEnabledChange(enabled);
+    appNotifications.notify(
+      settingsNotification('startup', 'pending', 'info', 'Updating startup setting'),
+    );
+
+    try {
+      await platform.settings?.setStartupEnabled(enabled);
+      onStartupEnabledChange(enabled);
+      appNotifications.notify(
+        settingsNotification(
+          'startup',
+          'success',
+          'success',
+          enabled ? 'Open on login enabled' : 'Open on login disabled',
+        ),
+      );
+    } catch {
+      appNotifications.notify(
+        settingsNotification('startup', 'error', 'error', 'Could not update startup setting'),
+      );
+    }
   };
 
   const checkCameraAccess = async (): Promise<void> => {
     setCameraStatus('Checking camera permission...');
-    const permission = await platform.cameraPermission?.ensureCameraPermission();
-    setCameraStatus(
-      permission?.granted
-        ? 'Camera access is available for this app.'
-        : (permission?.reason ?? 'Camera permission could not be verified.'),
+    appNotifications.notify(
+      systemNotification('camera-permission', 'pending', 'info', 'Checking camera access'),
     );
-    await refreshCameraDevices();
+
+    try {
+      const permission = await platform.cameraPermission?.ensureCameraPermission();
+      const message = permission?.granted
+        ? 'Camera access is available for this app.'
+        : (permission?.reason ?? 'Camera permission could not be verified.');
+      setCameraStatus(message);
+      appNotifications.notify(
+        systemNotification(
+          'camera-permission',
+          permission?.granted ? 'success' : 'warning',
+          permission?.granted ? 'success' : 'warning',
+          permission?.granted ? 'Camera access available' : 'Camera access not verified',
+          permission?.granted ? undefined : message,
+        ),
+      );
+      await refreshCameraDevices();
+    } catch {
+      const message = 'Camera permission could not be verified.';
+      setCameraStatus(message);
+      appNotifications.notify(
+        systemNotification('camera-permission', 'error', 'error', 'Camera check failed', message),
+      );
+    }
   };
 
   const exportSessionData = async (): Promise<void> => {
-    const exportedSessions = await platform.history.list();
-    const payload = JSON.stringify(
-      {
-        ...persistedActivityHistory(exportedSessions),
-        exportedAt: new Date().toISOString(),
-      },
-      null,
-      2,
+    appNotifications.notify(
+      systemNotification('history-export', 'pending', 'info', 'Preparing export'),
     );
-    const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `camchad-session-export-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    setDataStatus(`Exported ${exportedSessions.length} local sessions.`);
+
+    try {
+      const exportedSessions = await platform.history.list();
+      const payload = JSON.stringify(
+        {
+          ...persistedActivityHistory(exportedSessions),
+          exportedAt: new Date().toISOString(),
+        },
+        null,
+        2,
+      );
+      const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `camchad-session-export-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setDataStatus(`Exported ${exportedSessions.length} local sessions.`);
+      appNotifications.notify(
+        systemNotification(
+          'history-export',
+          'success',
+          'success',
+          'Session data exported',
+          `${exportedSessions.length} local session${exportedSessions.length === 1 ? '' : 's'} exported.`,
+        ),
+      );
+    } catch {
+      setDataStatus('Session data could not be exported.');
+      appNotifications.notify(
+        systemNotification('history-export', 'error', 'error', 'Export failed'),
+      );
+    }
   };
 
   const importSessionData = async (file: File): Promise<void> => {
-    const parsed = JSON.parse(await file.text()) as unknown;
-    const importedHistory = normalizeActivityHistory(parsed);
-    const importedSessions = importedHistory.sessions;
-
-    if (importedSessions.length === 0) {
-      setDataStatus('No supported CamChad v1 sessions were found in that backup.');
-      return;
-    }
-
-    const mergeSummary = await platform.history.merge(importedSessions);
-    await onHistoryChanged();
-    await refreshStorageInfo();
-    setDataStatus(
-      `Merged ${mergeSummary.importedSessions} imported sessions: ${mergeSummary.addedSessions} added, ${mergeSummary.updatedSessions} updated, ${mergeSummary.unchangedSessions} unchanged. ${mergeSummary.totalSessions} sessions stored locally.`,
+    appNotifications.notify(
+      systemNotification('history-import', 'pending', 'info', 'Reading backup'),
     );
+
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      const importedHistory = normalizeActivityHistory(parsed);
+      const importedSessions = importedHistory.sessions;
+
+      if (importedSessions.length === 0) {
+        const message = 'No supported CamChad v1 sessions were found in that backup.';
+        setDataStatus(message);
+        appNotifications.notify(
+          systemNotification(
+            'history-import',
+            'warning',
+            'warning',
+            'No sessions imported',
+            message,
+          ),
+        );
+        return;
+      }
+
+      const mergeSummary = await platform.history.merge(importedSessions);
+      await onHistoryChanged();
+      await refreshStorageInfo();
+      const message = `Merged ${mergeSummary.importedSessions} imported sessions: ${mergeSummary.addedSessions} added, ${mergeSummary.updatedSessions} updated, ${mergeSummary.unchangedSessions} unchanged. ${mergeSummary.totalSessions} sessions stored locally.`;
+      setDataStatus(message);
+      appNotifications.notify(
+        systemNotification('history-import', 'success', 'success', 'Backup imported', message),
+      );
+    } catch {
+      const message = 'Backup could not be imported. Choose a valid CamChad JSON export.';
+      setDataStatus(message);
+      appNotifications.notify(
+        systemNotification('history-import', 'error', 'error', 'Import failed', message),
+      );
+    }
   };
 
   const clearAllSessions = async (): Promise<void> => {
-    await platform.history.clear();
-    setConfirmClearSessions(false);
-    setConfirmClearCache(false);
-    await onHistoryChanged();
-    await refreshStorageInfo();
-    setDataStatus('All local session history has been cleared.');
+    appNotifications.notify(
+      systemNotification('history-clear', 'pending', 'info', 'Clearing sessions'),
+    );
+
+    try {
+      await platform.history.clear();
+      setConfirmClearSessions(false);
+      setConfirmClearCache(false);
+      await onHistoryChanged();
+      await refreshStorageInfo();
+      setDataStatus('All local session history has been cleared.');
+      appNotifications.notify(
+        systemNotification('history-clear', 'success', 'success', 'Session history cleared'),
+      );
+    } catch {
+      setDataStatus('Local session history could not be cleared.');
+      appNotifications.notify(
+        systemNotification('history-clear', 'error', 'error', 'Could not clear sessions'),
+      );
+    }
   };
 
   const clearInterfaceCache = (): void => {
@@ -2503,8 +2642,14 @@ function SettingsView({
       setConfirmClearSessions(false);
       setConfirmClearCache(false);
       setDataStatus('Interface preferences and cached UI state have been reset.');
+      appNotifications.notify(
+        systemNotification('interface-cache', 'success', 'success', 'Interface cache reset'),
+      );
     } catch {
       setDataStatus('Interface cache could not be reset in this environment.');
+      appNotifications.notify(
+        systemNotification('interface-cache', 'error', 'error', 'Could not reset interface cache'),
+      );
     }
   };
 
@@ -2887,6 +3032,37 @@ function SettingsView({
       </aside>
     </section>
   );
+}
+
+function settingsPreferenceNotificationCopy<Key extends keyof AppSettingsPreferences>(
+  key: Key,
+  value: AppSettingsPreferences[Key],
+): { readonly title: string; readonly message?: string } {
+  switch (key) {
+    case 'cameraDeviceId':
+      return {
+        title: 'Camera source updated',
+        message: value
+          ? 'Selected camera will be requested on the next preview.'
+          : 'Using the system default camera.',
+      };
+    case 'cameraResolution':
+      return { title: 'Resolution updated', message: `Capture target set to ${value}.` };
+    case 'cameraFrameRate':
+      return { title: 'Frame rate updated', message: `Capture target set to ${value}.` };
+    case 'cameraMirror':
+      return { title: value ? 'Mirror preview enabled' : 'Mirror preview disabled' };
+    case 'cameraPositionGuide':
+      return { title: 'Camera view preference updated', message: `Preference set to ${value}.` };
+    case 'skeletonVisible':
+      return { title: value ? 'Skeleton shown' : 'Skeleton hidden' };
+    case 'telemetryOpacity':
+      return { title: 'HUD opacity updated', message: `${value}% opacity.` };
+    case 'telemetryBlur':
+      return { title: 'HUD blur updated', message: `${value}px blur.` };
+    case 'autoSaveSessions':
+      return { title: value ? 'Auto-save enabled' : 'Auto-save disabled' };
+  }
 }
 
 function SettingsSection({

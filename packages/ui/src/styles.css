@@ -216,6 +216,31 @@ button:disabled {
   opacity: 0.58;
 }
 
+.app-notification-toast {
+  border-color: rgb(var(--primary-rgb) / 24%) !important;
+  border-radius: 8px !important;
+  color: var(--text) !important;
+  background: var(--surface-glass-strong) !important;
+  box-shadow: 0 16px 40px var(--shadow) !important;
+  backdrop-filter: blur(18px) saturate(1.18);
+}
+
+.app-notification-title {
+  color: var(--text) !important;
+  font-weight: 720 !important;
+  letter-spacing: 0;
+}
+
+.app-notification-description {
+  color: var(--text-muted) !important;
+}
+
+.app-notification-close {
+  color: var(--text-muted) !important;
+  background: var(--card-surface-strong) !important;
+  border-color: rgb(var(--primary-rgb) / 22%) !important;
+}
+
 button,
 .metric,
 .telemetry-panel,
